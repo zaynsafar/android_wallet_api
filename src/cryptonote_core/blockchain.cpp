@@ -107,8 +107,9 @@ static const uint64_t mainnet_hard_fork_version_1_till = 9;
 static const hard_fork_record testnet_hard_forks[] =
 {
   { 1, 1, 0, 1554197086},
-  { network_version_7, 10, 0, 1559474448 },
-  { network_version_8, 11, 0, 1559474449 } 
+  { network_version_7, 10, 0, 1548474448 },
+  { network_version_8, 11, 0, 1548474449 },
+  { network_version_11_infinite_staking, 12, 0, 1559474450 } 
 };
 static const uint64_t testnet_hard_fork_version_1_till = 9;
 
