@@ -1,5 +1,5 @@
 ---
-name: "loki-osx-x64-1.0.4"
+name: "beldex-osx-x64-1.0.4"
 enable_cache: true
 suites:
 - "bionic"
@@ -105,7 +105,7 @@ script: |
     mkdir build && cd build
     cmake .. -DCMAKE_TOOLCHAIN_FILE=${BASEPREFIX}/${i}/share/toolchain.cmake
     make
-    DISTNAME=loki-${i}
+    DISTNAME=beldex-${i}
     mv bin ${DISTNAME}
     find ${DISTNAME}/ | sort | tar --no-recursion --mode='u+rw,go+r-w,a+X' --owner=0 --group=0 -c -T - | gzip -9n > ${OUTDIR}/${DISTNAME}.tar.gz
     cd ..
