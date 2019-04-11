@@ -64,7 +64,7 @@
 #include "node_rpc_proxy.h"
 #include "message_store.h"
 
-#include "common/loki_integration_test_hooks.h"
+#include "common/beldex_integration_test_hooks.h"
 
 #undef BELDEX_DEFAULT_LOG_CATEGORY
 #define BELDEX_DEFAULT_LOG_CATEGORY "wallet.wallet2"

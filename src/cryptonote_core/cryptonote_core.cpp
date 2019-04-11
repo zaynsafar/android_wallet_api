@@ -58,7 +58,7 @@ using namespace epee;
 #include "wipeable_string.h"
 #include "common/i18n.h"
 
-#include "common/loki_integration_test_hooks.h"
+#include "common/beldex_integration_test_hooks.h"
 
 #undef BELDEX_DEFAULT_LOG_CATEGORY
 #define BELDEX_DEFAULT_LOG_CATEGORY "cn"
@@ -337,8 +337,8 @@ namespace cryptonote
     command_line::add_arg(desc, arg_block_rate_notify);
 
 #if defined(BELDEX_ENABLE_INTEGRATION_TEST_HOOKS)
-    command_line::add_arg(desc, loki::arg_integration_test_hardforks_override);
-    command_line::add_arg(desc, loki::arg_integration_test_shared_mem_name);
+    command_line::add_arg(desc, beldex::arg_integration_test_hardforks_override);
+    command_line::add_arg(desc, beldex::arg_integration_test_shared_mem_name);
 #endif
 
     miner::init_options(desc);
@@ -460,7 +460,7 @@ namespace cryptonote
     start_time = std::time(nullptr);
 
 #if defined(BELDEX_ENABLE_INTEGRATION_TEST_HOOKS)
-    const std::string arg_integration_test_override_hardforks = command_line::get_arg(vm, loki::arg_integration_test_hardforks_override);
+    const std::string arg_integration_test_override_hardforks = command_line::get_arg(vm, beldex::arg_integration_test_hardforks_override);
 
     std::vector<std::pair<uint8_t, uint64_t>> integration_test_hardforks;
     if (!arg_integration_test_override_hardforks.empty())
@@ -488,8 +488,8 @@ namespace cryptonote
       test_options = &integration_hardfork_override;
 
     {
-      const std::string arg_shared_mem_name = command_line::get_arg(vm, loki::arg_integration_test_shared_mem_name);
-      loki::init_integration_test_context(arg_shared_mem_name);
+      const std::string arg_shared_mem_name = command_line::get_arg(vm, beldex::arg_integration_test_shared_mem_name);
+      beldex::init_integration_test_context(arg_shared_mem_name);
     }
 #endif
 
@@ -1761,7 +1761,7 @@ namespace cryptonote
     m_mempool.on_idle();
 
 #if defined(BELDEX_ENABLE_INTEGRATION_TEST_HOOKS)
-    loki::core_is_idle = true;
+    beldex::core_is_idle = true;
 #endif
 
     return true;

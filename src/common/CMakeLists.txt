@@ -36,7 +36,7 @@ set(common_sources
   download.cpp
   error.cpp
   expect.cpp
-  loki.cpp
+  beldex.cpp
   util.cpp
   i18n.cpp
   rules.cpp
@@ -71,9 +71,9 @@ set(common_private_headers
   download.h
   error.h
   expect.h
-  loki.h
+  beldex.h
   http_connection.h
-  loki_integration_test_hooks.h
+  beldex_integration_test_hooks.h
   notify.h
   pod-class.h
   pruning.h

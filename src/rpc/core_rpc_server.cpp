@@ -37,7 +37,7 @@ using namespace epee;
 #include "common/command_line.h"
 #include "common/updates.h"
 #include "common/download.h"
-#include "common/loki.h"
+#include "common/beldex.h"
 #include "common/util.h"
 #include "common/perf_timer.h"
 #include "cryptonote_basic/cryptonote_format_utils.h"
@@ -2559,7 +2559,7 @@ namespace cryptonote
     for (const auto& key : keys)
     {
       std::string const hex64 = string_tools::pod_to_hex(key);
-      res.keys[i++]           = loki::hex64_to_base32z(hex64);
+      res.keys[i++]           = beldex::hex64_to_base32z(hex64);
     }
     return true;
   }

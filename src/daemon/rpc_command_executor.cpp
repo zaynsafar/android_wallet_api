@@ -41,7 +41,7 @@
 #include "cryptonote_basic/hardfork.h"
 #include <boost/format.hpp>
 
-#include "common/loki_integration_test_hooks.h"
+#include "common/beldex_integration_test_hooks.h"
 
 #include <fstream>
 #include <ctime>
@@ -62,8 +62,8 @@ namespace {
     std::cout << prompt << std::flush;
     std::string result;
 #if defined (BELDEX_ENABLE_INTEGRATION_TEST_HOOKS)
-    loki::write_redirected_stdout_to_shared_mem();
-    loki::fixed_buffer buffer = loki::read_from_stdin_shared_mem();
+    beldex::write_redirected_stdout_to_shared_mem();
+    beldex::fixed_buffer buffer = beldex::read_from_stdin_shared_mem();
     result.reserve(buffer.len);
     result = buffer.data;
 #else
