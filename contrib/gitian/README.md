@@ -83,7 +83,7 @@ Setup the required environment, you only need to do this once:
 ./gitian-build.py --setup beldex-user x.x.x
 ```
 
-Where `loki-user` is your Github name and `x.x.x` is the version tag you want to build.
+Where `beldex-user` is your Github name and `x.x.x` is the version tag you want to build.
 
 While gitian and this build script does provide a way for you to sign the build directly, it is recommended to sign in a seperate step. 
 This script is only there for convenience. Seperate steps for building can still be taken.
@@ -93,7 +93,7 @@ or pass the signed assert file back to your build machine.
 
 ```
 git clone git@github.com:Beldex-Coin/gitian.sigs.git
-git remote add beldex-user git@github.com:loki-user/gitian.sigs.git
+git remote add beldex-user git@github.com:beldex-user/gitian.sigs.git
 ```
 
 Build Binaries
@@ -109,11 +109,11 @@ If all went well, this produces a number of (uncommited) `.assert` files in the 
 If you do detached, offline signing, you need to copy these uncommited changes to your host machine, where you can sign them. For example:
 
 ```
-export NAME=loki-user
+export NAME=beldex-user
 export VERSION=2.0.0
-gpg --output $VERSION-linux/$NAME/loki-linux-$VERSION-build.assert.sig --detach-sign $VERSION-linux/$NAME/loki-linux-$VERSION-build.assert
-gpg --output $VERSION-osx-unsigned/$NAME/loki-osx-$VERSION-build.assert.sig --detach-sign $VERSION-osx-unsigned/$NAME/loki-osx-$VERSION-build.assert
-gpg --output $VERSION-win-unsigned/$NAME/loki-win-$VERSION-build.assert.sig --detach-sign $VERSION-win-unsigned/$NAME/loki-win-$VERSION-build.assert
+gpg --output $VERSION-linux/$NAME/beldex-linux-$VERSION-build.assert.sig --detach-sign $VERSION-linux/$NAME/beldex-linux-$VERSION-build.assert
+gpg --output $VERSION-osx-unsigned/$NAME/beldex-osx-$VERSION-build.assert.sig --detach-sign $VERSION-osx-unsigned/$NAME/beldex-osx-$VERSION-build.assert
+gpg --output $VERSION-win-unsigned/$NAME/beldex-win-$VERSION-build.assert.sig --detach-sign $VERSION-win-unsigned/$NAME/beldex-win-$VERSION-build.assert
 ```
 
 Make a pull request (both the `.assert` and `.assert.sig` files) to the
@@ -126,8 +126,8 @@ git push --set-upstream $NAME 2.0.0
 ```
 
 ```bash
-    gpg --detach-sign ${VERSION}-linux/${SIGNER}/loki-linux-*-build.assert
-    gpg --detach-sign ${VERSION}-win-unsigned/${SIGNER}/loki-win-*-build.assert
-    gpg --detach-sign ${VERSION}-osx-unsigned/${SIGNER}/loki-osx-*-build.assert
+    gpg --detach-sign ${VERSION}-linux/${SIGNER}/beldex-linux-*-build.assert
+    gpg --detach-sign ${VERSION}-win-unsigned/${SIGNER}/beldex-win-*-build.assert
+    gpg --detach-sign ${VERSION}-osx-unsigned/${SIGNER}/beldex-osx-*-build.assert
 ```
 

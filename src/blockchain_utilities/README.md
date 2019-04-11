@@ -22,7 +22,7 @@ This loads the existing blockchain and exports it to `$BELDEX_DATA_DIR/export/bl
 `$ beldex-blockchain-import`
 
 This imports blocks from `$BELDEX_DATA_DIR/export/blockchain.raw` (exported using the
-`loki-blockchain-export` tool as described above) into the current database.
+`beldex-blockchain-export` tool as described above) into the current database.
 
 Defaults: `--batch on`, `--batch size 20000`, `--verify on`
 
@@ -31,7 +31,7 @@ Batch size refers to number of blocks and can be adjusted for performance based 
 Verification should only be turned off if importing from a trusted blockchain.
 
 If you encounter an error like "resizing not supported in batch mode", you can just re-run
-the `loki-blockchain-import` command again, and it will restart from where it left off.
+the `beldex-blockchain-import` command again, and it will restart from where it left off.
 
 ```bash
 ## use default settings to import blockchain.raw into database
