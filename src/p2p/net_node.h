@@ -136,7 +136,7 @@ namespace nodetool
   private:
     const std::vector<std::string> m_seed_nodes_list =
     {
-      // TODO(beldex): "seeds.loki.network"
+      // TODO(beldex): "seeds.beldex.network"
 	  "35.207.13.80:19090",
       "35.211.123.115:19090",
       "35.228.216.218:19090",

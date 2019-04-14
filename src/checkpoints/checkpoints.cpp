@@ -39,7 +39,7 @@
 
 using namespace epee;
 
-#include "common/loki_integration_test_hooks.h"
+#include "common/beldex_integration_test_hooks.h"
 
 #undef BELDEX_DEFAULT_LOG_CATEGORY
 #define BELDEX_DEFAULT_LOG_CATEGORY "checkpoints"

@@ -83,7 +83,7 @@ const command_line::arg_descriptor<std::string, false> arg_integration_test_hard
 const command_line::arg_descriptor<std::string, false> arg_integration_test_shared_mem_name = {
   "integration-test-shared-mem-name"
 , "Specify the shared memory base name for stdin, stdout and semaphore name"
-, "loki-default-integration-test-mem-name"
+, "beldex-default-integration-test-mem-name"
 , false
 };
 
@@ -96,10 +96,10 @@ std::string global_stdout_semaphore_name;
 std::string global_stdout_ready_semaphore_name;
 std::string global_stdin_ready_semaphore_name;
 
-void loki::use_standard_cout()   { if (!global_std_cout) { global_std_cout = std::cout.rdbuf(); } std::cout.rdbuf(global_std_cout); }
-void loki::use_redirected_cout() { if (!global_std_cout) { global_std_cout = std::cout.rdbuf(); } std::cout.rdbuf(global_redirected_cout.rdbuf()); }
+void beldex::use_standard_cout()   { if (!global_std_cout) { global_std_cout = std::cout.rdbuf(); } std::cout.rdbuf(global_std_cout); }
+void beldex::use_redirected_cout() { if (!global_std_cout) { global_std_cout = std::cout.rdbuf(); } std::cout.rdbuf(global_redirected_cout.rdbuf()); }
 
-void loki::init_integration_test_context(const std::string &base_name)
+void beldex::init_integration_test_context(const std::string &base_name)
 {
   assert(base_name.size() > 0);
 
@@ -153,7 +153,7 @@ void loki::init_integration_test_context(const std::string &base_name)
       global_stdout_ready_semaphore_name.c_str());
 }
 
-void loki::deinit_integration_test_context()
+void beldex::deinit_integration_test_context()
 {
   sem_unlink(global_stdin_semaphore_name.c_str());
   sem_unlink(global_stdout_semaphore_name.c_str());
@@ -204,7 +204,7 @@ static char *parse_message(char *msg_buf, int msg_buf_len)
   return ptr;
 }
 
-std::vector<std::string> loki::separate_stdin_to_space_delim_args(loki::fixed_buffer const *cmd)
+std::vector<std::string> beldex::separate_stdin_to_space_delim_args(beldex::fixed_buffer const *cmd)
 {
   std::vector<std::string> args;
   char const *start = cmd->data;
@@ -227,7 +227,7 @@ std::vector<std::string> loki::separate_stdin_to_space_delim_args(loki::fixed_bu
   return args;
 }
 
-loki::fixed_buffer loki::read_from_stdin_shared_mem()
+beldex::fixed_buffer beldex::read_from_stdin_shared_mem()
 {
   boost::unique_lock<boost::mutex> scoped_lock(integration_test_mutex);
 
@@ -261,7 +261,7 @@ loki::fixed_buffer loki::read_from_stdin_shared_mem()
   return result;
 }
 
-void loki::write_redirected_stdout_to_shared_mem()
+void beldex::write_redirected_stdout_to_shared_mem()
 {
   boost::unique_lock<boost::mutex> scoped_lock(integration_test_mutex);
 

@@ -19,7 +19,7 @@ To update ts files after changing source code:
 
 To add a new language, eg Spanish (ISO code es):
 
-    cp translations/loki.ts translations/beldex_es.ts
+    cp translations/beldex.ts translations/beldex_es.ts
 
 To edit translations for Spanish:
 

@@ -23,7 +23,7 @@ packages:
 - "rename"
 - "cmake"
 remotes:
-- "url": "https://github.com/Beldex-Coin/loki.git"
+- "url": "https://github.com/Beldex-Coin/beldex.git"
   "dir": "beldex"
 files: []
 script: |
