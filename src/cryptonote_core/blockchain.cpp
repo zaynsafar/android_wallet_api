@@ -2714,6 +2714,7 @@ bool Blockchain::check_tx_inputs(transaction& tx, tx_verification_context &tvc, 
 
         // Mixin Check, from hard fork 7, we require mixin at least 9, always.
         if (((hf_version <=7) && (in_to_key.key_offsets.size() - 1 < 6) && tx.version==2) ||
+		    ((hf_version ==8) && (in_to_key.key_offsets.size() - 1 < 7) ) ||
             ((hf_version >8 ) && (in_to_key.key_offsets.size() - 1 != CRYPTONOTE_DEFAULT_TX_MIXIN)))
         {
           MERROR_VER("Tx " << get_transaction_hash(tx) << " has incorrect ring size (" << in_to_key.key_offsets.size() - 1 << ", expected (" << CRYPTONOTE_DEFAULT_TX_MIXIN << ")");
