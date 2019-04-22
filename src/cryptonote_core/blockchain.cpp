@@ -100,7 +100,8 @@ static const hard_fork_record mainnet_hard_forks[] =
 {
 	{ 1, 1, 0, 1548750273 },
 	{ network_version_7, 10, 0, 1548750283 },
-	{ network_version_8, 40000, 0, 1559474448 } 
+	{ network_version_8, 40000, 0, 1559474448 },
+	{ network_version_11_infinite_staking, 56240, 0, 1577836800 } 
 };
 static const uint64_t mainnet_hard_fork_version_1_till = 9;
 
@@ -2714,6 +2715,7 @@ bool Blockchain::check_tx_inputs(transaction& tx, tx_verification_context &tvc, 
 
         // Mixin Check, from hard fork 7, we require mixin at least 9, always.
         if (((hf_version <=7) && (in_to_key.key_offsets.size() - 1 < 6) && tx.version==2) ||
+		    ((hf_version ==8) && (in_to_key.key_offsets.size() - 1 < 7) ) ||
             ((hf_version >8 ) && (in_to_key.key_offsets.size() - 1 != CRYPTONOTE_DEFAULT_TX_MIXIN)))
         {
           MERROR_VER("Tx " << get_transaction_hash(tx) << " has incorrect ring size (" << in_to_key.key_offsets.size() - 1 << ", expected (" << CRYPTONOTE_DEFAULT_TX_MIXIN << ")");

@@ -47,7 +47,7 @@
 #define CURRENT_BLOCK_MINOR_VERSION                     8
 #define CRYPTONOTE_BLOCK_FUTURE_TIME_LIMIT_V2           60*10
 #define CRYPTONOTE_DEFAULT_TX_SPENDABLE_AGE             10
-#define CRYPTONOTE_DEFAULT_TX_MIXIN                     7
+#define CRYPTONOTE_DEFAULT_TX_MIXIN                     9
 
 #define STAKING_REQUIREMENT_LOCK_BLOCKS_EXCESS          20
 #define STAKING_PORTIONS                                UINT64_C(0xfffffffffffffffc)
