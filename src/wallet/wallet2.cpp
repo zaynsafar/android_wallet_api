@@ -7886,7 +7886,7 @@ void wallet2::get_outs(std::vector<std::vector<tools::wallet2::get_outs_entry>> 
     {
       MWARNING("More than 5% of outputs are blacklisted ("
                << output_blacklist.size() << "/" << rct_offsets.size()
-               << "), please notify the Loki developers");
+               << "), please notify the Beldex developers");
     }
 
     // get histogram for the amounts we need
