@@ -43,7 +43,7 @@
 
 #define EOT 0x4
 
-#include "common/loki_integration_test_hooks.h"
+#include "common/beldex_integration_test_hooks.h"
 
 namespace
 {

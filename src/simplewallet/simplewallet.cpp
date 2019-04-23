@@ -57,7 +57,7 @@
 #include "common/dns_utils.h"
 #include "common/base58.h"
 #include "common/scoped_message_writer.h"
-#include "common/loki_integration_test_hooks.h"
+#include "common/beldex_integration_test_hooks.h"
 #include "cryptonote_protocol/cryptonote_protocol_handler.h"
 #include "cryptonote_core/master_node_deregister.h"
 #include "cryptonote_core/master_node_list.h"
@@ -264,8 +264,8 @@ namespace
     std::string buf;
     if (yesno) std::cout << prompt << " (Y/Yes/N/No): ";
     else       std::cout << prompt << ": ";
-    loki::write_redirected_stdout_to_shared_mem();
-    loki::fixed_buffer buffer = loki::read_from_stdin_shared_mem();
+    beldex::write_redirected_stdout_to_shared_mem();
+    beldex::fixed_buffer buffer = beldex::read_from_stdin_shared_mem();
     buf.reserve(buffer.len);
     buf = buffer.data;
     return epee::string_tools::trim(buf);
@@ -297,8 +297,8 @@ namespace
   {
 #if defined (BELDEX_ENABLE_INTEGRATION_TEST_HOOKS)
     std::cout << prompt;
-    loki::write_redirected_stdout_to_shared_mem();
-    loki::fixed_buffer buffer = loki::read_from_stdin_shared_mem();
+    beldex::write_redirected_stdout_to_shared_mem();
+    beldex::fixed_buffer buffer = beldex::read_from_stdin_shared_mem();
     epee::wipeable_string buf = buffer.data;
 #else
 
@@ -323,7 +323,7 @@ namespace
   {
 #if defined(BELDEX_ENABLE_INTEGRATION_TEST_HOOKS)
     std::cout << prompt << ": NOTE(beldex): Passwords not supported, defaulting to empty password";
-    loki::write_redirected_stdout_to_shared_mem();
+    beldex::write_redirected_stdout_to_shared_mem();
     tools::password_container pwd_container(std::string(""));
 #else
   #ifdef HAVE_READLINE
@@ -2668,7 +2668,7 @@ simple_wallet::simple_wallet()
                                   "  Set the fee to default/unimportant/normal/elevated/priority.\n "
                                   "confirm-missing-payment-id <1|0>\n "
                                   "ask-password <0|1|2   (or never|action|decrypt)>\n "
-                                  "unit <loki|megarok|kilorok|rok>\n "
+                                  "unit <beldex|megabdx|kilobdx|bdx>\n "
                                   "  Set the default beldex (sub-)unit.\n "
                                   "min-outputs-count [n]\n "
                                   "  Try to keep at least that many outputs of value at least min-outputs-value.\n "
@@ -3085,7 +3085,7 @@ bool simple_wallet::set_variable(const std::vector<std::string> &args)
     CHECK_SIMPLE_VARIABLE("priority", set_default_priority, tr("0, 1, 2, 3, or 4, or one of ") << join_priority_strings(", "));
     CHECK_SIMPLE_VARIABLE("confirm-missing-payment-id", set_confirm_missing_payment_id, tr("0 or 1"));
     CHECK_SIMPLE_VARIABLE("ask-password", set_ask_password, tr("0|1|2 (or never|action|decrypt)"));
-    CHECK_SIMPLE_VARIABLE("unit", set_unit, tr("loki, megarok, kilorok, rok"));
+    CHECK_SIMPLE_VARIABLE("unit", set_unit, tr("beldex, megabdx, kilobdx, bdx"));
     CHECK_SIMPLE_VARIABLE("min-outputs-count", set_min_output_count, tr("unsigned integer"));
     CHECK_SIMPLE_VARIABLE("min-outputs-value", set_min_output_value, tr("amount"));
     CHECK_SIMPLE_VARIABLE("merge-destinations", set_merge_destinations, tr("0 or 1"));
@@ -8181,23 +8181,23 @@ bool simple_wallet::run()
 #if defined(BELDEX_ENABLE_INTEGRATION_TEST_HOOKS)
   for (;;)
   {
-    loki::fixed_buffer const input = loki::read_from_stdin_shared_mem();
-    std::vector<std::string> args  = loki::separate_stdin_to_space_delim_args(&input);
+    beldex::fixed_buffer const input = beldex::read_from_stdin_shared_mem();
+    std::vector<std::string> args  = beldex::separate_stdin_to_space_delim_args(&input);
     {
-      boost::unique_lock<boost::mutex> scoped_lock(loki::integration_test_mutex);
-      loki::use_standard_cout();
+      boost::unique_lock<boost::mutex> scoped_lock(beldex::integration_test_mutex);
+      beldex::use_standard_cout();
       std::cout << input.data << std::endl;
-      loki::use_redirected_cout();
+      beldex::use_redirected_cout();
     }
 
     this->process_command(args);
     if (args.size() == 1 && args[0] == "exit")
     {
-      loki::deinit_integration_test_context();
+      beldex::deinit_integration_test_context();
       return true;
     }
 
-    loki::write_redirected_stdout_to_shared_mem();
+    beldex::write_redirected_stdout_to_shared_mem();
   }
 #endif
 
@@ -9360,12 +9360,12 @@ int main(int argc, char* argv[])
   bool should_terminate = false;
   std::tie(vm, should_terminate) = wallet_args::main(
    argc, argv,
-   "loki-wallet-cli [--wallet-file=<filename>|--generate-new-wallet=<filename>] [<COMMAND>]",
+   "beldex-wallet-cli [--wallet-file=<filename>|--generate-new-wallet=<filename>] [<COMMAND>]",
     sw::tr("This is the command line Beldex wallet. It needs to connect to a Beldex\ndaemon to work correctly.\n\nWARNING: Do not reuse your Beldex keys on a contentious fork, doing so will harm your privacy.\n Only consider reusing your key on a contentious fork if the fork has key reuse mitigations built in."),
     desc_params,
     positional_options,
     [](const std::string &s, bool emphasis){ tools::scoped_message_writer(emphasis ? epee::console_color_white : epee::console_color_default, true) << s; },
-    "loki-wallet-cli.log"
+    "beldex-wallet-cli.log"
   );
 
   if (!vm)

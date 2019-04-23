@@ -39,7 +39,7 @@
 
 using namespace epee;
 
-#include "common/loki_integration_test_hooks.h"
+#include "common/beldex_integration_test_hooks.h"
 
 #undef BELDEX_DEFAULT_LOG_CATEGORY
 #define BELDEX_DEFAULT_LOG_CATEGORY "checkpoints"
@@ -174,7 +174,7 @@ namespace cryptonote
       case MAINNET:
 #if !defined(BELDEX_ENABLE_INTEGRATION_TEST_HOOKS)
         ADD_CHECKPOINT(1,     "a9eedcc8ad75c40acbed366a64029d0bf1c1b282ec0ca1d28213b9d386c2b81f");
-	    ADD_CHECKPOINT(10,    "a4014ffa8d32fe14bba3c6d8fc2bf8d3766615ee9ba779a075219a067257216c");
+	      ADD_CHECKPOINT(10,    "a4014ffa8d32fe14bba3c6d8fc2bf8d3766615ee9ba779a075219a067257216c");
         ADD_CHECKPOINT(100,   "450a6fdade242c8afa8db3414a45a94371bf320470f95408a12122a64b836ee1");
         ADD_CHECKPOINT(1000,  "c023df332f7f6f7fcc8e2d1e5f57791a3a8e0b4c18eabb5b4362cdfea559c4a3");
         ADD_CHECKPOINT(10000, "2ba23579a88eb51c3b6f942f7a9d4551949dc9c0f28bb9828a1b31b86be7530e");
@@ -182,6 +182,8 @@ namespace cryptonote
         ADD_CHECKPOINT(30000, "3564a8f37148b5e9639f6cf2bb8c67d0176a5464001449d5e8420fc0d67fa587");
         ADD_CHECKPOINT(40000, "ac2ad416b209526eb1c6f8e17d678896284561e55422541c82605dcea023e73c");
         ADD_CHECKPOINT(43108, "f54611306472cae55e4de18544f1c00bd83902a86d35310ac7e2cad846457a50");
+        ADD_CHECKPOINT(50000, "64f0bc96738d3d809baef37991d85c497ad4b52d224757fd71a42aab3ded49b6");
+        ADD_CHECKPOINT(55000, "f00d1ab250da7935ef74bf907d94d1ac1f91be93fd3f0506fc9cf150c75c32e9");
 #endif
         break;
     }

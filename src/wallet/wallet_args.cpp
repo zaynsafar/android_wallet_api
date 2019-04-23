@@ -37,7 +37,7 @@
 #include "string_tools.h"
 #include "version.h"
 
-#include "common/loki_integration_test_hooks.h"
+#include "common/beldex_integration_test_hooks.h"
 
 #if defined(WIN32)
 #include <crtdbg.h>
@@ -130,7 +130,7 @@ namespace wallet_args
     command_line::add_arg(desc_params, arg_config_file);
 
 #if defined(BELDEX_ENABLE_INTEGRATION_TEST_HOOKS)
-    command_line::add_arg(desc_params, loki::arg_integration_test_shared_mem_name);
+    command_line::add_arg(desc_params, beldex::arg_integration_test_shared_mem_name);
 #endif
 
     i18n_set_language("translations", "beldex", lang);
@@ -146,8 +146,8 @@ namespace wallet_args
 
 #if defined(BELDEX_ENABLE_INTEGRATION_TEST_HOOKS)
       {
-        const std::string arg_shared_mem_name = command_line::get_arg(vm, loki::arg_integration_test_shared_mem_name);
-        loki::init_integration_test_context(arg_shared_mem_name);
+        const std::string arg_shared_mem_name = command_line::get_arg(vm, beldex::arg_integration_test_shared_mem_name);
+        beldex::init_integration_test_context(arg_shared_mem_name);
       }
 #endif
 

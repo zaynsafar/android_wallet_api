@@ -33,7 +33,7 @@
 #include "string_tools.h"
 #include "daemon/command_server.h"
 
-#include "common/loki_integration_test_hooks.h"
+#include "common/beldex_integration_test_hooks.h"
 
 
 #undef BELDEX_DEFAULT_LOG_CATEGORY
@@ -372,28 +372,28 @@ bool t_command_server::start_handling(std::function<void(void)> exit_handler)
   auto handle_shared_mem_ins_and_outs = [&]()
   {
     // TODO(doyle): Hack, don't hook into input until the daemon has completely initialised, i.e. you can print the status
-    while(!loki::core_is_idle) {}
+    while(!beldex::core_is_idle) {}
     mlog_set_categories("");
 
     for (;;)
     {
-      loki::fixed_buffer const input = loki::read_from_stdin_shared_mem();
-      std::vector<std::string> args  = loki::separate_stdin_to_space_delim_args(&input);
+      beldex::fixed_buffer const input = beldex::read_from_stdin_shared_mem();
+      std::vector<std::string> args  = beldex::separate_stdin_to_space_delim_args(&input);
       {
-        boost::unique_lock<boost::mutex> scoped_lock(loki::integration_test_mutex);
-        loki::use_standard_cout();
+        boost::unique_lock<boost::mutex> scoped_lock(beldex::integration_test_mutex);
+        beldex::use_standard_cout();
         std::cout << input.data << std::endl;
-        loki::use_redirected_cout();
+        beldex::use_redirected_cout();
       }
 
       process_command_vec(args);
       if (args.size() == 1 && args[0] == "exit")
       {
-        loki::deinit_integration_test_context();
+        beldex::deinit_integration_test_context();
         break;
       }
 
-      loki::write_redirected_stdout_to_shared_mem();
+      beldex::write_redirected_stdout_to_shared_mem();
     }
   };
   static std::thread handle_remote_stdin_out_thread(handle_shared_mem_ins_and_outs);

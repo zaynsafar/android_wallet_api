@@ -39,7 +39,7 @@
   #define PAUSE_READLINE()
 #endif
 
-#include "common/loki_integration_test_hooks.h"
+#include "common/beldex_integration_test_hooks.h"
 
 namespace tools
 {

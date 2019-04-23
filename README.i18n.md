@@ -1,9 +1,9 @@
 Beldex daemon internationalization
 ==================================
 
-The Beldex command line tools can be translated in various languages. If you wish to contribute and need help/support, contact the [Beldex Localization Workgroup on Taiga](https://taiga.getloki.org/project/erciccione-loki-localization/) or come chat on `#loki-translations` (Freenode/IRC, riot/matrix, MatterMost)
+The Beldex command line tools can be translated in various languages. If you wish to contribute and need help/support, contact the [Beldex Localization Workgroup on Taiga](https://taiga.getloki.org/project/erciccione-beldex-localization/) or come chat on `#beldex-translations` (Freenode/IRC, riot/matrix, MatterMost)
 
-In order to use the same translation workflow as the [Beldex GUI](https://github.com/Beldex-Coin/loki-gui), they use Qt Linguist translation files.  However, to avoid the dependencies on Qt this normally implies, they use a custom loader to read those files at runtime.
+In order to use the same translation workflow as the [Beldex GUI](https://github.com/Beldex-Coin/beldex-gui), they use Qt Linguist translation files.  However, to avoid the dependencies on Qt this normally implies, they use a custom loader to read those files at runtime.
 
 ### Tools for translators
 
@@ -19,7 +19,7 @@ To update ts files after changing source code:
 
 To add a new language, eg Spanish (ISO code es):
 
-    cp translations/loki.ts translations/beldex_es.ts
+    cp translations/beldex.ts translations/beldex_es.ts
 
 To edit translations for Spanish:
 
@@ -31,7 +31,7 @@ To build translations after modifying them:
 
 To test a translation:
 
-    LANG=es ./build/release/bin/loki-wallet-cli
+    LANG=es ./build/release/bin/beldex-wallet-cli
 
 To add new translatable strings in the source code:
 

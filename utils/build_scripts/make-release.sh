@@ -17,7 +17,7 @@ then
   exit
 fi
 
-WORKING_DIR=loki-$version
+WORKING_DIR=beldex-$version
 
 echo "Working in $WORKING_DIR..."
 
