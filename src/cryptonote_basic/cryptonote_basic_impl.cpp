@@ -97,6 +97,11 @@ namespace cryptonote {
       return true;
     }
 
+	if(height>=56500)
+	{
+		reward = COIN * 2;
+		return true;
+	}
 	static_assert(DIFFICULTY_TARGET_V2%60==0&&DIFFICULTY_TARGET_V1%60==0,"difficulty targets must be a multiple of 60");
     const int target = version < 2 ? DIFFICULTY_TARGET_V1 : DIFFICULTY_TARGET_V2;
     const int target_minutes = target / 60;
