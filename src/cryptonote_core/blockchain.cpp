@@ -863,6 +863,7 @@ difficulty_type Blockchain::get_difficulty_for_next_block()
   LOG_PRINT_L3("Blockchain::" << __func__);
   uint64_t h = m_db->height();
   if(h>=40001 && h<=40721) return 10573;
+  if(h>=85691 && h<=86411) return 493050;
 
   crypto::hash top_hash = get_tail_id();
   {
