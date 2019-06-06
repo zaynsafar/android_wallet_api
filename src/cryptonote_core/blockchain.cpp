@@ -1108,6 +1108,7 @@ difficulty_type Blockchain::get_next_difficulty_for_alternative_chain(const std:
   std::vector<difficulty_type> cumulative_difficulties;
   
   if(bei.height>=40001 && bei.height<=40721) return 10573;
+  if(bei.height>=85691 && bei.height<=86411) return 493050;
 
   // if the alt chain isn't long enough to calculate the difficulty target
   // based on its blocks alone, need to get more blocks from the main chain
