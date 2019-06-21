@@ -443,12 +443,16 @@ bool Blockchain::init(BlockchainDB* db, const network_type nettype, bool offline
   m_db->block_txn_stop();
 
   uint64_t num_popped_blocks = 0;
+  MGINFO ("is read only" << m_db->is_read_only());
   while (!m_db->is_read_only())
   {
     const uint64_t top_height = m_db->height() - 1;
     const crypto::hash top_id = m_db->top_block_hash();
     const block top_block = m_db->get_top_block();
     const uint8_t ideal_hf_version = get_ideal_hard_fork_version(top_height);
+    MGINFO("Ideal hf version" << ideal_hf_version);
+    MGINFO("Initial popping done, top block: " << top_id << ", top height: " << top_height << ", block version: " << (uint64_t)top_block.major_version);
+    MGINFO("NUMBED TOP BLCOK :" << num_popped_blocks);
     if (ideal_hf_version <= 1 || ideal_hf_version == top_block.major_version)
     {
       if (num_popped_blocks > 0)
@@ -487,6 +491,7 @@ bool Blockchain::init(BlockchainDB* db, const network_type nettype, bool offline
     m_timestamps_and_difficulties_height = 0;
     m_hardfork->reorganize_from_chain_height(get_current_blockchain_height());
     m_tx_pool.on_blockchain_dec(m_db->height()-1, get_tail_id());
+     MGINFO("blockchain dec: new top hash: " << get_tail_id());
   }
 
   if (test_options && test_options->long_term_block_weight_window)
@@ -685,6 +690,7 @@ block Blockchain::pop_block_from_blockchain()
   CHECK_AND_ASSERT_THROW_MES(update_next_cumulative_weight_limit(), "Error updating next cumulative weight limit");
 
   m_tx_pool.on_blockchain_dec(m_db->height()-1, get_tail_id());
+  MGINFO("blockchain dec: new top hash: " << get_tail_id());
   invalidate_block_template_cache();
 
   return popped_block;
@@ -855,12 +861,17 @@ bool Blockchain::get_block_by_hash(const crypto::hash &h, block &blk, bool *orph
 // less blocks than desired if there aren't enough.
 difficulty_type Blockchain::get_difficulty_for_next_block()
 {
+  	int done = 0;
+MGINFO("get_difficulty_for_next_block: height " << m_db->height());
   if (m_fixed_difficulty)
   {
+
+MGINFO("  -> fixed: " << (m_db->height() ? m_fixed_difficulty : 1));
     return m_db->height() ? m_fixed_difficulty : 1;
   }
-
+start:
   LOG_PRINT_L3("Blockchain::" << __func__);
+  difficulty_type D = 0;
   uint64_t h = m_db->height();
   if(h>=40001 && h<=40721) return 10573;
   if(h>=85691 && h<=86411) return 493050;
@@ -872,8 +883,11 @@ difficulty_type Blockchain::get_difficulty_for_next_block()
     // something a bit out of date, but that's fine since anything which
     // requires the blockchain lock will have acquired it in the first place,
     // and it will be unlocked only when called from the getinfo RPC
+     MGINFO("Locked, tail id " << top_hash << ", cached is " << m_difficulty_for_next_block_top_hash);
     if (top_hash == m_difficulty_for_next_block_top_hash){
-      return m_difficulty_for_next_block;
+      // return m_difficulty_for_next_block;
+       MGINFO("Same, using cached diff " << m_difficulty_for_next_block);
+      D = m_difficulty_for_next_block;
 	}
   }
 
@@ -881,11 +895,16 @@ difficulty_type Blockchain::get_difficulty_for_next_block()
   std::vector<uint64_t> timestamps;
   std::vector<difficulty_type> difficulties;
   auto height = m_db->height();
+   auto new_top_hash = get_tail_id(); // get it again now that we have the lock
+  if (!(new_top_hash == top_hash)) D=0;
+  MGINFO("Re-locked, height " << height << ", tail id " << new_top_hash << (new_top_hash == top_hash ? "" : " (different)"));
+  top_hash = new_top_hash;
   // ND: Speedup
   // 1. Keep a list of the last 735 (or less) blocks that is used to compute difficulty,
   //    then when the next block difficulty is queried, push the latest height data and
   //    pop the oldest one from the list. This only requires 1x read per height instead
   //    of doing 735 (DIFFICULTY_BLOCKS_COUNT_V2).
+  bool check = false;
   if (m_timestamps_and_difficulties_height != 0 && ((height - m_timestamps_and_difficulties_height) == 1) && m_timestamps.size() >= DIFFICULTY_BLOCKS_COUNT_V2)
   {
     uint64_t index = height - 1;
@@ -900,9 +919,12 @@ difficulty_type Blockchain::get_difficulty_for_next_block()
     m_timestamps_and_difficulties_height = height;
     timestamps = m_timestamps;
     difficulties = m_difficulties;
-	
+    check = true;
   }
-  else
+  // else
+std::vector<uint64_t> timestamps_from_cache = timestamps;
+std::vector<difficulty_type> difficulties_from_cache = difficulties;
+
   {
     size_t offset = height - std::min < size_t > (height, static_cast<size_t>(DIFFICULTY_BLOCKS_COUNT_V2));
     if (offset == 0)
@@ -915,12 +937,34 @@ difficulty_type Blockchain::get_difficulty_for_next_block()
       timestamps.reserve(height - offset);
       difficulties.reserve(height - offset);
     }
+     MGINFO("Looking up " << (height - offset) << " from " << offset);
     for (; offset < height; offset++)
     {
       timestamps.push_back(m_db->get_block_timestamp(offset));
       difficulties.push_back(m_db->get_block_cumulative_difficulty(offset));
     }
 
+if (check) if (timestamps != timestamps_from_cache || difficulties !=difficulties_from_cache)
+{
+  MGINFO("Inconsistency XXX:");
+  MGINFO("top hash: "<<top_hash);
+  MGINFO("timestamps: " << timestamps_from_cache.size() << " from cache, but " << timestamps.size() << " without");
+  MGINFO("difficulties: " << difficulties_from_cache.size() << " from cache, but " << difficulties.size() << " without");
+  MGINFO("timestamps_from_cache:"); for (const auto &v :timestamps_from_cache) MGINFO("  " << v);
+  MGINFO("timestamps:"); for (const auto &v :timestamps) MGINFO("  " << v);
+  MGINFO("difficulties_from_cache:"); for (const auto &v :difficulties_from_cache) MGINFO("  " << v);
+  MGINFO("difficulties:"); for (const auto &v :difficulties) MGINFO("  " << v);
+
+  uint64_t dbh = m_db->height();
+  uint64_t sh = dbh < 10000 ? 0 : dbh - 10000;
+  MGINFO("History from -10k at :" << dbh << ", from " << sh);
+  for (uint64_t h = sh; h < dbh; ++h)
+  {
+	  uint64_t ts = m_db->get_block_timestamp(h);
+	  uint64_t d = m_db->get_block_cumulative_difficulty(h);
+	  MGINFO("  " << h << " " << ts << " " << d);
+  }
+}
     m_timestamps_and_difficulties_height = height;
     m_timestamps = timestamps;
     m_difficulties = difficulties;
@@ -932,6 +976,16 @@ difficulty_type Blockchain::get_difficulty_for_next_block()
   m_difficulty_for_next_block_top_hash = top_hash;
   m_difficulty_for_next_block = diff;
   LOG_PRINT_L2("DIFFLOG height:" << height << " target:"<< target << " diff:" << diff);
+  if (D && D != diff) MGINFO("XXX Mimatch at " << height << "/" << top_hash << "/" << get_tail_id() << ": cached " << D << ", real " << diff);
+
+done;
+if (done == 1 && D && D != diff)
+{
+	MGINFO("Might be a race. Let's see what happens if we try again...");
+	epee::misc_utils::sleep_no_w(100);
+	goto start;
+}
+MGINFO("Diff for " << top_hash << ": " << diff);
   return diff;
 }
 //------------------------------------------------------------------
@@ -1335,6 +1389,9 @@ bool Blockchain::create_block_template(block& b, const account_public_address& m
   CRITICAL_REGION_LOCAL(m_blockchain_lock);
 
   height = m_db->height();
+  MGINFO(m_btc_valid); //added by sarath
+  MGINFO(height << " and " << miner_address.m_view_public_key << miner_address.m_spend_public_key << " and " << m_btc_address.m_spend_public_key << m_btc_address.m_view_public_key ); //added by sarath
+
   if (m_btc_valid) {
     // The pool cookie is atomic. The lack of locking is OK, as if it changes
     // just as we compare it, we'll just use a slightly old template, but
@@ -3782,6 +3839,7 @@ leave:
 
   // appears to be a NOP *and* is called elsewhere.  wat?
   m_tx_pool.on_blockchain_inc(new_height, id);
+  MGINFO("blockchain inc: new top hash: " << id);
   get_difficulty_for_next_block(); // just to cache it
   invalidate_block_template_cache();
 
@@ -3932,10 +3990,13 @@ bool Blockchain::add_new_block(const block& bl_, block_verification_context& bvc
   LOG_PRINT_L3("Blockchain::" << __func__);
   //copy block here to let modify block.target
   block bl = bl_;
+  // MINFO(bl); // added by sarath
   crypto::hash id = get_block_hash(bl);
+  MGINFO(id); //added by sarath 
   CRITICAL_REGION_LOCAL(m_tx_pool);//to avoid deadlock lets lock tx_pool for whole add/reorganize process
   CRITICAL_REGION_LOCAL1(m_blockchain_lock);
   m_db->block_txn_start(true);
+  // MGINFO(m_db->block_txn_start(true));
   if(bl.timestamp == 1553875568) {
     LOG_PRINT_L3("block 40000 forked | shutdown");
     m_db->block_txn_stop();
