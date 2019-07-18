@@ -10,8 +10,8 @@ Portions Copyright (c) 2012-2013 The Cryptonote developers.
 
 ## Development resources
 
-- Web: [beldexcoin.com](https://beldexcoin.com)
-- Telegram: [t.me/beldexcoin](https://t.me/beldexcoin)
+- Web: [beldex.io/coin](https://beldex.io/coin)
+- Telegram: [t.me/beldexcoin](https://t.me/beldex_official)
 - GitHub: [https://github.com/Beldex-Coin/beldex](https://github.com/Beldex-Coin/beldex)
 
 ## Information
