@@ -46,6 +46,7 @@
 #define TX_EXTRA_TAG_TX_SECRET_KEY            0x75
 #define TX_EXTRA_TAG_TX_KEY_IMAGE_PROOFS      0x76
 #define TX_EXTRA_TAG_TX_KEY_IMAGE_UNLOCK      0x77
+#define TX_EXTRA_TAG_SECURITY_SIGNATURE       0x88
 #define TX_EXTRA_MYSTERIOUS_MINERGATE_TAG     0xDE
 
 #define TX_EXTRA_NONCE_PAYMENT_ID             0x00
@@ -204,6 +205,14 @@ namespace cryptonote
     END_SERIALIZE()
   };
 
+  struct tx_extra_security_signature
+  {
+      crypto::signature m_security_signature;
+
+      BEGIN_SERIALIZE()
+          FIELD(m_security_signature)
+      END_SERIALIZE()
+  };
 
   struct tx_extra_master_node_register
   {
@@ -300,6 +309,7 @@ namespace cryptonote
                          tx_extra_nonce,
                          tx_extra_merge_mining_tag,
                          tx_extra_additional_pub_keys,
+                         tx_extra_security_signature,
                          tx_extra_mysterious_minergate,
                          tx_extra_master_node_pubkey,
                          tx_extra_master_node_register,
@@ -320,6 +330,7 @@ VARIANT_TAG(binary_archive, cryptonote::tx_extra_pub_key,                  TX_EX
 VARIANT_TAG(binary_archive, cryptonote::tx_extra_nonce,                    TX_EXTRA_NONCE);
 VARIANT_TAG(binary_archive, cryptonote::tx_extra_merge_mining_tag,         TX_EXTRA_MERGE_MINING_TAG);
 VARIANT_TAG(binary_archive, cryptonote::tx_extra_additional_pub_keys,      TX_EXTRA_TAG_ADDITIONAL_PUBKEYS);
+VARIANT_TAG(binary_archive, cryptonote::tx_extra_security_signature,       TX_EXTRA_TAG_SECURITY_SIGNATURE);
 VARIANT_TAG(binary_archive, cryptonote::tx_extra_mysterious_minergate,     TX_EXTRA_MYSTERIOUS_MINERGATE_TAG);
 VARIANT_TAG(binary_archive, cryptonote::tx_extra_master_node_register,    TX_EXTRA_TAG_MASTER_NODE_REGISTER);
 VARIANT_TAG(binary_archive, cryptonote::tx_extra_master_node_deregister,  TX_EXTRA_TAG_MASTER_NODE_DEREGISTER);

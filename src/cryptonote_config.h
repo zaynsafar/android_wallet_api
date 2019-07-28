@@ -262,7 +262,7 @@ namespace cryptonote
     network_version_9_master_nodes, // Proof Of Stake w/ Master Nodes
     network_version_10_bulletproofs, // Bulletproofs, Master Node Grace Registration Period, Batched Governance
     network_version_11_infinite_staking,
-
+    network_version_12_security_signature,
     network_version_count,
   };
 

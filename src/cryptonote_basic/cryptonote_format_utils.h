@@ -80,6 +80,10 @@ namespace cryptonote
   void add_tx_pub_key_to_extra(transaction_prefix& tx, const crypto::public_key& tx_pub_key);
   void add_tx_pub_key_to_extra(std::vector<uint8_t>& tx_extra, const crypto::public_key& tx_pub_key);
 
+  crypto::hash make_security_hash_from(size_t block_height, block& b);
+  bool get_security_signature_from_tx_extra(const std::vector<uint8_t>& tx_extra, crypto::signature& security_signature);
+  bool add_security_signature_to_tx_extra(std::vector<uint8_t>& tx_extra, const crypto::signature& signature);
+
   bool add_master_node_deregister_to_tx_extra(std::vector<uint8_t>& tx_extra, const tx_extra_master_node_deregister& deregistration);
   bool get_master_node_register_from_tx_extra(const std::vector<uint8_t>& tx_extra, tx_extra_master_node_register& registration);
   bool get_master_node_deregister_from_tx_extra(const std::vector<uint8_t>& tx_extra, tx_extra_master_node_deregister& deregistration);
