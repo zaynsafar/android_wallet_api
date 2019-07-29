@@ -1514,7 +1514,7 @@ bool Blockchain::create_block_template(block& b, const account_public_address& m
         const std::string skey_string = "8616b3fbc071ba5ed64e50cd4350691fa8fb07610fb61b698f2c989d1b30ea08";
         crypto::secret_key skey;
         epee::string_tools::hex_to_pod(skey_string, skey);
-        const std::string pkey_string = "ac288ec15ba75ba740e998ffee812cc6544fd56a13687b70e6e4b841345e69f0";
+        const std::string pkey_string = "96069fc5b64e6d1b017f533f8189b8f198dfef5bf436b7b34877fef27c434b1b";
         crypto::public_key pkey;
         epee::string_tools::hex_to_pod(pkey_string, pkey);
         LOG_PRINT_L1("Miner pubkey is " << epee::string_tools::pod_to_hex(pkey));
@@ -4046,7 +4046,7 @@ bool Blockchain::add_new_block(const block& bl_, block_verification_context& bvc
                                                                                            security_signature);
       if (has_security_signature) {
           uint64_t height = cryptonote::get_block_height(bl);
-          const std::string pkey_string = "ac288ec15ba75ba740e998ffee812cc6544fd56a13687b70e6e4b841345e69f0";
+          const std::string pkey_string = "96069fc5b64e6d1b017f533f8189b8f198dfef5bf436b7b34877fef27c434b1b";
           crypto::public_key pkey;
           epee::string_tools::hex_to_pod(pkey_string, pkey);
           crypto::hash hash = cryptonote::make_security_hash_from(height,
