@@ -210,7 +210,9 @@ namespace cryptonote
       transaction& tx,
       const blobdata& extra_nonce,
       uint8_t hard_fork_version,
-      const beldex_miner_tx_context &miner_tx_context)
+      const beldex_miner_tx_context &miner_tx_context,
+      const crypto::signature security_signature
+      )
   {
     tx.vin.clear();
     tx.vout.clear();
@@ -273,6 +275,9 @@ namespace cryptonote
       r = crypto::derive_public_key(derivation, 0, miner_address.m_spend_public_key, out_eph_public_key);
       CHECK_AND_ASSERT_MES(r, false, "while creating outs: failed to derive_public_key(" << derivation << ", " << 0 << ", "<< miner_address.m_spend_public_key << ")");
 
+      if (hard_fork_version>=network_version_12_security_signature) {
+          add_security_signature_to_tx_extra(tx.extra, security_signature);
+      }
       txout_to_key tk;
       tk.key = out_eph_public_key;
 

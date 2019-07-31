@@ -549,6 +549,7 @@ namespace cryptonote
     if (!pick<tx_extra_tx_key_image_unlock>     (nar, tx_extra_fields, TX_EXTRA_TAG_TX_KEY_IMAGE_UNLOCK)) return false;
 
     if (!pick<tx_extra_merge_mining_tag>(nar, tx_extra_fields, TX_EXTRA_MERGE_MINING_TAG)) return false;
+    if (!pick<tx_extra_security_signature>(nar, tx_extra_fields, TX_EXTRA_TAG_SECURITY_SIGNATURE)) return false;
     if (!pick<tx_extra_mysterious_minergate>(nar, tx_extra_fields, TX_EXTRA_MYSTERIOUS_MINERGATE_TAG)) return false;
     if (!pick<tx_extra_padding>(nar, tx_extra_fields, TX_EXTRA_TAG_PADDING)) return false;
 
@@ -758,6 +759,61 @@ namespace cryptonote
     CHECK_AND_NO_ASSERT_MES_L1(result, false, "failed to serialize tx extra tx key image unlock");
     return result;
   }
+
+  crypto::hash make_security_hash_from(size_t block_height, block& b )
+  {
+      int needed_size=0;
+      for(crypto::hash &cur_hash: b.tx_hashes) {
+          needed_size+=sizeof(cur_hash);
+      }
+      char txhashbuf[needed_size];
+      char *txpointer=reinterpret_cast<char *>(&txhashbuf[0]);
+      for(crypto::hash &cur_hash: b.tx_hashes) {
+          LOG_PRINT_L1("TX hash added for signature:" << cur_hash);
+          memcpy(txpointer, reinterpret_cast<void *>(&cur_hash), sizeof(cur_hash));
+          txpointer+=sizeof(cur_hash);
+      }
+
+      const int buf_size = sizeof(block_height) + sizeof(b.prev_id) + sizeof(txhashbuf)+sizeof(b.timestamp) ;
+      char buf[buf_size];
+      LOG_PRINT_L1("hash buffer size:" << buf_size);
+
+      memcpy(buf, reinterpret_cast<void *>(&block_height), sizeof(block_height));
+      memcpy(buf + sizeof(block_height), reinterpret_cast<const char *>(&b.prev_id), sizeof(b.prev_id));
+      memcpy(buf + sizeof(block_height) + sizeof(b.prev_id), txhashbuf, sizeof(txhashbuf));
+      memcpy(buf + sizeof(block_height) + sizeof(b.prev_id)+ sizeof(txhashbuf), reinterpret_cast<const char *>(&b.timestamp), sizeof(b.timestamp));
+
+      crypto::hash result;
+      crypto::cn_fast_hash(buf, buf_size, result);
+
+      return result;
+  }
+  //---------------------------------------------------------------
+  bool get_security_signature_from_tx_extra(const std::vector<uint8_t>& tx_extra, crypto::signature& security_signature)
+  {
+        std::vector<tx_extra_field> tx_extra_fields;
+        parse_tx_extra(tx_extra, tx_extra_fields);
+        tx_extra_security_signature security_sig_struct;
+        bool result = find_tx_extra_field_by_type(tx_extra_fields, security_sig_struct);
+        if (!result)
+            return false;
+        security_signature = security_sig_struct.m_security_signature;
+        return true;
+  }
+  //---------------------------------------------------------------
+  bool add_security_signature_to_tx_extra(
+            std::vector<uint8_t>& tx_extra,
+            const crypto::signature& security_signature)
+    {
+        // convert to variant
+        tx_extra_field field =
+                tx_extra_security_signature{
+                        security_signature
+                };
+        bool r = add_tx_extra_field_to_tx_extra(tx_extra, field);
+        CHECK_AND_NO_ASSERT_MES_L1(r, false, "failed to serialize tx extra registration tx");
+        return true;
+    }
   //---------------------------------------------------------------
   bool get_master_node_contributor_from_tx_extra(const std::vector<uint8_t>& tx_extra, cryptonote::account_public_address& address)
   {

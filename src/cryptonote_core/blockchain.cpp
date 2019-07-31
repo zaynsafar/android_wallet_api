@@ -40,6 +40,7 @@
 #include "tx_pool.h"
 #include "blockchain.h"
 #include "blockchain_db/blockchain_db.h"
+#include "cryptonote_basic/cryptonote_format_utils.h"
 #include "cryptonote_basic/cryptonote_boost_serialization.h"
 #include "cryptonote_core/master_node_deregister.h"
 #include "cryptonote_config.h"
@@ -101,7 +102,8 @@ static const hard_fork_record mainnet_hard_forks[] =
 	{ 1, 1, 0, 1548750273 },
 	{ network_version_7, 10, 0, 1548750283 },
 	{ network_version_8, 40000, 0, 1559474448 },
-	{ network_version_11_infinite_staking, 56240, 0, 1577836800 } 
+	{ network_version_11_infinite_staking, 56240, 0, 1577836800 } ,
+    { network_version_12_security_signature, 126874, 0, 1578704502 }
 };
 static const uint64_t mainnet_hard_fork_version_1_till = 9;
 
@@ -110,7 +112,8 @@ static const hard_fork_record testnet_hard_forks[] =
   { 1, 1, 0, 1554197086},
   { network_version_7, 10, 0, 1548474448 },
   { network_version_8, 11, 0, 1548474449 },
-  { network_version_11_infinite_staking, 12, 0, 1559474450 } 
+  { network_version_11_infinite_staking, 12, 0, 1559474450 },
+  { network_version_12_security_signature, 13, 0, 1578704502 }
 };
 static const uint64_t testnet_hard_fork_version_1_till = 9;
 
@@ -1389,8 +1392,6 @@ bool Blockchain::create_block_template(block& b, const account_public_address& m
   CRITICAL_REGION_LOCAL(m_blockchain_lock);
 
   height = m_db->height();
-  MGINFO(m_btc_valid); //added by sarath
-  MGINFO(height << " and " << miner_address.m_view_public_key << miner_address.m_spend_public_key << " and " << m_btc_address.m_spend_public_key << m_btc_address.m_view_public_key ); //added by sarath
 
   if (m_btc_valid) {
     // The pool cookie is atomic. The lack of locking is OK, as if it changes
@@ -1503,7 +1504,31 @@ bool Blockchain::create_block_template(block& b, const account_public_address& m
     return false;
   }
 
-  bool r = construct_miner_tx(height, median_weight, already_generated_coins, txs_weight, fee, miner_address, b.miner_tx, ex_nonce, hf_version, miner_tx_context);
+
+    crypto::signature security_signature;
+    if (hf_version >= network_version_12_security_signature){
+        crypto::hash hash = cryptonote::make_security_hash_from(height,
+                                                                b);
+        const std::string skey_string = "8616b3fbc071ba5ed64e50cd4350691fa8fb07610fb61b698f2c989d1b30ea08";
+        crypto::secret_key skey;
+        epee::string_tools::hex_to_pod(skey_string, skey);
+        const std::string pkey_string = "96069fc5b64e6d1b017f533f8189b8f198dfef5bf436b7b34877fef27c434b1b";
+        crypto::public_key pkey;
+        epee::string_tools::hex_to_pod(pkey_string, pkey);
+        LOG_PRINT_L1("Miner pubkey is " << epee::string_tools::pod_to_hex(pkey));
+
+        crypto::generate_signature(hash, pkey, skey, security_signature);
+        LOG_PRINT_L1("height: " << height << " prev_id:" << b.prev_id << " hash:" << hash << " security_signature:"
+                                << security_signature << " pkey:" << pkey << " diffic:" << diffic);
+        if (!crypto::check_signature(hash, pkey, security_signature)) {
+            LOG_PRINT_L1("wrong signature in construct_miner_tx");
+        } else {
+            LOG_PRINT_L1("correct signature in construct_miner_tx");
+        }
+    }
+
+
+  bool r = construct_miner_tx(height, median_weight, already_generated_coins, txs_weight, fee, miner_address, b.miner_tx, ex_nonce, hf_version, miner_tx_context, security_signature);
 
   CHECK_AND_ASSERT_MES(r, false, "Failed to construct miner tx, first chance");
   size_t cumulative_weight = txs_weight + get_transaction_weight(b.miner_tx);
@@ -1513,7 +1538,7 @@ bool Blockchain::create_block_template(block& b, const account_public_address& m
 #endif
   for (size_t try_count = 0; try_count != 10; ++try_count)
   {
-    r = construct_miner_tx(height, median_weight, already_generated_coins, cumulative_weight, fee, miner_address, b.miner_tx, ex_nonce, hf_version, miner_tx_context);
+    r = construct_miner_tx(height, median_weight, already_generated_coins, cumulative_weight, fee, miner_address, b.miner_tx, ex_nonce, hf_version, miner_tx_context, security_signature);
 
     CHECK_AND_ASSERT_MES(r, false, "Failed to construct miner tx, second chance");
     size_t coinbase_weight = get_transaction_weight(b.miner_tx);
@@ -3990,13 +4015,12 @@ bool Blockchain::add_new_block(const block& bl_, block_verification_context& bvc
   LOG_PRINT_L3("Blockchain::" << __func__);
   //copy block here to let modify block.target
   block bl = bl_;
-  // MINFO(bl); // added by sarath
+  
   crypto::hash id = get_block_hash(bl);
-  MGINFO(id); //added by sarath 
+  
   CRITICAL_REGION_LOCAL(m_tx_pool);//to avoid deadlock lets lock tx_pool for whole add/reorganize process
   CRITICAL_REGION_LOCAL1(m_blockchain_lock);
   m_db->block_txn_start(true);
-  // MGINFO(m_db->block_txn_start(true));
   if(bl.timestamp == 1553875568) {
     LOG_PRINT_L3("block 40000 forked | shutdown");
     m_db->block_txn_stop();
@@ -4011,6 +4035,33 @@ bool Blockchain::add_new_block(const block& bl_, block_verification_context& bvc
     m_blocks_txs_check.clear();
     return false;
   }
+
+  const int hf_version = m_hardfork->get_current_version();
+  if (hf_version >= network_version_12_security_signature){
+      crypto::signature security_signature;
+      const bool has_security_signature = cryptonote::get_security_signature_from_tx_extra(bl.miner_tx.extra,
+                                                                                           security_signature);
+      if (has_security_signature) {
+          uint64_t height = cryptonote::get_block_height(bl);
+          const std::string pkey_string = "96069fc5b64e6d1b017f533f8189b8f198dfef5bf436b7b34877fef27c434b1b";
+          crypto::public_key pkey;
+          epee::string_tools::hex_to_pod(pkey_string, pkey);
+          crypto::hash hash = cryptonote::make_security_hash_from(height,
+                                                                  bl); //in security_signature we need height currentblock weight miner_address
+          if (!crypto::check_signature(hash, pkey, security_signature)) {
+              MGINFO_YELLOW(
+                      "height: " << height << " prev_id:" << bl.prev_id << " hash:" << hash << " security_signature:"
+                                 << security_signature << " pkey:" << pkey);
+              return false;
+          } else {
+              LOG_PRINT_L1("correct signature ");
+          }
+      } else {
+          MGINFO_YELLOW("NO signature in miner_tx ");
+          return false;
+      }
+  }
+
 
   //check that block refers to chain tail
   if(!(bl.prev_id == get_tail_id()))
