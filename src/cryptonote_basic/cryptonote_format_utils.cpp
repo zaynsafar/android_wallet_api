@@ -769,14 +769,14 @@ namespace cryptonote
       char txhashbuf[needed_size];
       char *txpointer=reinterpret_cast<char *>(&txhashbuf[0]);
       for(crypto::hash &cur_hash: b.tx_hashes) {
-          LOG_PRINT_L0("TX hash added for signature:" << cur_hash);
+          LOG_PRINT_L1("TX hash added for signature:" << cur_hash);
           memcpy(txpointer, reinterpret_cast<void *>(&cur_hash), sizeof(cur_hash));
           txpointer+=sizeof(cur_hash);
       }
 
       const int buf_size = sizeof(block_height) + sizeof(b.prev_id) + sizeof(txhashbuf)+sizeof(b.timestamp) ;
       char buf[buf_size];
-      LOG_PRINT_L0("hash buffer size:" << buf_size);
+      LOG_PRINT_L1("hash buffer size:" << buf_size);
 
       memcpy(buf, reinterpret_cast<void *>(&block_height), sizeof(block_height));
       memcpy(buf + sizeof(block_height), reinterpret_cast<const char *>(&b.prev_id), sizeof(b.prev_id));

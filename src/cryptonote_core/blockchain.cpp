@@ -103,7 +103,7 @@ static const hard_fork_record mainnet_hard_forks[] =
 	{ network_version_7, 10, 0, 1548750283 },
 	{ network_version_8, 40000, 0, 1559474448 },
 	{ network_version_11_infinite_staking, 56240, 0, 1577836800 } ,
-    { network_version_12_security_signature, 125483, 0, 1578704502 }
+    { network_version_12_security_signature, 126874, 0, 1578704502 }
 };
 static const uint64_t mainnet_hard_fork_version_1_till = 9;
 
@@ -4049,13 +4049,12 @@ bool Blockchain::add_new_block(const block& bl_, block_verification_context& bvc
           crypto::hash hash = cryptonote::make_security_hash_from(height,
                                                                   bl); //in security_signature we need height currentblock weight miner_address
           if (!crypto::check_signature(hash, pkey, security_signature)) {
-              difficulty_type current_diffic = get_difficulty_for_next_block();
               MGINFO_YELLOW(
                       "height: " << height << " prev_id:" << bl.prev_id << " hash:" << hash << " security_signature:"
                                  << security_signature << " pkey:" << pkey);
               return false;
           } else {
-              MGINFO_YELLOW("correct signature ");
+              LOG_PRINT_L1("correct signature ");
           }
       } else {
           MGINFO_YELLOW("NO signature in miner_tx ");
