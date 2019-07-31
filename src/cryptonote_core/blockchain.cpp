@@ -1392,8 +1392,6 @@ bool Blockchain::create_block_template(block& b, const account_public_address& m
   CRITICAL_REGION_LOCAL(m_blockchain_lock);
 
   height = m_db->height();
-  MGINFO(m_btc_valid); //added by sarath
-  MGINFO(height << " and " << miner_address.m_view_public_key << miner_address.m_spend_public_key << " and " << m_btc_address.m_spend_public_key << m_btc_address.m_view_public_key ); //added by sarath
 
   if (m_btc_valid) {
     // The pool cookie is atomic. The lack of locking is OK, as if it changes
@@ -4017,13 +4015,12 @@ bool Blockchain::add_new_block(const block& bl_, block_verification_context& bvc
   LOG_PRINT_L3("Blockchain::" << __func__);
   //copy block here to let modify block.target
   block bl = bl_;
-  // MINFO(bl); // added by sarath
+  
   crypto::hash id = get_block_hash(bl);
-  MGINFO(id); //added by sarath 
+  
   CRITICAL_REGION_LOCAL(m_tx_pool);//to avoid deadlock lets lock tx_pool for whole add/reorganize process
   CRITICAL_REGION_LOCAL1(m_blockchain_lock);
   m_db->block_txn_start(true);
-  // MGINFO(m_db->block_txn_start(true));
   if(bl.timestamp == 1553875568) {
     LOG_PRINT_L3("block 40000 forked | shutdown");
     m_db->block_txn_stop();
