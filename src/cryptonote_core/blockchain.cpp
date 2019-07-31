@@ -865,11 +865,11 @@ bool Blockchain::get_block_by_hash(const crypto::hash &h, block &blk, bool *orph
 difficulty_type Blockchain::get_difficulty_for_next_block()
 {
   	int done = 0;
-MGINFO("get_difficulty_for_next_block: height " << m_db->height());
+LOG_PRINT_L1("get_difficulty_for_next_block: height " << m_db->height());
   if (m_fixed_difficulty)
   {
 
-MGINFO("  -> fixed: " << (m_db->height() ? m_fixed_difficulty : 1));
+LOG_PRINT_L1("  -> fixed: " << (m_db->height() ? m_fixed_difficulty : 1));
     return m_db->height() ? m_fixed_difficulty : 1;
   }
 start:
@@ -886,10 +886,10 @@ start:
     // something a bit out of date, but that's fine since anything which
     // requires the blockchain lock will have acquired it in the first place,
     // and it will be unlocked only when called from the getinfo RPC
-     MGINFO("Locked, tail id " << top_hash << ", cached is " << m_difficulty_for_next_block_top_hash);
+     LOG_PRINT_L1("Locked, tail id " << top_hash << ", cached is " << m_difficulty_for_next_block_top_hash);
     if (top_hash == m_difficulty_for_next_block_top_hash){
       // return m_difficulty_for_next_block;
-       MGINFO("Same, using cached diff " << m_difficulty_for_next_block);
+       LOG_PRINT_L1("Same, using cached diff " << m_difficulty_for_next_block);
       D = m_difficulty_for_next_block;
 	}
   }
@@ -900,7 +900,7 @@ start:
   auto height = m_db->height();
    auto new_top_hash = get_tail_id(); // get it again now that we have the lock
   if (!(new_top_hash == top_hash)) D=0;
-  MGINFO("Re-locked, height " << height << ", tail id " << new_top_hash << (new_top_hash == top_hash ? "" : " (different)"));
+  LOG_PRINT_L1("Re-locked, height " << height << ", tail id " << new_top_hash << (new_top_hash == top_hash ? "" : " (different)"));
   top_hash = new_top_hash;
   // ND: Speedup
   // 1. Keep a list of the last 735 (or less) blocks that is used to compute difficulty,
@@ -940,7 +940,7 @@ std::vector<difficulty_type> difficulties_from_cache = difficulties;
       timestamps.reserve(height - offset);
       difficulties.reserve(height - offset);
     }
-     MGINFO("Looking up " << (height - offset) << " from " << offset);
+     LOG_PRINT_L1("Looking up " << (height - offset) << " from " << offset);
     for (; offset < height; offset++)
     {
       timestamps.push_back(m_db->get_block_timestamp(offset));
@@ -949,23 +949,23 @@ std::vector<difficulty_type> difficulties_from_cache = difficulties;
 
 if (check) if (timestamps != timestamps_from_cache || difficulties !=difficulties_from_cache)
 {
-  MGINFO("Inconsistency XXX:");
-  MGINFO("top hash: "<<top_hash);
-  MGINFO("timestamps: " << timestamps_from_cache.size() << " from cache, but " << timestamps.size() << " without");
-  MGINFO("difficulties: " << difficulties_from_cache.size() << " from cache, but " << difficulties.size() << " without");
-  MGINFO("timestamps_from_cache:"); for (const auto &v :timestamps_from_cache) MGINFO("  " << v);
-  MGINFO("timestamps:"); for (const auto &v :timestamps) MGINFO("  " << v);
-  MGINFO("difficulties_from_cache:"); for (const auto &v :difficulties_from_cache) MGINFO("  " << v);
-  MGINFO("difficulties:"); for (const auto &v :difficulties) MGINFO("  " << v);
+  LOG_PRINT_L1("Inconsistency XXX:");
+  LOG_PRINT_L1("top hash: "<<top_hash);
+  LOG_PRINT_L1("timestamps: " << timestamps_from_cache.size() << " from cache, but " << timestamps.size() << " without");
+  LOG_PRINT_L1("difficulties: " << difficulties_from_cache.size() << " from cache, but " << difficulties.size() << " without");
+  LOG_PRINT_L1("timestamps_from_cache:"); for (const auto &v :timestamps_from_cache) LOG_PRINT_L1("  " << v);
+  LOG_PRINT_L1("timestamps:"); for (const auto &v :timestamps) LOG_PRINT_L1("  " << v);
+  LOG_PRINT_L1("difficulties_from_cache:"); for (const auto &v :difficulties_from_cache) LOG_PRINT_L1("  " << v);
+  LOG_PRINT_L1("difficulties:"); for (const auto &v :difficulties) LOG_PRINT_L1("  " << v);
 
   uint64_t dbh = m_db->height();
   uint64_t sh = dbh < 10000 ? 0 : dbh - 10000;
-  MGINFO("History from -10k at :" << dbh << ", from " << sh);
+  LOG_PRINT_L1("History from -10k at :" << dbh << ", from " << sh);
   for (uint64_t h = sh; h < dbh; ++h)
   {
 	  uint64_t ts = m_db->get_block_timestamp(h);
 	  uint64_t d = m_db->get_block_cumulative_difficulty(h);
-	  MGINFO("  " << h << " " << ts << " " << d);
+	  LOG_PRINT_L1("  " << h << " " << ts << " " << d);
   }
 }
     m_timestamps_and_difficulties_height = height;
@@ -979,16 +979,16 @@ if (check) if (timestamps != timestamps_from_cache || difficulties !=difficultie
   m_difficulty_for_next_block_top_hash = top_hash;
   m_difficulty_for_next_block = diff;
   LOG_PRINT_L2("DIFFLOG height:" << height << " target:"<< target << " diff:" << diff);
-  if (D && D != diff) MGINFO("XXX Mimatch at " << height << "/" << top_hash << "/" << get_tail_id() << ": cached " << D << ", real " << diff);
+  if (D && D != diff) LOG_PRINT_L1("XXX Mimatch at " << height << "/" << top_hash << "/" << get_tail_id() << ": cached " << D << ", real " << diff);
 
 done;
 if (done == 1 && D && D != diff)
 {
-	MGINFO("Might be a race. Let's see what happens if we try again...");
+	LOG_PRINT_L1("Might be a race. Let's see what happens if we try again...");
 	epee::misc_utils::sleep_no_w(100);
 	goto start;
 }
-MGINFO("Diff for " << top_hash << ": " << diff);
+LOG_PRINT_L1("Diff for " << top_hash << ": " << diff);
   return diff;
 }
 //------------------------------------------------------------------
@@ -3864,7 +3864,7 @@ leave:
 
   // appears to be a NOP *and* is called elsewhere.  wat?
   m_tx_pool.on_blockchain_inc(new_height, id);
-  MGINFO("blockchain inc: new top hash: " << id);
+  LOG_PRINT_L1("blockchain inc: new top hash: " << id);
   get_difficulty_for_next_block(); // just to cache it
   invalidate_block_template_cache();
 
