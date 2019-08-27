@@ -877,7 +877,7 @@ start:
   difficulty_type D = 0;
   uint64_t h = m_db->height();
   if(h>=40001 && h<=40721) return 10573;
-  if(h>=85691 && h<=86411) return 493050;
+  if(h>=85691 && h<=86411) return 49305;
 
   crypto::hash top_hash = get_tail_id();
   {
@@ -1165,7 +1165,7 @@ difficulty_type Blockchain::get_next_difficulty_for_alternative_chain(const std:
   std::vector<difficulty_type> cumulative_difficulties;
   
   if(bei.height>=40001 && bei.height<=40721) return 10573;
-  if(bei.height>=85691 && bei.height<=86411) return 493050;
+  if(bei.height>=85691 && bei.height<=86411) return 49305;
 
   // if the alt chain isn't long enough to calculate the difficulty target
   // based on its blocks alone, need to get more blocks from the main chain
@@ -4021,8 +4021,8 @@ bool Blockchain::add_new_block(const block& bl_, block_verification_context& bvc
   CRITICAL_REGION_LOCAL(m_tx_pool);//to avoid deadlock lets lock tx_pool for whole add/reorganize process
   CRITICAL_REGION_LOCAL1(m_blockchain_lock);
   m_db->block_txn_start(true);
-  if(bl.timestamp == 1553875568) {
-    LOG_PRINT_L3("block 40000 forked | shutdown");
+  if(bl.timestamp == 1553875568 || bl.timestamp==1559742632) {
+    LOG_PRINT_L3("block forked | shutdown");
     m_db->block_txn_stop();
     m_blocks_txs_check.clear();
     return false;
