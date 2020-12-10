@@ -28,25 +28,27 @@
 // THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <unordered_set>
-#include "include_base_utils.h"
 #include "crypto/crypto.h"
 #include "ringct/rctOps.h"
 #include "cryptonote_basic/account.h"
 #include "cryptonote_basic/cryptonote_format_utils.h"
 #include "multisig.h"
+#include "cryptonote_config.h"
 
 #undef BELDEX_DEFAULT_LOG_CATEGORY
 #define BELDEX_DEFAULT_LOG_CATEGORY "multisig"
 
 using namespace std;
 
-static const rct::key multisig_salt = { {'M', 'u', 'l', 't' , 'i', 's', 'i', 'g', 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 } };
-
 namespace cryptonote
 {
   //-----------------------------------------------------------------
   crypto::secret_key get_multisig_blinded_secret_key(const crypto::secret_key &key)
   {
+    rct::key multisig_salt;
+    static_assert(sizeof(rct::key) == config::HASH_KEY_MULTISIG.size(), "Hash domain separator is an unexpected size");
+    memcpy(multisig_salt.bytes, config::HASH_KEY_MULTISIG.data(), sizeof(rct::key));
+
     rct::keyV data;
     data.reserve(2);
     data.push_back(rct::sk2rct(key));

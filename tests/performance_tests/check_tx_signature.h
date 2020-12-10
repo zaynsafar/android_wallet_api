@@ -71,7 +71,8 @@ public:
     std::vector<crypto::secret_key> additional_tx_keys;
     std::unordered_map<crypto::public_key, cryptonote::subaddress_index> subaddresses;
     subaddresses[this->m_miners[this->real_source_idx].get_keys().m_account_address.m_spend_public_key] = {0,0};
-    beldex_construct_tx_params tx_params(cryptonote::network_version_9_master_nodes);
+    beldex_construct_tx_params tx_params;
+    tx_params.hf_version = cryptonote::network_version_count - 1;
     rct::RCTConfig rct_config{range_proof_type, bp_version};
     if (!construct_tx_and_get_tx_key(this->m_miners[this->real_source_idx].get_keys(), subaddresses, this->m_sources, destinations, cryptonote::tx_destination_entry{}, std::vector<uint8_t>(), m_tx, 0, tx_key, additional_tx_keys, rct_config, nullptr, tx_params))
       return false;
@@ -92,7 +93,7 @@ public:
     }
     else
     {
-      const cryptonote::txin_to_key& txin = boost::get<cryptonote::txin_to_key>(m_tx.vin[0]);
+      const cryptonote::txin_to_key& txin = var::get<cryptonote::txin_to_key>(m_tx.vin[0]);
       return crypto::check_ring_signature(m_tx_prefix_hash, txin.k_image, this->m_public_key_ptrs, ring_size, m_tx.signatures[0].data());
     }
   }
@@ -134,7 +135,8 @@ public:
     std::unordered_map<crypto::public_key, cryptonote::subaddress_index> subaddresses;
     subaddresses[this->m_miners[this->real_source_idx].get_keys().m_account_address.m_spend_public_key] = {0,0};
 
-    beldex_construct_tx_params tx_params(cryptonote::network_version_10_bulletproofs);
+    beldex_construct_tx_params tx_params;
+    tx_params.hf_version = cryptonote::network_version_count - 1;
     m_txes.resize(a_num_txes + (extra_outs > 0 ? 1 : 0));
     for (size_t n = 0; n < a_num_txes; ++n)
     {
@@ -146,8 +148,9 @@ public:
     {
       destinations.clear();
       destinations.push_back(tx_destination_entry(this->m_source_amount - extra_outs + 1, m_alice.get_keys().m_account_address, false));
-      for (size_t n = 1; n < extra_outs; ++n)
-        destinations.push_back(tx_destination_entry(1, m_alice.get_keys().m_account_address, false));
+      if constexpr (extra_outs > 1)
+        for (size_t n = 1; n < extra_outs; ++n)
+          destinations.push_back(tx_destination_entry(1, m_alice.get_keys().m_account_address, false));
 
       if (!construct_tx_and_get_tx_key(this->m_miners[this->real_source_idx].get_keys(), subaddresses, this->m_sources, destinations, cryptonote::tx_destination_entry{}, std::vector<uint8_t>(), m_txes.back(), 0, tx_key, additional_tx_keys, {rct::RangeProofMultiOutputBulletproof, 2}, nullptr, tx_params))
         return false;

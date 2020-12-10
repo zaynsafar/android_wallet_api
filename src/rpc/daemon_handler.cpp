@@ -1,4 +1,4 @@
-// Copyright (c) 2017-2018, The Monero Project
+// Copyright (c) 2017-2019, The Monero Project
 // 
 // All rights reserved.
 // 
@@ -28,6 +28,8 @@
 
 #include "daemon_handler.h"
 
+#include <thread>
+
 // likely included by daemon_handler.h's includes,
 // but including here for clarity
 #include "cryptonote_core/cryptonote_core.h"
@@ -53,7 +55,7 @@ namespace rpc
   {
     std::vector<std::pair<std::pair<blobdata, crypto::hash>, std::vector<std::pair<crypto::hash, blobdata> > > > blocks;
 
-    if(!m_core.find_blockchain_supplement(req.start_height, req.block_ids, blocks, res.current_height, res.start_height, req.prune, true, COMMAND_RPC_GET_BLOCKS_FAST_MAX_COUNT))
+    if(!m_core.find_blockchain_supplement(req.start_height, req.block_ids, blocks, res.current_height, res.start_height, req.prune, true, GET_BLOCKS_FAST::MAX_COUNT))
     {
       res.status = Message::STATUS_FAILED;
       res.error_details = "core::find_blockchain_supplement() returned false";
@@ -141,7 +143,7 @@ namespace rpc
 
     auto& chain = m_core.get_blockchain_storage();
 
-    if (!chain.find_blockchain_supplement(req.known_hashes, res.hashes, res.start_height, res.current_height))
+    if (!chain.find_blockchain_supplement(req.known_hashes, res.hashes, res.start_height, res.current_height, false))
     {
       res.status = Message::STATUS_FAILED;
       res.error_details = "Blockchain::find_blockchain_supplement() returned false";
@@ -183,7 +185,7 @@ namespace rpc
     {
       std::vector<cryptonote::transaction> pool_txs;
 
-      m_core.get_pool_transactions(pool_txs);
+      m_core.get_pool().get_transactions(pool_txs);
 
       for (const auto& tx : pool_txs)
       {
@@ -263,20 +265,43 @@ namespace rpc
 
   void DaemonHandler::handle(const SendRawTx::Request& req, SendRawTx::Response& res)
   {
-    auto tx_blob = cryptonote::tx_to_blob(req.tx);
+    handleTxBlob(cryptonote::tx_to_blob(req.tx), req.relay, res);
+  }
 
-    cryptonote_connection_context fake_context = AUTO_VAL_INIT(fake_context);
-    tx_verification_context tvc = AUTO_VAL_INIT(tvc);
+  void DaemonHandler::handle(const SendRawTxHex::Request& req, SendRawTxHex::Response& res)
+  {
+    std::string tx_blob;
+    if(!epee::string_tools::parse_hexstr_to_binbuff(req.tx_as_hex, tx_blob))
+    {
+      MERROR("[SendRawTxHex]: Failed to parse tx from hexbuff: " << req.tx_as_hex);
+      res.status = Message::STATUS_FAILED;
+      res.error_details = "Invalid hex";
+      return;
+    }
+    handleTxBlob(tx_blob, req.relay, res);
+  }
 
-    if(!m_core.handle_incoming_tx(tx_blob, tvc, false, false, !req.relay) || tvc.m_verifivation_failed)
+  void DaemonHandler::handleTxBlob(const std::string& tx_blob, bool relay, SendRawTx::Response& res)
+  {
+    if (!m_p2p.get_payload_object().is_synchronized())
+    {
+      res.status = Message::STATUS_FAILED;
+      res.error_details = "Not ready to accept transactions; try again later";
+      return;
+    }
+
+    cryptonote_connection_context fake_context{};
+    tx_verification_context tvc{};
+
+    if(!m_core.handle_incoming_tx(tx_blob, tvc, tx_pool_options::new_tx(!relay)) || tvc.m_verifivation_failed)
     {
       if (tvc.m_verifivation_failed)
       {
-        LOG_PRINT_L0("[on_send_raw_tx]: tx verification failed");
+        MERROR("[SendRawTx]: tx verification failed");
       }
       else
       {
-        LOG_PRINT_L0("[on_send_raw_tx]: Failed to process tx");
+        MERROR("[SendRawTx]: Failed to process tx");
       }
       res.status = Message::STATUS_FAILED;
       res.error_details = "";
@@ -315,10 +340,10 @@ namespace rpc
         if (!res.error_details.empty()) res.error_details += " and ";
         res.error_details = "fee too low";
       }
-      if (tvc.m_not_rct)
+      if (tvc.m_too_few_outputs)
       {
         if (!res.error_details.empty()) res.error_details += " and ";
-        res.error_details = "tx is not ringct";
+        res.error_details = "too few outputs";
       }
       if (tvc.m_invalid_version)
       {
@@ -330,7 +355,7 @@ namespace rpc
         if (!res.error_details.empty()) res.error_details += " and ";
         res.error_details = "tx has an invalid type";
       }
-      if (tvc.m_key_image_locked_by_snode)
+      if (tvc.m_key_image_locked_by_mnode)
       {
         if (!res.error_details.empty()) res.error_details += " and ";
         res.error_details = "tx uses outputs that are locked by the master node network";
@@ -348,9 +373,9 @@ namespace rpc
       return;
     }
 
-    if(!tvc.m_should_be_relayed || !req.relay)
+    if(!tvc.m_should_be_relayed || !relay)
     {
-      LOG_PRINT_L0("[on_send_raw_tx]: tx accepted, but not relayed");
+      MERROR("[SendRawTx]: tx accepted, but not relayed");
       res.error_details = "Not relayed";
       res.relayed = false;
       res.status = Message::STATUS_OK;
@@ -387,7 +412,7 @@ namespace rpc
       return;
     }
 
-    unsigned int concurrency_count = boost::thread::hardware_concurrency() * 4;
+    unsigned int concurrency_count = std::thread::hardware_concurrency() * 4;
 
     // if we couldn't detect threads, set it to a ridiculously high number
     if(concurrency_count == 0)
@@ -405,10 +430,7 @@ namespace rpc
       return;
     }
 
-    boost::thread::attributes attrs;
-    attrs.set_stack_size(THREAD_STACK_SIZE);
-
-    if(!m_core.get_miner().start(info.address, static_cast<size_t>(req.threads_count), attrs, req.do_background_mining, req.ignore_battery))
+    if(!m_core.get_miner().start(info.address, static_cast<size_t>(req.threads_count)))
     {
       res.error_details = "Failed, mining not started";
       LOG_PRINT_L0(res.error_details);
@@ -433,32 +455,38 @@ namespace rpc
 
     auto& chain = m_core.get_blockchain_storage();
 
-    res.info.difficulty = chain.get_difficulty_for_next_block();
+    bool next_block_is_pulse = false;
+    auto prev_ts             = m_core.get_blockchain_storage().get_db().get_block_timestamp(res.info.height);
+    if (pulse::timings t; pulse::get_round_timings(m_core.get_blockchain_storage(), res.info.height, prev_ts, t)) {
+      next_block_is_pulse = pulse::clock::now() < t.miner_fallback_timestamp;
+    }
 
-    res.info.target = chain.get_difficulty_target();
+    res.info.difficulty = chain.get_difficulty_for_next_block(next_block_is_pulse);
+
+    res.info.target = tools::to_seconds(TARGET_BLOCK_TIME);
 
     res.info.tx_count = chain.get_total_transactions() - res.info.height; //without coinbase
 
-    res.info.tx_pool_size = m_core.get_pool_transactions_count();
+    res.info.tx_pool_size = m_core.get_pool().get_transactions_count();
 
     res.info.alt_blocks_count = chain.get_alternative_blocks_count();
 
-    uint64_t total_conn = m_p2p.get_connections_count();
-    res.info.outgoing_connections_count = m_p2p.get_outgoing_connections_count();
+    uint64_t total_conn = m_p2p.get_public_connections_count();
+    res.info.outgoing_connections_count = m_p2p.get_public_outgoing_connections_count();
     res.info.incoming_connections_count = total_conn - res.info.outgoing_connections_count;
 
-    res.info.white_peerlist_size = m_p2p.get_peerlist_manager().get_white_peers_count();
+    res.info.white_peerlist_size = m_p2p.get_public_white_peers_count();
 
-    res.info.grey_peerlist_size = m_p2p.get_peerlist_manager().get_gray_peers_count();
+    res.info.grey_peerlist_size = m_p2p.get_public_gray_peers_count();
 
     res.info.mainnet = m_core.get_nettype() == MAINNET;
     res.info.testnet = m_core.get_nettype() == TESTNET;
-    res.info.stagenet = m_core.get_nettype() == STAGENET;
+    res.info.devnet = m_core.get_nettype() == DEVNET;
     res.info.cumulative_difficulty = m_core.get_blockchain_storage().get_db().get_block_cumulative_difficulty(res.info.height - 1);
     res.info.block_size_limit = res.info.block_weight_limit = m_core.get_blockchain_storage().get_current_cumulative_block_weight_limit();
     res.info.block_size_median = res.info.block_weight_median = m_core.get_blockchain_storage().get_current_cumulative_block_weight_median();
     res.info.start_time = (uint64_t)m_core.get_start_time();
-    res.info.version = BELDEX_VERSION;
+    res.info.version = BELDEX_VERSION_STR;
 
     res.status = Message::STATUS_OK;
     res.error_details = "";
@@ -482,7 +510,6 @@ namespace rpc
   {
     const cryptonote::miner& lMiner = m_core.get_miner();
     res.active = lMiner.is_mining();
-    res.is_background_mining_enabled = lMiner.get_is_background_mining_enabled();
     
     if ( lMiner.is_mining() ) {
       res.speed = lMiner.get_speed();
@@ -628,7 +655,7 @@ namespace rpc
 
   void DaemonHandler::handle(const GetTransactionPool::Request& req, GetTransactionPool::Response& res)
   {
-    bool r = m_core.get_pool_for_rpc(res.transactions, res.key_images);
+    bool r = m_core.get_pool().get_pool_for_rpc(res.transactions, res.key_images);
 
     if (!r) res.status = Message::STATUS_FAILED;
     else res.status = Message::STATUS_OK;
@@ -749,7 +776,9 @@ namespace rpc
   void DaemonHandler::handle(const GetFeeEstimate::Request& req, GetFeeEstimate::Response& res)
   {
     res.hard_fork_version = m_core.get_blockchain_storage().get_current_hard_fork_version();
-    res.estimated_base_fee = m_core.get_blockchain_storage().get_dynamic_base_fee_estimate(req.num_grace_blocks);
+    auto fees = m_core.get_blockchain_storage().get_dynamic_base_fee_estimate(req.num_grace_blocks);
+    res.estimated_base_fee_per_byte = fees.first;
+    res.estimated_base_fee_per_output = fees.second;
 
     if (res.hard_fork_version < HF_VERSION_PER_BYTE_FEE)
     {
@@ -773,7 +802,7 @@ namespace rpc
       const uint64_t req_to_height = req.to_height ? req.to_height : (m_core.get_current_blockchain_height() - 1);
       for (std::uint64_t amount : req.amounts)
       {
-        auto data = rpc::RpcHandler::get_output_distribution([this](uint64_t amount, uint64_t from, uint64_t to, uint64_t &start_height, std::vector<uint64_t> &distribution, uint64_t &base) { return m_core.get_output_distribution(amount, from, to, start_height, distribution, base); }, amount, req.from_height, req_to_height, req.cumulative);
+        auto data = rpc::RpcHandler::get_output_distribution([this](uint64_t amount, uint64_t from, uint64_t to, uint64_t &start_height, std::vector<uint64_t> &distribution, uint64_t &base) { return m_core.get_output_distribution(amount, from, to, start_height, distribution, base); }, amount, req.from_height, req_to_height, [this](uint64_t height) { return m_core.get_blockchain_storage().get_db().get_block_hash_from_height(height); }, req.cumulative, m_core.get_current_blockchain_height());
         if (!data)
         {
           res.distributions.clear();
@@ -803,11 +832,11 @@ namespace rpc
     }
 
     header.hash = hash_in;
-    if (b.miner_tx.vin.size() != 1 || b.miner_tx.vin.front().type() != typeid(txin_gen))
+    if (b.miner_tx.vin.size() != 1 || !std::holds_alternative<txin_gen>(b.miner_tx.vin.front()))
     {
       return false;
     }
-    header.height = boost::get<txin_gen>(b.miner_tx.vin.front()).height;
+    header.height = var::get<txin_gen>(b.miner_tx.vin.front()).height;
 
     header.major_version = b.major_version;
     header.minor_version = b.minor_version;
@@ -850,6 +879,7 @@ namespace rpc
       REQ_RESP_TYPES_MACRO(request_type, KeyImagesSpent, req_json, resp_message, handle);
       REQ_RESP_TYPES_MACRO(request_type, GetTxGlobalOutputIndices, req_json, resp_message, handle);
       REQ_RESP_TYPES_MACRO(request_type, SendRawTx, req_json, resp_message, handle);
+      REQ_RESP_TYPES_MACRO(request_type, SendRawTxHex, req_json, resp_message, handle);
       REQ_RESP_TYPES_MACRO(request_type, GetInfo, req_json, resp_message, handle);
       REQ_RESP_TYPES_MACRO(request_type, StartMining, req_json, resp_message, handle);
       REQ_RESP_TYPES_MACRO(request_type, StopMining, req_json, resp_message, handle);

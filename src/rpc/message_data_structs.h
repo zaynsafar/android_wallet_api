@@ -1,4 +1,4 @@
-// Copyright (c) 2016-2018, The Monero Project
+// Copyright (c) 2016-2019, The Monero Project
 // 
 // All rights reserved.
 // 
@@ -78,6 +78,7 @@ namespace rpc
     uint64_t id;
     uint32_t ip;
     uint16_t port;
+    uint16_t rpc_port;
     uint64_t last_seen;
     uint32_t pruning_seed;
   };
@@ -183,7 +184,7 @@ namespace rpc
     uint64_t grey_peerlist_size;
     bool mainnet;
     bool testnet;
-    bool stagenet;
+    bool devnet;
     std::string nettype;
     crypto::hash top_block_hash;
     uint64_t cumulative_difficulty;

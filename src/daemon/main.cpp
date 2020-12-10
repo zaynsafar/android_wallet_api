@@ -29,23 +29,23 @@
 //
 // Parts of this file are originally copyright (c) 2012-2013 The Cryptonote developers
 
+#include <cstdlib>
 #include "common/command_line.h"
 #include "common/scoped_message_writer.h"
 #include "common/password.h"
 #include "common/util.h"
+#include "common/fs.h"
 #include "cryptonote_core/cryptonote_core.h"
-#include "cryptonote_basic/miner.h"
-#include "daemon/command_server.h"
-#include "daemon/daemon.h"
-#include "daemon/executor.h"
 #include "daemonizer/daemonizer.h"
-#include "misc_log_ex.h"
+#include "epee/misc_log_ex.h"
 #include "p2p/net_node.h"
-#include "rpc/core_rpc_server.h"
 #include "rpc/rpc_args.h"
+#include "rpc/core_rpc_server.h"
 #include "daemon/command_line_args.h"
-#include "blockchain_db/db_types.h"
 #include "version.h"
+
+#include "command_server.h"
+#include "daemon.h"
 
 #ifdef STACK_TRACE
 #include "common/stack_trace.h"
@@ -55,7 +55,8 @@
 #define BELDEX_DEFAULT_LOG_CATEGORY "daemon"
 
 namespace po = boost::program_options;
-namespace bf = boost::filesystem;
+
+using namespace std::literals;
 
 int main(int argc, char const * argv[])
 {
@@ -67,18 +68,19 @@ int main(int argc, char const * argv[])
 
     epee::string_tools::set_module_name_and_folder(argv[0]);
 
+    auto opt_size = command_line::boost_option_sizes();
+
     // Build argument description
-    po::options_description all_options("All");
+    po::options_description all_options("All", opt_size.first, opt_size.second);
     po::options_description hidden_options("Hidden");
-    po::options_description visible_options("Options");
-    po::options_description core_settings("Settings");
+    po::options_description visible_options("Options", opt_size.first, opt_size.second);
+    po::options_description core_settings("Settings", opt_size.first, opt_size.second);
     po::positional_options_description positional_options;
     {
       // Misc Options
 
       command_line::add_arg(visible_options, command_line::arg_help);
       command_line::add_arg(visible_options, command_line::arg_version);
-      command_line::add_arg(visible_options, daemon_args::arg_os_version);
       command_line::add_arg(visible_options, daemon_args::arg_config_file);
 
       // Settings
@@ -87,11 +89,9 @@ int main(int argc, char const * argv[])
       command_line::add_arg(core_settings, daemon_args::arg_max_log_file_size);
       command_line::add_arg(core_settings, daemon_args::arg_max_log_files);
       command_line::add_arg(core_settings, daemon_args::arg_max_concurrency);
-      command_line::add_arg(core_settings, daemon_args::arg_zmq_rpc_bind_ip);
-      command_line::add_arg(core_settings, daemon_args::arg_zmq_rpc_bind_port);
 
       daemonizer::init_options(hidden_options, visible_options);
-      daemonize::t_executor::init_options(core_settings);
+      daemonize::daemon::init_options(core_settings, hidden_options);
 
       // Hidden options
       command_line::add_arg(hidden_options, daemon_args::arg_command);
@@ -120,7 +120,7 @@ int main(int argc, char const * argv[])
 
     if (command_line::get_arg(vm, command_line::arg_help))
     {
-      std::cout << "Beldex '" << BELDEX_RELEASE_NAME << "' (v" << BELDEX_VERSION_FULL << ")" << ENDL << ENDL;
+      std::cout << "Beldex '" << BELDEX_RELEASE_NAME << "' (v" << BELDEX_VERSION_FULL << ")\n\n";
       std::cout << "Usage: " + std::string{argv[0]} + " [options|settings] [daemon_command...]" << std::endl << std::endl;
       std::cout << visible_options << std::endl;
       return 0;
@@ -129,25 +129,22 @@ int main(int argc, char const * argv[])
     // Beldex Version
     if (command_line::get_arg(vm, command_line::arg_version))
     {
-      std::cout << "Beldex '" << BELDEX_RELEASE_NAME << "' (v" << BELDEX_VERSION_FULL << ")" << ENDL;
+      std::cout << "Beldex '" << BELDEX_RELEASE_NAME << "' (v" << BELDEX_VERSION_FULL << ")\n\n";
       return 0;
     }
 
-    // OS
-    if (command_line::get_arg(vm, daemon_args::arg_os_version))
-    {
-      std::cout << "OS: " << tools::get_os_version_string() << ENDL;
-      return 0;
-    }
-
-    std::string config = command_line::get_arg(vm, daemon_args::arg_config_file);
-    boost::filesystem::path config_path(config);
-    boost::system::error_code ec;
-    if (bf::exists(config_path, ec))
+    auto config = fs::u8path(command_line::get_arg(vm, daemon_args::arg_config_file));
+    if (std::error_code ec; fs::exists(config, ec))
     {
       try
       {
-        po::store(po::parse_config_file<char>(config_path.string<std::string>().c_str(), core_settings), vm);
+        fs::ifstream cfg{config};
+        if (!cfg.is_open())
+          throw std::runtime_error{"Unable to open file"};
+        po::store(po::parse_config_file<char>(
+                    cfg,
+                    po::options_description{}.add(core_settings).add(hidden_options)),
+                vm);
       }
       catch (const std::exception &e)
       {
@@ -163,22 +160,12 @@ int main(int argc, char const * argv[])
     }
 
     const bool testnet = command_line::get_arg(vm, cryptonote::arg_testnet_on);
-    const bool stagenet = command_line::get_arg(vm, cryptonote::arg_stagenet_on);
+    const bool devnet = command_line::get_arg(vm, cryptonote::arg_devnet_on);
     const bool regtest = command_line::get_arg(vm, cryptonote::arg_regtest_on);
-    if (testnet + stagenet + regtest > 1)
+    if (testnet + devnet + regtest > 1)
     {
-      std::cerr << "Can't specify more than one of --tesnet and --stagenet and --regtest" << ENDL;
+      std::cerr << "Can't specify more than one of --testnet and --devnet and --regtest\n";
       return 1;
-    }
-
-    std::string db_type = command_line::get_arg(vm, cryptonote::arg_db_type);
-
-    // verify that blockchaindb type is valid
-    if(!cryptonote::blockchain_valid_db_type(db_type))
-    {
-      std::cout << "Invalid database type (" << db_type << "), available types are: " <<
-        cryptonote::blockchain_db_types(", ") << std::endl;
-      return 0;
     }
 
     // data_dir
@@ -188,12 +175,11 @@ int main(int argc, char const * argv[])
     //     relative path: relative to cwd
 
     // Create data dir if it doesn't exist
-    boost::filesystem::path data_dir = boost::filesystem::absolute(
-        command_line::get_arg(vm, cryptonote::arg_data_dir));
+    auto data_dir = fs::absolute(fs::u8path(command_line::get_arg(vm, cryptonote::arg_data_dir)));
 
     // FIXME: not sure on windows implementation default, needs further review
-    //bf::path relative_path_base = daemonizer::get_relative_path_base(vm);
-    bf::path relative_path_base = data_dir;
+    //fs::path relative_path_base = daemonizer::get_relative_path_base(vm);
+    fs::path relative_path_base = data_dir;
 
     po::notify(vm);
 
@@ -202,10 +188,11 @@ int main(int argc, char const * argv[])
     //   if log-file argument given:
     //     absolute path
     //     relative path: relative to data_dir
-    bf::path log_file_path {data_dir / std::string(CRYPTONOTE_NAME ".log")};
+    auto log_file_path = data_dir / CRYPTONOTE_NAME ".log";
     if (!command_line::is_arg_defaulted(vm, daemon_args::arg_log_file))
       log_file_path = command_line::get_arg(vm, daemon_args::arg_log_file);
-    log_file_path = bf::absolute(log_file_path, relative_path_base);
+    if (log_file_path.is_relative())
+      log_file_path = fs::absolute(fs::relative(log_file_path, relative_path_base));
     mlog_configure(log_file_path.string(), true, command_line::get_arg(vm, daemon_args::arg_max_log_file_size), command_line::get_arg(vm, daemon_args::arg_max_log_files));
 
     // Set log level
@@ -215,7 +202,7 @@ int main(int argc, char const * argv[])
     }
 
     // after logs initialized
-    tools::create_directories_if_necessary(data_dir.string());
+    tools::create_directories_if_necessary(data_dir);
 
 #ifdef STACK_TRACE
     tools::set_stack_trace_log(log_file_path.filename().string());
@@ -225,7 +212,8 @@ int main(int argc, char const * argv[])
       tools::set_max_concurrency(command_line::get_arg(vm, daemon_args::arg_max_concurrency));
 
     // logging is now set up
-    MGINFO("Beldex '" << BELDEX_RELEASE_NAME << "' (v" << BELDEX_VERSION_FULL << ")");
+    // FIXME: only print this when starting up as a daemon but not when running rpc commands
+    MGINFO_GREEN("BELDEX '" << BELDEX_RELEASE_NAME << "' (v" << BELDEX_VERSION_FULL << ")");
 
     // If there are positional options, we're running a daemon command
     {
@@ -233,63 +221,39 @@ int main(int argc, char const * argv[])
 
       if (command.size())
       {
-        const cryptonote::rpc_args::descriptors arg{};
-        auto rpc_ip_str = command_line::get_arg(vm, arg.rpc_bind_ip);
-        auto rpc_port_str = command_line::get_arg(vm, cryptonote::core_rpc_server::arg_rpc_bind_port);
-
-        uint32_t rpc_ip;
-        uint16_t rpc_port;
-        if (!epee::string_tools::get_ip_int32_from_string(rpc_ip, rpc_ip_str))
-        {
-          std::cerr << "Invalid IP: " << rpc_ip_str << std::endl;
-          return 1;
-        }
-        if (!epee::string_tools::get_xtype_from_string(rpc_port, rpc_port_str))
-        {
-          std::cerr << "Invalid port: " << rpc_port_str << std::endl;
-          return 1;
-        }
-
-        const char *env_rpc_login = nullptr;
-        const bool has_rpc_arg = command_line::has_arg(vm, arg.rpc_login);
-        const bool use_rpc_env = !has_rpc_arg && (env_rpc_login = getenv("RPC_LOGIN")) != nullptr && strlen(env_rpc_login) > 0;
-        boost::optional<tools::login> login{};
-        if (has_rpc_arg || use_rpc_env)
-        {
-          login = tools::login::parse(
-            has_rpc_arg ? command_line::get_arg(vm, arg.rpc_login) : std::string(env_rpc_login), false, [](bool verify) {
-#ifdef HAVE_READLINE
-        rdln::suspend_readline pause_readline;
-#endif
-              return tools::password_container::prompt(verify, "Daemon client password");
-            }
-          );
-          if (!login)
-          {
-            std::cerr << "Failed to obtain password" << std::endl;
-            return 1;
-          }
+        auto rpc_config = cryptonote::rpc_args::process(vm);
+        std::string rpc_addr;
+        // TODO: remove this in beldex 9.x and only use rpc-admin
+        if (!is_arg_defaulted(vm, cryptonote::rpc::http_server::arg_rpc_bind_port) ||
+            rpc_config.bind_ip.has_value()) {
+          auto rpc_port = command_line::get_arg(vm, cryptonote::rpc::http_server::arg_rpc_bind_port);
+          if (rpc_port == 0)
+            rpc_port =
+              command_line::get_arg(vm, cryptonote::arg_testnet_on) ? config::testnet::RPC_DEFAULT_PORT :
+              command_line::get_arg(vm, cryptonote::arg_devnet_on) ? config::devnet::RPC_DEFAULT_PORT :
+              config::RPC_DEFAULT_PORT;
+          rpc_addr = rpc_config.bind_ip.value_or("127.0.0.1") + ":" + std::to_string(rpc_port);
+        } else {
+          rpc_addr = command_line::get_arg(vm, cryptonote::rpc::http_server::arg_rpc_admin)[0];
+          if (rpc_addr == "none")
+            throw std::runtime_error{"Cannot invoke beldexd command: --rpc-admin is disabled"};
         }
 
-        daemonize::t_command_server rpc_commands{rpc_ip, rpc_port, std::move(login)};
-        if (rpc_commands.process_command_vec(command))
         {
-          return 0;
+          // Throws if invalid:
+          auto [ip, port] = daemonize::parse_ip_port(rpc_addr, "--rpc-admin");
+          rpc_addr = "http://"s + (ip.find(':') != std::string::npos ? "[" + ip + "]" : ip) + ":" + std::to_string(port);
         }
-        else
-        {
-#ifdef HAVE_READLINE
-          rdln::suspend_readline pause_readline;
-#endif
-          std::cerr << "Unknown command: " << command.front() << std::endl;
-          return 1;
-        }
+
+        daemonize::command_server rpc_commands{rpc_addr, rpc_config.login};
+        return rpc_commands.process_command_and_log(command) ? 0 : 1;
       }
     }
 
     MINFO("Moving from main() into the daemonize now.");
 
-    return daemonizer::daemonize(argc, argv, daemonize::t_executor{}, vm) ? 0 : 1;
+    return daemonizer::daemonize<daemonize::daemon>("Beldex Daemon", argc, argv, std::move(vm))
+        ? 0 : 1;
   }
   catch (std::exception const & ex)
   {

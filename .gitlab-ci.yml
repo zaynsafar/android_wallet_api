@@ -33,7 +33,7 @@ build:osx:
       - "build/release/bin"
 
 build:linux:
-  image: registry.gitlab.com/lokiproject/beldex:latest
+  image: registry.gitlab.com/Beldex-Coin/beldex:latest
   tags:
     - ubuntu
   stage: build

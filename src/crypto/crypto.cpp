@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2018, The Monero Project
+// Copyright (c) 2014-2019, The Monero Project
 // 
 // All rights reserved.
 // 
@@ -28,18 +28,18 @@
 // 
 // Parts of this file are originally copyright (c) 2012-2013 The Cryptonote developers
 
+#include <mutex>
 #include <unistd.h>
 #include <cassert>
-#include <cstddef>
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
-#include <boost/thread/mutex.hpp>
-#include <boost/thread/lock_guard.hpp>
-#include <boost/shared_ptr.hpp>
+#include <cstdio>
+#include <memory>
+#include <stdexcept>
 
 #include "common/varint.h"
-#include "warnings.h"
+#include "epee/warnings.h"
 #include "crypto.h"
 #include "hash.h"
 
@@ -69,9 +69,6 @@ namespace crypto {
 #include "random.h"
   }
 
-  const crypto::public_key null_pkey = crypto::public_key{};
-  const crypto::secret_key null_skey = crypto::secret_key{};
-
   static inline unsigned char *operator &(ec_point &point) {
     return &reinterpret_cast<unsigned char &>(point);
   }
@@ -88,11 +85,22 @@ namespace crypto {
     return &reinterpret_cast<const unsigned char &>(scalar);
   }
 
+  static auto get_random_lock()
+  {
+    static std::mutex random_mutex;
+    return std::lock_guard{random_mutex};
+  }
+
   void generate_random_bytes_thread_safe(size_t N, uint8_t *bytes)
   {
-    static boost::mutex random_lock;
-    boost::lock_guard<boost::mutex> lock(random_lock);
+    auto lock = get_random_lock();
     generate_random_bytes_not_thread_safe(N, bytes);
+  }
+
+  void add_extra_entropy_thread_safe(const void *ptr, size_t bytes)
+  {
+    auto lock = get_random_lock();
+    add_extra_entropy_not_thread_safe(ptr, bytes);
   }
 
   static inline bool less32(const unsigned char *k0, const unsigned char *k1)
@@ -133,7 +141,7 @@ namespace crypto {
    * TODO: allow specifying random value (for wallet recovery)
    * 
    */
-  secret_key crypto_ops::generate_keys(public_key &pub, secret_key &sec, const secret_key& recovery_key, bool recover) {
+  secret_key generate_keys(public_key &pub, secret_key &sec, const secret_key& recovery_key, bool recover) {
     ge_p3 point;
 
     secret_key rng;
@@ -155,12 +163,12 @@ namespace crypto {
     return rng;
   }
 
-  bool crypto_ops::check_key(const public_key &key) {
+  bool check_key(const public_key &key) {
     ge_p3 point;
     return ge_frombytes_vartime(&point, &key) == 0;
   }
 
-  bool crypto_ops::secret_key_to_public_key(const secret_key &sec, public_key &pub) {
+  bool secret_key_to_public_key(const secret_key &sec, public_key &pub) {
     ge_p3 point;
     if (sc_check(&unwrap(sec)) != 0) {
       return false;
@@ -170,7 +178,7 @@ namespace crypto {
     return true;
   }
 
-  bool crypto_ops::generate_key_derivation(const public_key &key1, const secret_key &key2, key_derivation &derivation) {
+  bool generate_key_derivation(const public_key &key1, const secret_key &key2, key_derivation &derivation) {
     ge_p3 point;
     ge_p2 point2;
     ge_p1p1 point3;
@@ -185,19 +193,18 @@ namespace crypto {
     return true;
   }
 
-  void crypto_ops::derivation_to_scalar(const key_derivation &derivation, size_t output_index, ec_scalar &res) {
+  void derivation_to_scalar(const key_derivation &derivation, size_t output_index, ec_scalar &res) {
     struct {
       key_derivation derivation;
-      char output_index[(sizeof(size_t) * 8 + 6) / 7];
+      char output_index[tools::VARINT_MAX_LENGTH<size_t>];
     } buf;
     char *end = buf.output_index;
     buf.derivation = derivation;
     tools::write_varint(end, output_index);
-    assert(end <= buf.output_index + sizeof buf.output_index);
     hash_to_scalar(&buf, end - reinterpret_cast<char *>(&buf), res);
   }
 
-  bool crypto_ops::derive_public_key(const key_derivation &derivation, size_t output_index,
+  bool derive_public_key(const key_derivation &derivation, size_t output_index,
     const public_key &base, public_key &derived_key) {
     ec_scalar scalar;
     ge_p3 point1;
@@ -217,7 +224,7 @@ namespace crypto {
     return true;
   }
 
-  void crypto_ops::derive_secret_key(const key_derivation &derivation, size_t output_index,
+  void derive_secret_key(const key_derivation &derivation, size_t output_index,
     const secret_key &base, secret_key &derived_key) {
     ec_scalar scalar;
     assert(sc_check(&base) == 0);
@@ -225,7 +232,7 @@ namespace crypto {
     sc_add(&unwrap(derived_key), &unwrap(base), &scalar);
   }
 
-  bool crypto_ops::derive_subaddress_public_key(const public_key &out_key, const key_derivation &derivation, std::size_t output_index, public_key &derived_key) {
+  bool derive_subaddress_public_key(const public_key &out_key, const key_derivation &derivation, std::size_t output_index, public_key &derived_key) {
     ec_scalar scalar;
     ge_p3 point1;
     ge_p3 point2;
@@ -257,7 +264,7 @@ namespace crypto {
     ec_point Y;
   };
 
-  void crypto_ops::generate_signature(const hash &prefix_hash, const public_key &pub, const secret_key &sec, signature &sig) {
+  void generate_signature(const hash &prefix_hash, const public_key &pub, const secret_key &sec, signature &sig) {
     ge_p3 tmp3;
     ec_scalar k;
     s_comm buf;
@@ -275,8 +282,6 @@ namespace crypto {
     buf.key = pub;
   try_again:
     random_scalar(k);
-    if (((const uint32_t*)(&k))[7] == 0) // we don't want tiny numbers here
-      goto try_again;
     ge_scalarmult_base(&tmp3, &k);
     ge_p3_tobytes(&buf.comm, &tmp3);
     hash_to_scalar(&buf, sizeof(s_comm), sig.c);
@@ -287,7 +292,7 @@ namespace crypto {
       goto try_again;
   }
 
-  bool crypto_ops::check_signature(const hash &prefix_hash, const public_key &pub, const signature &sig) {
+  bool check_signature(const hash &prefix_hash, const public_key &pub, const signature &sig) {
     ge_p2 tmp2;
     ge_p3 tmp3;
     ec_scalar c;
@@ -311,7 +316,7 @@ namespace crypto {
     return sc_isnonzero(&c) == 0;
   }
 
-  void crypto_ops::generate_tx_proof(const hash &prefix_hash, const public_key &R, const public_key &A, const boost::optional<public_key> &B, const public_key &D, const secret_key &r, signature &sig) {
+  void generate_tx_proof(const hash &prefix_hash, const public_key &R, const public_key &A, const std::optional<public_key> &B, const public_key &D, const secret_key &r, signature &sig) {
     // sanity check
     ge_p3 R_p3;
     ge_p3 A_p3;
@@ -383,7 +388,7 @@ namespace crypto {
     sc_mulsub(&sig.r, &sig.c, &unwrap(r), &k);
   }
 
-  bool crypto_ops::check_tx_proof(const hash &prefix_hash, const public_key &R, const public_key &A, const boost::optional<public_key> &B, const public_key &D, const signature &sig) {
+  bool check_tx_proof(const hash &prefix_hash, const public_key &R, const public_key &A, const std::optional<public_key> &B, const public_key &D, const signature &sig) {
     // sanity check
     ge_p3 R_p3;
     ge_p3 A_p3;
@@ -473,13 +478,13 @@ namespace crypto {
     hash h;
     ge_p2 point;
     ge_p1p1 point2;
-    cn_fast_hash(std::addressof(key), sizeof(public_key), h);
+    cn_fast_hash(&key, sizeof(public_key), h);
     ge_fromfe_frombytes_vartime(&point, reinterpret_cast<const unsigned char *>(&h));
     ge_mul8(&point2, &point);
     ge_p1p1_to_p3(&res, &point2);
   }
 
-  void crypto_ops::generate_key_image(const public_key &pub, const secret_key &sec, key_image &image) {
+  void generate_key_image(const public_key &pub, const secret_key &sec, key_image &image) {
     ge_p3 point;
     ge_p2 point2;
     assert(sc_check(&sec) == 0);
@@ -503,7 +508,7 @@ POP_WARNINGS
     return sizeof(rs_comm) + pubs_count * sizeof(ec_point_pair);
   }
 
-  void crypto_ops::generate_ring_signature(const hash &prefix_hash, const key_image &image,
+  void generate_ring_signature(const hash &prefix_hash, const key_image &image,
     const public_key *const *pubs, size_t pubs_count,
     const secret_key &sec, size_t sec_index,
     signature *sig) {
@@ -511,7 +516,7 @@ POP_WARNINGS
     ge_p3 image_unp;
     ge_dsmp image_pre;
     ec_scalar sum, k, h;
-    boost::shared_ptr<rs_comm> buf(reinterpret_cast<rs_comm *>(malloc(rs_comm_size(pubs_count))), free);
+    std::shared_ptr<rs_comm> buf(reinterpret_cast<rs_comm *>(malloc(rs_comm_size(pubs_count))), free);
     if (!buf)
       local_abort("malloc failure");
     assert(sec_index < pubs_count);
@@ -566,14 +571,14 @@ POP_WARNINGS
     sc_mulsub(&sig[sec_index].r, &sig[sec_index].c, &unwrap(sec), &k);
   }
 
-  bool crypto_ops::check_ring_signature(const hash &prefix_hash, const key_image &image,
+  bool check_ring_signature(const hash &prefix_hash, const key_image &image,
     const public_key *const *pubs, size_t pubs_count,
     const signature *sig) {
     size_t i;
     ge_p3 image_unp;
     ge_dsmp image_pre;
     ec_scalar sum, h;
-    boost::shared_ptr<rs_comm> buf(reinterpret_cast<rs_comm *>(malloc(rs_comm_size(pubs_count))), free);
+    std::shared_ptr<rs_comm> buf(reinterpret_cast<rs_comm *>(malloc(rs_comm_size(pubs_count))), free);
     if (!buf)
       return false;
 #if !defined(NDEBUG)

@@ -27,13 +27,14 @@
 # STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
 # THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-set(ringct_basic_sources
+add_library(ringct_basic
   rctOps.cpp
   rctTypes.cpp
   rctCryptoOps.c
   multiexp.cc
   bulletproofs.cc)
 
+<<<<<<< HEAD
 set(ringct_basic_private_headers
   rctOps.h
   rctTypes.h
@@ -45,16 +46,19 @@ beldex_private_headers(ringct_basic
 beldex_add_library(ringct_basic
   ${ringct_basic_sources}
   ${ringct_basic_private_headers})
+=======
+>>>>>>> v8.1.4
 target_link_libraries(ringct_basic
   PUBLIC
     common
-    cncrypto
   PRIVATE
-    ${OPENSSL_LIBRARIES}
-    ${EXTRA_LIBRARIES})
+    OpenSSL::SSL
+    OpenSSL::Crypto
+    extra)
 
-set(ringct_sources
+add_library(ringct
   rctSigs.cpp
+<<<<<<< HEAD
 )
 
 set(ringct_headers)
@@ -69,12 +73,15 @@ beldex_add_library(ringct
   ${ringct_sources}
   ${ringct_headers}
   ${ringct_private_headers})
+=======
+  )
+>>>>>>> v8.1.4
 target_link_libraries(ringct
   PUBLIC
     common
-    cncrypto
     cryptonote_basic
     device
   PRIVATE
-    ${OPENSSL_LIBRARIES}
-    ${EXTRA_LIBRARIES})
+    OpenSSL::SSL
+    OpenSSL::Crypto
+    extra)

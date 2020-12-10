@@ -1,15 +1,17 @@
 #include "cryptonote_config.h"
 #include "common/beldex.h"
-#include "int-util.h"
+#include "epee/int-util.h"
+#include <limits>
 #include <vector>
 #include <boost/lexical_cast.hpp>
+#include <cfenv>
 
 #include "master_node_rules.h"
 
 namespace master_nodes {
 
-
-uint64_t get_staking_requirement(cryptonote::network_type m_nettype, uint64_t height, int hf_version)
+// TODO(beldex): Move to beldex_economy, this will also need access to beldex::exp2
+uint64_t get_staking_requirement(cryptonote::network_type m_nettype, uint64_t height, uint8_t hf_version)
 {
   uint64_t result = COIN * 100000;
   if(height>=56500) result = COIN * 10000;
@@ -67,17 +69,24 @@ static uint64_t get_min_node_contribution_pre_v11(uint64_t staking_requirement, 
   return std::min(staking_requirement - total_reserved, staking_requirement / MAX_NUMBER_OF_CONTRIBUTORS);
 }
 
+uint64_t get_max_node_contribution(uint8_t version, uint64_t staking_requirement, uint64_t total_reserved)
+{
+  if (version >= cryptonote::network_version_16_pulse)
+    return (staking_requirement - total_reserved) * config::MAXIMUM_ACCEPTABLE_STAKE::num
+      / config::MAXIMUM_ACCEPTABLE_STAKE::den;
+  return std::numeric_limits<uint64_t>::max();
+}
+
 uint64_t get_min_node_contribution(uint8_t version, uint64_t staking_requirement, uint64_t total_reserved, size_t num_contributions)
 {
   if (version < cryptonote::network_version_11_infinite_staking)
     return get_min_node_contribution_pre_v11(staking_requirement, total_reserved);
 
-  const uint64_t needed                 = staking_requirement - total_reserved;
-  const size_t max_num_of_contributions = MAX_NUMBER_OF_CONTRIBUTORS * MAX_KEY_IMAGES_PER_CONTRIBUTOR;
-  assert(max_num_of_contributions > num_contributions);
-  if (max_num_of_contributions <= num_contributions) return UINT64_MAX;
+  const uint64_t needed = staking_requirement - total_reserved;
+  assert(MAX_NUMBER_OF_CONTRIBUTORS > num_contributions);
+  if (MAX_NUMBER_OF_CONTRIBUTORS <= num_contributions) return UINT64_MAX;
 
-  const size_t num_contributions_remaining_avail = max_num_of_contributions - num_contributions;
+  const size_t num_contributions_remaining_avail = MAX_NUMBER_OF_CONTRIBUTORS - num_contributions;
   return needed / num_contributions_remaining_avail;
 }
 
@@ -88,10 +97,10 @@ uint64_t get_min_node_contribution_in_portions(uint8_t version, uint64_t staking
   return result;
 }
 
-uint64_t get_portions_to_make_amount(uint64_t staking_requirement, uint64_t amount)
+uint64_t get_portions_to_make_amount(uint64_t staking_requirement, uint64_t amount, uint64_t max_portions)
 {
   uint64_t lo, hi, resulthi, resultlo;
-  lo = mul128(amount, STAKING_PORTIONS, &hi);
+  lo = mul128(amount, max_portions, &hi);
   if (lo > UINT64_MAX - (staking_requirement - 1))
     hi++;
   lo += staking_requirement-1;
@@ -109,7 +118,7 @@ static bool get_portions_from_percent(double cur_percent, uint64_t& portions) {
   }
   else
   {
-    portions = (cur_percent / 100.0) * STAKING_PORTIONS;
+    portions = (cur_percent / 100.0) * (double)STAKING_PORTIONS;
   }
 
   return true;

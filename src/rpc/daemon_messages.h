@@ -1,4 +1,4 @@
-// Copyright (c) 2016-2018, The Monero Project
+// Copyright (c) 2016-2019, The Monero Project
 // 
 // All rights reserved.
 // 
@@ -165,12 +165,18 @@ BEGIN_RPC_MESSAGE_CLASS(SendRawTx);
   END_RPC_MESSAGE_RESPONSE;
 END_RPC_MESSAGE_CLASS;
 
+BEGIN_RPC_MESSAGE_CLASS(SendRawTxHex);
+  BEGIN_RPC_MESSAGE_REQUEST;
+    std::string tx_as_hex;
+    bool relay;
+  END_RPC_MESSAGE_REQUEST;
+  using Response = SendRawTx::Response;
+END_RPC_MESSAGE_CLASS;
+
 BEGIN_RPC_MESSAGE_CLASS(StartMining);
   BEGIN_RPC_MESSAGE_REQUEST;
     std::string miner_address;
     uint64_t threads_count;
-    bool do_background_mining;
-    bool ignore_battery;
   END_RPC_MESSAGE_REQUEST;
   BEGIN_RPC_MESSAGE_RESPONSE;
   END_RPC_MESSAGE_RESPONSE;
@@ -199,7 +205,6 @@ BEGIN_RPC_MESSAGE_CLASS(MiningStatus);
     uint64_t speed;
     uint64_t threads_count;
     std::string address;
-    bool is_background_mining_enabled;
   END_RPC_MESSAGE_RESPONSE;
 END_RPC_MESSAGE_CLASS;
 
@@ -408,7 +413,8 @@ BEGIN_RPC_MESSAGE_CLASS(GetFeeEstimate);
     uint64_t num_grace_blocks;
   END_RPC_MESSAGE_REQUEST;
   BEGIN_RPC_MESSAGE_RESPONSE;
-    uint64_t estimated_base_fee;
+    uint64_t estimated_base_fee_per_byte;
+    uint64_t estimated_base_fee_per_output;
     uint64_t fee_mask;
     uint32_t size_scale;
     uint8_t hard_fork_version;
