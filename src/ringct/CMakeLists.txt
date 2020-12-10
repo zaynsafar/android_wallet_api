@@ -34,20 +34,6 @@ add_library(ringct_basic
   multiexp.cc
   bulletproofs.cc)
 
-<<<<<<< HEAD
-set(ringct_basic_private_headers
-  rctOps.h
-  rctTypes.h
-  multiexp.h
-  bulletproofs.h)
-
-beldex_private_headers(ringct_basic
-  ${crypto_private_headers})
-beldex_add_library(ringct_basic
-  ${ringct_basic_sources}
-  ${ringct_basic_private_headers})
-=======
->>>>>>> v8.1.4
 target_link_libraries(ringct_basic
   PUBLIC
     common
@@ -58,24 +44,7 @@ target_link_libraries(ringct_basic
 
 add_library(ringct
   rctSigs.cpp
-<<<<<<< HEAD
-)
-
-set(ringct_headers)
-
-set(ringct_private_headers
-  rctSigs.h
-)
-
-beldex_private_headers(ringct
-  ${crypto_private_headers})
-beldex_add_library(ringct
-  ${ringct_sources}
-  ${ringct_headers}
-  ${ringct_private_headers})
-=======
   )
->>>>>>> v8.1.4
 target_link_libraries(ringct
   PUBLIC
     common
