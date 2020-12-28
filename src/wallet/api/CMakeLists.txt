@@ -1,5 +1,5 @@
 # Copyright (c) 2018, The Beldex Project
-# Copyright (c) 2014-2018, The Monero Project
+# Copyright (c) 2014-2019, The Monero Project
 #
 # All rights reserved.
 #
@@ -35,31 +35,11 @@ add_library(wallet_api
   pending_transaction.cpp
   utils.cpp
   address_book.cpp
+  stake_unlock_result.cpp
   subaddress.cpp
   subaddress_account.cpp
   unsigned_transaction.cpp)
 
-set(wallet_api_headers
-    wallet2_api.h)
-
-set(wallet_api_private_headers
-  wallet.h
-  wallet_manager.h
-  transaction_info.h
-  transaction_history.h
-  pending_transaction.h
-  common_defines.h
-  address_book.h
-  subaddress.h
-  subaddress_account.h
-  unsigned_transaction.h)
-
-beldex_private_headers(wallet_api
-  ${wallet_api_private_headers})
-beldex_add_library(wallet_api
-  ${wallet_api_sources}
-  ${wallet_api_headers}
-  ${wallet_api_private_headers})
 target_link_libraries(wallet_api
   PUBLIC
     wallet
