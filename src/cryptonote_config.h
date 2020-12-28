@@ -464,48 +464,11 @@ namespace cryptonote
   {
     switch (nettype)
     {
-<<<<<<< HEAD
-      case MAINNET: case FAKECHAIN:
-      {
-        if (nettype == FAKECHAIN)
-          mainnet.GOVERNANCE_REWARD_INTERVAL_IN_BLOCKS = 100;
-
-        if (hard_fork_version <= network_version_10_bulletproofs)
-          mainnet.GOVERNANCE_WALLET_ADDRESS = &::config::GOVERNANCE_WALLET_ADDRESS[0];
-        else
-          mainnet.GOVERNANCE_WALLET_ADDRESS = &::config::GOVERNANCE_WALLET_ADDRESS[0];
-
-        return mainnet;
-      }
-
-      case TESTNET:
-      {
-        if (hard_fork_version <= network_version_9_master_nodes)
-          testnet.GOVERNANCE_WALLET_ADDRESS = &::config::testnet::GOVERNANCE_WALLET_ADDRESS[0];
-        else
-          testnet.GOVERNANCE_WALLET_ADDRESS = &::config::testnet::GOVERNANCE_WALLET_ADDRESS[0];
-
-        return testnet;
-      }
-
-      case STAGENET:
-      {
-        if (hard_fork_version <= network_version_9_master_nodes)
-          stagenet.GOVERNANCE_WALLET_ADDRESS = &::config::stagenet::GOVERNANCE_WALLET_ADDRESS[0];
-        else
-          stagenet.GOVERNANCE_WALLET_ADDRESS = &::config::stagenet::GOVERNANCE_WALLET_ADDRESS[0];
-
-        return stagenet;
-      }
-
-      default: throw std::runtime_error("Invalid network type");
-=======
       case MAINNET: return mainnet_config;
       case TESTNET: return testnet_config;
       case DEVNET: return devnet_config;
       case FAKECHAIN: return fakenet_config;
       default: throw std::runtime_error{"Invalid network type"};
->>>>>>> v8.1.4
     }
   }
 }
