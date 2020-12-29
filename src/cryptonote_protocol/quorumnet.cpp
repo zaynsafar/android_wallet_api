@@ -1698,7 +1698,7 @@ void setup_endpoints(cryptonote::core& core, void* obj) {
             throw std::logic_error{"qnet initialization failure: quorumnet_new must be called for master node operation"};
         auto& qnet = QnetState::from(obj);
         // quorum.*: commands between quorum members, requires that both side of the connection is a MN
-        lmq.add_category("quorum", Access{AuthLevel::none, true /*remote sn*/, true /*local sn*/}, 2 /*reserved threads*/)
+        lmq.add_category("quorum", Access{AuthLevel::none, true /*remote mn*/, true /*local mn*/}, 2 /*reserved threads*/)
             // Receives an obligation vote
             .add_command("vote_ob", [&qnet](Message& m) { handle_obligation_vote(m, qnet); })
             // Receives blink tx signatures or rejections between quorum members (either original or
@@ -1707,13 +1707,13 @@ void setup_endpoints(cryptonote::core& core, void* obj) {
             ;
 
         // blink.*: commands sent to blink quorum members from anyone (e.g. blink submission)
-        lmq.add_category("blink", Access{AuthLevel::none, false /*remote sn*/, true /*local sn*/}, 1 /*reserved thread*/)
+        lmq.add_category("blink", Access{AuthLevel::none, false /*remote mn*/, true /*local mn*/}, 1 /*reserved thread*/)
             // Receives a new blink tx submission from an external node, or forward from other quorum
             // members who received it from an external node.
             .add_command("submit", [&qnet](Message& m) { handle_blink(m, qnet); })
             ;
 
-        lmq.add_category(PULSE_CMD_CATEGORY, Access{AuthLevel::none, true /*remote sn*/, true /*local sn*/}, 1 /*reserved thread*/)
+        lmq.add_category(PULSE_CMD_CATEGORY, Access{AuthLevel::none, true /*remote mn*/, true /*local mn*/}, 1 /*reserved thread*/)
             .add_command(PULSE_CMD_VALIDATOR_BIT, [&qnet](Message& m) { handle_pulse_participation_bit_or_bitset(m, qnet, false /*bitset*/); })
             .add_command(PULSE_CMD_VALIDATOR_BITSET, [&qnet](Message& m) { handle_pulse_participation_bit_or_bitset(m, qnet, true /*bitset*/); })
             .add_command(PULSE_CMD_BLOCK_TEMPLATE, [&qnet](Message& m) { handle_pulse_block_template(m, qnet); })
@@ -1724,7 +1724,7 @@ void setup_endpoints(cryptonote::core& core, void* obj) {
     }
 
     // bl.*: responses to blinks sent from quorum members back to the node who submitted the blink
-    lmq.add_category("bl", Access{AuthLevel::none, true /*remote sn*/, false /*local sn*/})
+    lmq.add_category("bl", Access{AuthLevel::none, true /*remote mn*/, false /*local mn*/})
         // Message sent back to the blink initiator that the transaction was NOT relayed, either
         // because the height was invalid or the quorum checksum failed.  This is only sent by the
         // entry point master nodes into the quorum to let it know the tx verification has not

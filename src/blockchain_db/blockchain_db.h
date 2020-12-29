@@ -1856,7 +1856,7 @@ public:
   /// Creates or updates the proof data for a master node from a proof.
   virtual void set_master_node_proof(const crypto::public_key &pubkey, const master_nodes::proof_info &proof) = 0;
 
-  /// Removes stored serialized proof sn data associated with the given pubkey.  Returns true if
+  /// Removes stored serialized proof mn data associated with the given pubkey.  Returns true if
   /// found, false if not found.
   virtual bool remove_master_node_proof(const crypto::public_key &pubkey) = 0;
 

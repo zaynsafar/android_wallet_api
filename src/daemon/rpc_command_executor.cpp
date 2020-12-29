@@ -286,7 +286,7 @@ bool rpc_command_executor::print_checkpoints(uint64_t start_height, uint64_t end
   return true;
 }
 
-bool rpc_command_executor::print_sn_state_changes(uint64_t start_height, uint64_t end_height)
+bool rpc_command_executor::print_mn_state_changes(uint64_t start_height, uint64_t end_height)
 {
   GET_MN_STATE_CHANGES::request  req{};
   GET_MN_STATE_CHANGES::response res{};
@@ -1705,7 +1705,7 @@ static void append_printable_master_node_list_entry(cryptonote::network_type net
   buffer.append(stream.str());
 }
 
-bool rpc_command_executor::print_sn(const std::vector<std::string> &args)
+bool rpc_command_executor::print_mn(const std::vector<std::string> &args)
 {
     GET_MASTER_NODES::request req{};
     GET_MASTER_NODES::response res{};
@@ -1826,7 +1826,7 @@ bool rpc_command_executor::flush_cache(bool bad_txs, bool bad_blocks)
   return true;
 }
 
-bool rpc_command_executor::print_sn_status(std::vector<std::string> args)
+bool rpc_command_executor::print_mn_status(std::vector<std::string> args)
 {
   if (args.size() > 1)
   {
@@ -1840,7 +1840,7 @@ bool rpc_command_executor::print_sn_status(std::vector<std::string> args)
 
   args.push_back(std::move(res.master_node_pubkey));
 
-  return print_sn(args);
+  return print_mn(args);
 }
 
 bool rpc_command_executor::print_sr(uint64_t height)
@@ -1863,7 +1863,7 @@ bool rpc_command_executor::pop_blocks(uint64_t num_blocks)
   return true;
 }
 
-bool rpc_command_executor::print_sn_key()
+bool rpc_command_executor::print_mn_key()
 {
   GET_MASTER_KEYS::response res{};
 

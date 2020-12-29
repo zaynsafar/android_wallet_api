@@ -87,9 +87,9 @@ class MNNetwork:
                     self.all_nodes[i].add_peer(self.all_nodes[k])
 
         vprint("Starting new beldexd master nodes with RPC on {} ports".format(self.sns[0].listen_ip), end="")
-        for sn in self.sns:
-            vprint(" {}".format(sn.rpc_port), end="", flush=True, timestamp=False)
-            sn.start()
+        for mn in self.mns:
+            vprint(" {}".format(mn.rpc_port), end="", flush=True, timestamp=False)
+            mn.start()
         vprint(timestamp=False)
         vprint("Starting new regular beldexd nodes with RPC on {} ports".format(self.nodes[0].listen_ip), end="")
         for d in self.nodes:
@@ -125,8 +125,8 @@ class MNNetwork:
         # 5 registrations).
         self.mine(50)
         vprint("Submitting first round of master node registrations: ", end="", flush=True)
-        for sn in self.sns[0:5]:
-            self.mike.register_sn(sn)
+        for mn in self.mns[0:5]:
+            self.mike.register_mn(mn)
             vprint(".", end="", flush=True, timestamp=False)
         vprint(timestamp=False)
         if len(self.sns) > 5:
@@ -135,8 +135,8 @@ class MNNetwork:
             self.mine(6*len(self.sns))
 
             vprint("Submitting more master node registrations: ", end="", flush=True)
-            for sn in self.sns[5:]:
-                self.mike.register_sn(sn)
+            for mn in self.sns[5:]:
+                self.mike.register_mn(mn)
                 vprint(".", end="", flush=True, timestamp=False)
             vprint(timestamp=False)
             vprint("Done.")
@@ -149,15 +149,15 @@ class MNNetwork:
         self.print_wallet_balances()
 
         vprint("Sending fake beldexnet/ss pings")
-        for sn in self.sns:
-            sn.ping()
+        for mn in self.mns:
+            mn.ping()
 
-        all_master_nodes_proofed = lambda sn: all(x['quorumnet_port'] > 0 for x in
-                sn.json_rpc("get_n_master_nodes", {"fields":{"quorumnet_port":True}}).json()['result']['master_node_states'])
+        all_master_nodes_proofed = lambda mn: all(x['quorumnet_port'] > 0 for x in
+                mn.json_rpc("get_n_master_nodes", {"fields":{"quorumnet_port":True}}).json()['result']['master_node_states'])
 
         vprint("Waiting for proofs to propagate: ", end="", flush=True)
-        for sn in self.sns:
-            wait_for(lambda: all_master_nodes_proofed(sn), timeout=120)
+        for mn in self.sns:
+            wait_for(lambda: all_master_nodes_proofed(mn), timeout=120)
             vprint(".", end="", flush=True, timestamp=False)
         vprint(timestamp=False)
         vprint("Done.")

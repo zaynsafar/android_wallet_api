@@ -25,11 +25,11 @@ def test_init(net):
     blink_quorums = [
             [
                 q['quorum']['validators']
-                for q in sn.json_rpc("get_quorum_state",
+                for q in mn.json_rpc("get_quorum_state",
                     dict(quorum_type=2, start_height=q_heights[0], end_height=q_heights[1])).json()['result']['quorums']
                 if 'quorum' in q and 'validators' in q['quorum']
             ]
-            for sn in net.all_nodes
+            for mn in net.all_nodes
     ]
     assert len(blink_quorums) == len(net.all_nodes)                  # Got responses from every node
     assert blink_quorums == [blink_quorums[0]] * len(net.all_nodes)  # All nodes returned the same response

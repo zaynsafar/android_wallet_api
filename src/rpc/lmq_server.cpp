@@ -105,21 +105,21 @@ lmq_rpc::lmq_rpc(cryptonote::core& core, core_rpc_server& rpc, const boost::prog
     check_lmq_listen_addr(addr);
     MGINFO("LMQ listening on " << addr << " (public unencrypted)");
     lmq.listen_plain(addr,
-        [&core](std::string_view ip, std::string_view pk, bool /*sn*/) { return core.lmq_allow(ip, pk, AuthLevel::basic); });
+        [&core](std::string_view ip, std::string_view pk, bool /*mn*/) { return core.lmq_allow(ip, pk, AuthLevel::basic); });
   }
 
   for (const auto &addr : command_line::get_arg(vm, arg_lmq_curve_public)) {
     check_lmq_listen_addr(addr);
     MGINFO("LMQ listening on " << addr << " (public curve)");
     lmq.listen_curve(addr,
-        [&core](std::string_view ip, std::string_view pk, bool /*sn*/) { return core.lmq_allow(ip, pk, AuthLevel::basic); });
+        [&core](std::string_view ip, std::string_view pk, bool /*mn*/) { return core.lmq_allow(ip, pk, AuthLevel::basic); });
   }
 
   for (const auto &addr : command_line::get_arg(vm, arg_lmq_curve)) {
     check_lmq_listen_addr(addr);
     MGINFO("LMQ listening on " << addr << " (curve restricted)");
     lmq.listen_curve(addr,
-        [&core](std::string_view ip, std::string_view pk, bool /*sn*/) { return core.lmq_allow(ip, pk, AuthLevel::denied); });
+        [&core](std::string_view ip, std::string_view pk, bool /*mn*/) { return core.lmq_allow(ip, pk, AuthLevel::denied); });
   }
 
   auto locals = command_line::get_arg(vm, arg_lmq_local_control);
@@ -137,7 +137,7 @@ lmq_rpc::lmq_rpc(cryptonote::core& core, core_rpc_server& rpc, const boost::prog
     check_lmq_listen_addr(addr);
     MGINFO("LMQ listening on " << addr << " (unauthenticated local admin)");
     lmq.listen_plain(addr,
-        [&core](std::string_view ip, std::string_view pk, bool /*sn*/) { return core.lmq_allow(ip, pk, AuthLevel::admin); });
+        [&core](std::string_view ip, std::string_view pk, bool /*mn*/) { return core.lmq_allow(ip, pk, AuthLevel::admin); });
   }
 
 #ifndef _WIN32
@@ -284,7 +284,7 @@ lmq_rpc::lmq_rpc(cryptonote::core& core, core_rpc_server& rpc, const boost::prog
   // New block subscriptions: [sub.block].  This sends a notification every time a new block is
   // added to the blockchain.
   //
-  // TODO: make this support [sub.block, sn] so that we can receive notification only for blocks
+  // TODO: make this support [sub.block, mn] so that we can receive notification only for blocks
   // that change the MN composition.
   //
   // The subscription request returns the current [height, blockhash] as a reply.

@@ -341,8 +341,8 @@ class Wallet(RPCDaemon):
         return [find_tx(txid) for txid in txids]
 
 
-    def register_sn(self, sn):
-        r = sn.json_rpc("get_master_node_registration_cmd", {
+    def register_mn(self, mn):
+        r = mn.json_rpc("get_master_node_registration_cmd", {
             "operator_cut": "100",
             "contributions": [{"address": self.address(), "amount": 100000000000}],
             "staking_requirement": 100000000000
