@@ -2291,7 +2291,7 @@ namespace cryptonote { namespace rpc {
     GET_MASTER_NODE_STATUS::response res{};
 
     PERF_TIMER(on_get_master_node_status);
-    auto get_master_node_key_res = invoke(GET_SERVICE_KEYS::request{}, context);
+    auto get_master_node_key_res = invoke(GET_MASTER_KEYS::request{}, context);
 
     GET_MASTER_NODES::request get_master_nodes_req{};
     get_master_nodes_req.include_json = req.include_json;
@@ -2796,7 +2796,7 @@ namespace cryptonote { namespace rpc {
       throw rpc_error{ERROR_WRONG_PARAM, "Daemon has not been started in master node mode, please relaunch with --master-node flag."};
 
     uint8_t hf_version = m_core.get_hard_fork_version(m_core.get_current_blockchain_height());
-    if (!master_nodes::make_registration_cmd(m_core.get_nettype(), hf_version, req.staking_requirement, req.args, m_core.get_service_keys(), res.registration_cmd, req.make_friendly))
+    if (!master_nodes::make_registration_cmd(m_core.get_nettype(), hf_version, req.staking_requirement, req.args, m_core.get_master_keys(), res.registration_cmd, req.make_friendly))
       throw rpc_error{ERROR_INTERNAL, "Failed to make registration command"};
 
     res.status = STATUS_OK;

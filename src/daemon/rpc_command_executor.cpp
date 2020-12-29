@@ -473,9 +473,9 @@ bool rpc_command_executor::show_status() {
   uint64_t my_sn_last_uptime = 0;
   bool my_sn_registered = false, my_sn_staked = false, my_sn_active = false;
   if (ires.master_node && *ires.master_node) {
-    GET_SERVICE_KEYS::response res{};
+    GET_MASTER_KEYS::response res{};
 
-    if (!invoke<GET_SERVICE_KEYS>({}, res, "Failed to retrieve master node keys"))
+    if (!invoke<GET_MASTER_KEYS>({}, res, "Failed to retrieve master node keys"))
       return false;
 
     my_sn_key = std::move(res.master_node_pubkey);
@@ -1834,8 +1834,8 @@ bool rpc_command_executor::print_sn_status(std::vector<std::string> args)
     return false;
   }
 
-  GET_SERVICE_KEYS::response res{};
-  if (!invoke<GET_SERVICE_KEYS>({}, res, "Failed to retrieve master node keys"))
+  GET_MASTER_KEYS::response res{};
+  if (!invoke<GET_MASTER_KEYS>({}, res, "Failed to retrieve master node keys"))
     return false;
 
   args.push_back(std::move(res.master_node_pubkey));
@@ -1865,9 +1865,9 @@ bool rpc_command_executor::pop_blocks(uint64_t num_blocks)
 
 bool rpc_command_executor::print_sn_key()
 {
-  GET_SERVICE_KEYS::response res{};
+  GET_MASTER_KEYS::response res{};
 
-  if (!invoke<GET_SERVICE_KEYS>({}, res, "Failed to retrieve master node keys"))
+  if (!invoke<GET_MASTER_KEYS>({}, res, "Failed to retrieve master node keys"))
     return false;
 
   tools::success_msg_writer()
@@ -1909,11 +1909,11 @@ bool rpc_command_executor::prepare_registration()
 
   // Check if the daemon was started in Master Node or not
   GET_INFO::response res{};
-  GET_SERVICE_KEYS::response kres{};
+  GET_MASTER_KEYS::response kres{};
   HARD_FORK_INFO::response hf_res{};
   if (!invoke<GET_INFO>({}, res, "Failed to get node info") ||
       !invoke<HARD_FORK_INFO>({}, hf_res, "Failed to retrieve hard fork info") ||
-      !invoke<GET_SERVICE_KEYS>({}, kres, "Failed to retrieve master node keys"))
+      !invoke<GET_MASTER_KEYS>({}, kres, "Failed to retrieve master node keys"))
     return false;
 
   if (!res.master_node)
