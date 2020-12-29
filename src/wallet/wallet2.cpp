@@ -1345,7 +1345,7 @@ bool wallet2::get_multisig_seed(epee::wipeable_string& seed, const epee::wipeabl
   if (!passphrase.empty())
   {
     crypto::secret_key key;
-    crypto::cn_slow_hash(passphrase.data(), passphrase.size(), (crypto::hash&)key, crypto::cn_slow_hash_type::heavy_v0);
+    crypto::cn_slow_hash(passphrase.data(), passphrase.size(), (crypto::hash&)key, crypto::cn_slow_hash_type::heavy_v1);
     sc_reduce32((unsigned char*)key.data);
     data = encrypt(data.view(), key, true);
   }
@@ -6627,7 +6627,7 @@ bool wallet2::is_transfer_unlocked(uint64_t unlock_time, uint64_t block_height, 
       return true;
     }
 
-    for (cryptonote::rpc::GET_BELDEX_NODE_BLACKLISTED_KEY_IMAGES::entry const &entry : blacklist)
+    for (cryptonote::rpc::GET_MASTER_NODE_BLACKLISTED_KEY_IMAGES::entry const &entry : blacklist)
     {
       crypto::key_image check_image;
       if(!tools::hex_to_type(entry.key_image, check_image))
@@ -8510,9 +8510,9 @@ wallet2::request_stake_unlock_result wallet2::can_request_stake_unlock(const cry
   result.ptx.tx.version = cryptonote::txversion::v4_tx_types;
   result.ptx.tx.type    = cryptonote::txtype::key_image_unlock;
 
-  std::string const sn_key_as_str = tools::type_to_hex(sn_key);
+  std::string const mn_key_as_str = tools::type_to_hex(mn_key);
   {
-    const auto [success, response] = get_master_nodes({{sn_key_as_str}});
+    const auto [success, response] = get_master_nodes({{mn_key_as_str}});
     if (!success)
     {
       result.msg = tr("Failed to retrieve master node data from daemon");

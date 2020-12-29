@@ -445,14 +445,7 @@ bool Blockchain::init(BlockchainDB* db, sqlite3 *bns_db, const network_type nett
   m_offline = offline;
   m_fixed_difficulty = fixed_difficulty;
   if (m_hardfork == nullptr)
-  {
-    if (m_nettype ==  FAKECHAIN || m_nettype == STAGENET)
-      m_hardfork = new HardFork(*db, 1, stagenet_hard_fork_version_1_till);
-    else if (m_nettype == TESTNET)
-      m_hardfork = new HardFork(*db, 1, testnet_hard_fork_version_1_till);
-    else
-      m_hardfork = new HardFork(*db, 1, mainnet_hard_fork_version_1_till);
-  }
+    m_hardfork = new HardFork(*db, 7);
 
   if (test_options) // Fakechain mode or in integration testing mode we're overriding hardfork dates
   {
@@ -1623,8 +1616,8 @@ bool Blockchain::create_block_template_internal(block& b, const crypto::hash *fr
   uint8_t hf_version = b.major_version;
   auto miner_tx_context =
       info.is_miner
-          ? beldex_miner_tx_context::miner_block(m_nettype, info.miner_address, m_beldex_node_list.get_block_leader())
-          : beldex_miner_tx_context::pulse_block(m_nettype, info.beldex_node_payout, m_beldex_node_list.get_block_leader());
+          ? beldex_miner_tx_context::miner_block(m_nettype, info.miner_address, m_master_node_list.get_block_leader())
+          : beldex_miner_tx_context::pulse_block(m_nettype, info.master_node_payout, m_master_node_list.get_block_leader());
   if (!calc_batched_governance_reward(height, miner_tx_context.batched_governance))
   {
     LOG_ERROR("Failed to calculate batched governance reward");
@@ -3061,9 +3054,8 @@ bool Blockchain::check_tx_outputs(const transaction& tx, tx_verification_context
   std::unique_lock lock{*this};
 
   for (const auto &o: tx.vout) {
-    if (tx.version>=2 && o.amount != 0) { // in a v2 tx, all outputs must have 0 amount NOTE(beldex): All beldex tx's are atleast v2 from the beginning
+    if ( o.amount != 0) { // in a v2 tx, all outputs must have 0 amount NOTE(beldex): All beldex tx's are atleast v2 from the beginning
       tvc.m_invalid_output = true;
-	  LOG_PRINT_L0("o.amount!=0");
       return false;
     }
 
@@ -3076,20 +3068,17 @@ bool Blockchain::check_tx_outputs(const transaction& tx, tx_verification_context
 
   // from v10, allow bulletproofs
   const uint8_t hf_version = m_hardfork->get_current_version();
-  if (hf_version < network_version_8) {
-	if (tx.version >= 2) {
-       const bool bulletproof = rct::is_rct_bulletproof(tx.rct_signatures.type);
-	   if (bulletproof || !tx.rct_signatures.p.bulletproofs.empty())
+  if (hf_version < network_version_10_bulletproofs) {
+    const bool bulletproof = rct::is_rct_bulletproof(tx.rct_signatures.type);
+	  if (bulletproof || !tx.rct_signatures.p.bulletproofs.empty())
 		{
-		  LOG_PRINT_L0("Bulletproofs are not allowed before v8");
+		  LOG_PRINT_L0("Bulletproofs are not allowed before v10");
 		  tvc.m_invalid_output = true;
 		  return false;
 		}
-	}
   }
-
-  if (hf_version> network_version_8){
-	  if (tx.version >= 2) {
+  else
+  {
     const bool borromean = rct::is_rct_borromean(tx.rct_signatures.type);
     if (borromean)
     {
@@ -3109,10 +3098,8 @@ bool Blockchain::check_tx_outputs(const transaction& tx, tx_verification_context
         tvc.m_invalid_output = true;
         return false;
       }
-	}
     }
   }
-  
 
   if (hf_version < HF_VERSION_SMALLER_BP) {
     if (tx.rct_signatures.type == rct::RCTTypeBulletproof2)
@@ -3323,9 +3310,7 @@ bool Blockchain::check_tx_inputs(transaction& tx, tx_verification_context &tvc, 
         CHECK_AND_ASSERT_MES(in_to_key.key_offsets.size(), false, "empty in_to_key.key_offsets in transaction with id " << get_transaction_hash(tx));
 
         // Mixin Check, from hard fork 7, we require mixin at least 9, always.
-        if (((hf_version <=7) && (in_to_key.key_offsets.size() - 1 < 6) && tx.version==2) ||
-		    ((hf_version ==8) && (in_to_key.key_offsets.size() - 1 < 7) ) ||
-            ((hf_version >8 ) && (in_to_key.key_offsets.size() - 1 != CRYPTONOTE_DEFAULT_TX_MIXIN)))
+        if (in_to_key.key_offsets.size() - 1 != CRYPTONOTE_DEFAULT_TX_MIXIN)
         {
           MERROR_VER("Tx " << get_transaction_hash(tx) << " has incorrect ring size (" << in_to_key.key_offsets.size() - 1 << ", expected (" << CRYPTONOTE_DEFAULT_TX_MIXIN << ")");
           tvc.m_low_mixin = true;
@@ -3395,10 +3380,6 @@ bool Blockchain::check_tx_inputs(transaction& tx, tx_verification_context &tvc, 
       }
     }
 	
-	if (tx.version >=2)
-	{
-	
-
     if (hf_version >= HF_VERSION_ENFORCE_MIN_AGE)
     {
       CHECK_AND_ASSERT_MES(*pmax_used_block_height + CRYPTONOTE_DEFAULT_TX_SPENDABLE_AGE <= m_db->height(),

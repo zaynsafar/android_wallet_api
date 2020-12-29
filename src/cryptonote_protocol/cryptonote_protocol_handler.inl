@@ -1194,16 +1194,6 @@ namespace cryptonote
     m_sync_download_objects_size += size;
     MDEBUG(context << " downloaded " << size << " bytes worth of blocks");
 
-<<<<<<< HEAD
-    /*using namespace boost::chrono;
-      auto point = steady_clock::now();
-      auto time_from_epoh = point.time_since_epoch();
-      auto sec = duration_cast< seconds >( time_from_epoh ).count();*/
-
-    //epee::net_utils::network_throttle_manager::get_global_throttle_inreq().logger_handle_net("log/dr-beldex/net/req-all.data", sec, get_avg_block_size());
-
-=======
->>>>>>> v8.1.4
     if(context.m_last_response_height > arg.current_blockchain_height)
     {
       LOG_ERROR_CCONTEXT("sent wrong NOTIFY_GET_BLOCKS: arg.m_current_blockchain_height=" << arg.current_blockchain_height
