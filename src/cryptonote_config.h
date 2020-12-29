@@ -67,37 +67,26 @@ static_assert(STAKING_PORTIONS % 12 == 0, "Use a multiple of twelve, so that it 
 #endif
 
 #define UPTIME_PROOF_BUFFER_IN_SECONDS                  (5*60) // The acceptable window of time to accept a peer's uptime proof from its reported timestamp
-
-// MONEY_SUPPLY - total number coins to be generated
-#define EMISSION_SPEED_FACTOR_PER_MINUTE                (28)
-#define FINAL_SUBSIDY_PER_MINUTE                        ((uint64_t)500000000) // 3 * pow(10, 7)
-#define EMISSION_LINEAR_BASE                            ((uint64_t)(1) << 58)
-#define YEARLY_INFLATION_INVERSE                        200 // 0.5% yearly inflation, inverted for integer division
-#define EMISSION_SUPPLY_MULTIPLIER                      19
-#define EMISSION_SUPPLY_DIVISOR                         10
-
-#define CRYPTONOTE_REWARD_BLOCKS_WINDOW                 100
-#define CRYPTONOTE_BLOCK_GRANTED_FULL_REWARD_ZONE_V2    600000 //size of block (bytes) after which reward for block calculated using block size
-#define CRYPTONOTE_BLOCK_GRANTED_FULL_REWARD_ZONE_V1    20000 //size of block (bytes) after which reward for block calculated using block size - before first fork
 #define UPTIME_PROOF_INITIAL_DELAY_SECONDS              (2*UPTIME_PROOF_BASE_MINUTE) // Delay after startup before sending a proof (to allow connections to be established)
 #define UPTIME_PROOF_TIMER_SECONDS                      (5*UPTIME_PROOF_BASE_MINUTE) // How often we check whether we need to send an uptime proof
 #define UPTIME_PROOF_FREQUENCY_IN_SECONDS               (60*UPTIME_PROOF_BASE_MINUTE) // How often we resend uptime proofs normally (i.e. after we've seen an uptime proof reply from the network)
-#define UPTIME_PROOF_MAX_TIME_IN_SECONDS                (UPTIME_PROOF_FREQUENCY_IN_SECONDS * 2 + UPTIME_PROOF_BUFFER_IN_SECONDS) // How long until proofs of other network master nodes are considered expired
+#define UPTIME_PROOF_MAX_TIME_IN_SECONDS                (UPTIME_PROOF_FREQUENCY_IN_SECONDS * 2 + UPTIME_PROOF_BUFFER_IN_SECONDS) // How long until proofs of other network service nodes are considered expired
 
 #define STORAGE_SERVER_PING_LIFETIME                    UPTIME_PROOF_FREQUENCY_IN_SECONDS
 #define BELDEXNET_PING_LIFETIME                           UPTIME_PROOF_FREQUENCY_IN_SECONDS
 
 #define CRYPTONOTE_REWARD_BLOCKS_WINDOW                 100
+#define CRYPTONOTE_BLOCK_GRANTED_FULL_REWARD_ZONE_V1    20000 // NOTE(BDX): For testing suite, //size of block (bytes) after which reward for block calculated using block size - before first fork
 #define CRYPTONOTE_BLOCK_GRANTED_FULL_REWARD_ZONE_V5    300000 //size of block (bytes) after which reward for block calculated using block size - second change, from v5
 #define CRYPTONOTE_LONG_TERM_BLOCK_WEIGHT_WINDOW_SIZE   100000 // size in blocks of the long term block weight median window
 #define CRYPTONOTE_SHORT_TERM_BLOCK_WEIGHT_SURGE_FACTOR 50
 #define CRYPTONOTE_COINBASE_BLOB_RESERVED_SIZE          600
 #define CRYPTONOTE_DISPLAY_DECIMAL_POINT                9
 
-#define FEE_PER_KB                                      ((uint64_t)2000000000) // 2 BELDEX (= 2 * pow(10, 9))
+#define FEE_PER_KB                                      ((uint64_t)2000000000) // 2 BDX (= 2 * pow(10, 9))
 #define FEE_PER_BYTE                                    ((uint64_t)215)   // Fallback used in wallet if no fee is available from RPC
 #define FEE_PER_BYTE_V12                                ((uint64_t)17200) // Higher fee (and fallback) in v12 (only, v13 switches back)
-#define FEE_PER_OUTPUT                                  ((uint64_t)20000000) // 0.02 BELDEX per tx output (in addition to the per-byte fee), starting in v13
+#define FEE_PER_OUTPUT                                  ((uint64_t)20000000) // 0.02 BDX per tx output (in addition to the per-byte fee), starting in v13
 #define DYNAMIC_FEE_PER_KB_BASE_BLOCK_REWARD            ((uint64_t)10000000000000) // 10 * pow(10,12)
 #define DYNAMIC_FEE_PER_KB_BASE_FEE_V5                  ((uint64_t)400000000)
 #define DYNAMIC_FEE_REFERENCE_TRANSACTION_WEIGHT        ((uint64_t)3000)
@@ -231,13 +220,13 @@ namespace config
   // Maximum allowed stake contribution, as a fraction of the available contribution room.  This
   // should generally be slightly larger than 1.  This is used to disallow large overcontributions
   // which can happen when there are competing stakes submitted at the same time for the same
-  // master node.
+  // service node.
   using MAXIMUM_ACCEPTABLE_STAKE = std::ratio<101, 100>;
 
   // Used to estimate the blockchain height from a timestamp, with some grace time.  This can drift
   // slightly over time (because average block time is not typically *exactly*
   // DIFFICULTY_TARGET_V2).
-  inline constexpr uint64_t HEIGHT_ESTIMATE_HEIGHT = 482088;
+  inline constexpr uint64_t HEIGHT_ESTIMATE_HEIGHT = 582088;
   inline constexpr time_t HEIGHT_ESTIMATE_TIMESTAMP = 1595359932;
 
   inline constexpr uint64_t CRYPTONOTE_PUBLIC_ADDRESS_BASE58_PREFIX = 0xd1;
@@ -251,12 +240,13 @@ namespace config
         0x12 ,0x30, 0xF1, 0x71 , 0x61, 0x04 , 0x41, 0x61, 0x17, 0x31, 0x00, 0x82, 0x17, 0xA1, 0xB5, 0x90
     } }; // Bender's nightmare
   inline constexpr std::string_view GENESIS_TX = "013c01ff0005978c390224a302c019c844f7141f35bf7f0fc5b02ada055e4ba897557b17ac6ccf88f0a2c09fab030276d443549feee11fe325048eeea083fcb7535312572d255ede1ecb58f84253b480e89226023b7d7c5e6eff4da699393abf12b6e3d04eae7909ae21932520fb3166b8575bb180cab5ee0102e93beb645ce7d5574d6a5ed5d9b8aadec7368342d08a7ca7b342a428353a10df80e497d01202b6e6844c1e9a478d0e4f7f34e455b26077a51f0005357aa19a49ca16eb373f622101f7c2a3a2ed7011b61998b1cd4f45b4d3c1daaa82908a10ca191342297eef1cf8"sv;
-  inline constexpr uint32_t GENESIS_NONCE = 1022201;
+  inline constexpr uint32_t GENESIS_NONCE = 11011;
 
   inline constexpr uint64_t GOVERNANCE_REWARD_INTERVAL_IN_BLOCKS = BLOCKS_EXPECTED_IN_DAYS(7);
   inline constexpr std::array GOVERNANCE_WALLET_ADDRESS =
   {
-    "bxcguQiBhYaDW5wAdPLSwRHA6saX1nCEYUF89SPKZfBY1BENdLQWjti59aEtAEgrVZjnCJEVFoCDrG1DCoz2HeeN2pxhxL9xa"sv
+    "bxcguQiBhYaDW5wAdPLSwRHA6saX1nCEYUF89SPKZfBY1BENdLQWjti59aEtAEgrVZjnCJEVFoCDrG1DCoz2HeeN2pxhxL9xa"sv, // hardfork v7-10
+    "bxcguQiBhYaDW5wAdPLSwRHA6saX1nCEYUF89SPKZfBY1BENdLQWjti59aEtAEgrVZjnCJEVFoCDrG1DCoz2HeeN2pxhxL9xa"sv,
   };
 
   // Hash domain separators
@@ -275,11 +265,11 @@ namespace config
 
   namespace testnet
   {
-    inline constexpr uint64_t HEIGHT_ESTIMATE_HEIGHT = 9767;
+    inline constexpr uint64_t HEIGHT_ESTIMATE_HEIGHT = 339767;
     inline constexpr time_t HEIGHT_ESTIMATE_TIMESTAMP = 1595360006;
     inline constexpr uint64_t CRYPTONOTE_PUBLIC_ADDRESS_BASE58_PREFIX = 53;
     inline constexpr uint64_t CRYPTONOTE_PUBLIC_INTEGRATED_ADDRESS_BASE58_PREFIX = 54;
-    inline constexpr uint64_t CRYPTONOTE_PUBLIC_SUBADDRESS_BASE58_PREFIX = 63;
+    inline constexpr uint64_t CRYPTONOTE_PUBLIC_SUBADDRESS_BASE58_PREFIX = 53;
     inline constexpr uint16_t P2P_DEFAULT_PORT = 29090;
     inline constexpr uint16_t RPC_DEFAULT_PORT = 29091;
     inline constexpr uint16_t ZMQ_RPC_DEFAULT_PORT = 29092;
@@ -293,8 +283,8 @@ namespace config
     inline constexpr uint64_t GOVERNANCE_REWARD_INTERVAL_IN_BLOCKS = 1000;
     inline constexpr std::array GOVERNANCE_WALLET_ADDRESS =
     {
-      "9zGqWVYfaWRTroZwwtATfFHKcSby5JYCW8Yvu7gyTeg3ZC5deykauXNNms2J7DiiXxg3RknqkV4EV4UaPGFwc1Y8TkTSWzm"sv
-
+      "9zGqWVYfaWRTroZwwtATfFHKcSby5JYCW8Yvu7gyTeg3ZC5deykauXNNms2J7DiiXxg3RknqkV4EV4UaPGFwc1Y8TkTSWzm"sv,
+      "9zGqWVYfaWRTroZwwtATfFHKcSby5JYCW8Yvu7gyTeg3ZC5deykauXNNms2J7DiiXxg3RknqkV4EV4UaPGFwc1Y8TkTSWzm"sv, // hardfork v7-9
     };
 
   }
@@ -319,7 +309,8 @@ namespace config
     inline constexpr uint64_t GOVERNANCE_REWARD_INTERVAL_IN_BLOCKS = BLOCKS_EXPECTED_IN_DAYS(7);
     inline constexpr std::array GOVERNANCE_WALLET_ADDRESS =
     {
-      "59XZKiAFwAKVyWN1CuuyFqMTTFLu9PEjpb3WhXfVuStgdoCZM1MtyJ2C41qijqfbdnY844F3boaW29geb8pT3mfrV9QQSRB"sv
+      "59XZKiAFwAKVyWN1CuuyFqMTTFLu9PEjpb3WhXfVuStgdoCZM1MtyJ2C41qijqfbdnY844F3boaW29geb8pT3mfrV9QQSRB"sv, // hardfork v7-9
+      "59XZKiAFwAKVyWN1CuuyFqMTTFLu9PEjpb3WhXfVuStgdoCZM1MtyJ2C41qijqfbdnY844F3boaW29geb8pT3mfrV9QQSRB"sv, // hardfork v10
     };
   }
 }
@@ -330,10 +321,10 @@ namespace cryptonote
   {
     network_version_7 = 7,
     network_version_8,
-    network_version_9_master_nodes, // Proof Of Stake w/ master Nodes
-    network_version_10_bulletproofs, // Bulletproofs, master Node Grace Registration Period, Batched Governance
+    network_version_9_master_nodes, // Proof Of Stake w/ Service Nodes
+    network_version_10_bulletproofs, // Bulletproofs, Service Node Grace Registration Period, Batched Governance
     network_version_11_infinite_staking, // Infinite Staking, CN-Turtle
-    network_version_12_checkpointing, // Checkpointing, Relaxed Deregistration, RandomXL, Beldex Storage Server
+    network_version_12_checkpointing, // Checkpointing, Relaxed Deregistration, RandomXL, Loki Storage Server
     network_version_13_enforce_checkpoints,
     network_version_14_blink,
     network_version_15_bns,
