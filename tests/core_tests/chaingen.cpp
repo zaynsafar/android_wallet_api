@@ -392,9 +392,9 @@ cryptonote::transaction beldex_chain_generator::create_and_add_state_change_tx(m
   return result;
 }
 
-cryptonote::transaction beldex_chain_generator::create_and_add_registration_tx(const cryptonote::account_base &src, const cryptonote::keypair &sn_keys, bool kept_by_block)
+cryptonote::transaction beldex_chain_generator::create_and_add_registration_tx(const cryptonote::account_base &src, const cryptonote::keypair &mn_keys, bool kept_by_block)
 {
-  cryptonote::transaction result = create_registration_tx(src, sn_keys);
+  cryptonote::transaction result = create_registration_tx(src, mn_keys);
   add_tx(result, true /*can_be_added_to_blockchain*/, "" /*fail_msg*/, kept_by_block);
   return result;
 }

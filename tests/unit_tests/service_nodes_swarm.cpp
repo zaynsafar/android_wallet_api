@@ -36,7 +36,7 @@
 #include <iterator>
 
 #undef BELDEX_DEFAULT_LOG_CATEGORY
-#define BELDEX_DEFAULT_LOG_CATEGORY "sn_unit_tests"
+#define BELDEX_DEFAULT_LOG_CATEGORY "mn_unit_tests"
 
 using namespace master_nodes;
 

@@ -71,7 +71,7 @@ constexpr std::string_view round_state_string(round_state state)
   return "Invalid2"sv;
 }
 
-enum struct sn_type
+enum struct mn_type
 {
   none,
   producer,
@@ -148,7 +148,7 @@ struct round_context
     bool                  queue_for_next_round; // When set to true, invoking prepare_for_round(...) will wait for (round + 1)
     uint8_t               round;                // The next round the Pulse ceremony will generate a block for
     master_nodes::quorum quorum;               // The block producer/validator participating in the next round
-    sn_type               participant;          // Is this daemon a block producer, validator or non participant.
+    mn_type               participant;          // Is this daemon a block producer, validator or non participant.
     size_t                my_quorum_position;   // Position in the quorum, 0 if producer or neither, or [0, PULSE_QUORUM_NUM_VALIDATORS) if a validator
     std::string           node_name;            // Short-hand string for describing the node in logs, i.e. V[0] for validator 0 or W[0] for the producer.
     pulse::time_point     start_time;           // When the round starts
@@ -404,7 +404,7 @@ bool msg_signature_check(pulse::message const &msg, crypto::hash const &top_bloc
 // Construct a pulse::message for sending the handshake bit or bitset.
 void relay_validator_handshake_bit_or_bitset(round_context const &context, void *quorumnet_state, master_nodes::master_node_keys const &key, bool sending_bitset)
 {
-  assert(context.prepare_for_round.participant == sn_type::validator);
+  assert(context.prepare_for_round.participant == mn_type::validator);
 
   // Message
   pulse::message msg = msg_init_from_context(context);
@@ -719,7 +719,7 @@ void pulse::handle_message(void *quorumnet_state, pulse::message const &msg)
   stage->msgs_received++;
 
   if (quorumnet_state)
-    cryptonote::quorumnet_pulse_relay_message_to_quorum(quorumnet_state, msg, context.prepare_for_round.quorum, context.prepare_for_round.participant == sn_type::producer);
+    cryptonote::quorumnet_pulse_relay_message_to_quorum(quorumnet_state, msg, context.prepare_for_round.quorum, context.prepare_for_round.participant == mn_type::producer);
 }
 
 // TODO(doyle): Update pulse::perpare_for_round with this function after the hard fork and sanity check it on testnet.
@@ -1192,7 +1192,7 @@ round_state prepare_for_round(round_context &context, master_nodes::master_node_
     // NOTE: Producer doesn't send handshakes, they only collect the
     // handshake bitsets from the other validators to determine who to
     // lock in for this round in the block template.
-    context.prepare_for_round.participant = sn_type::producer;
+    context.prepare_for_round.participant = mn_type::producer;
     context.prepare_for_round.node_name   = "W[0]";
   }
   else
@@ -1202,7 +1202,7 @@ round_state prepare_for_round(round_context &context, master_nodes::master_node_
       auto const &validator_key = context.prepare_for_round.quorum.validators[index];
       if (validator_key == key.pub)
       {
-        context.prepare_for_round.participant        = sn_type::validator;
+        context.prepare_for_round.participant        = mn_type::validator;
         context.prepare_for_round.my_quorum_position = index;
         context.prepare_for_round.node_name = "V[" + std::to_string(context.prepare_for_round.my_quorum_position) + "]";
         break;
@@ -1253,12 +1253,12 @@ round_state wait_for_round(round_context &context, cryptonote::Blockchain const 
   }
 #endif
 
-  if (context.prepare_for_round.participant == sn_type::validator)
+  if (context.prepare_for_round.participant == mn_type::validator)
   {
     MINFO(log_prefix(context) << "We are a pulse validator, sending handshake bit and collecting other handshakes.");
     return round_state::send_and_wait_for_handshakes;
   }
-  else if (context.prepare_for_round.participant == sn_type::producer)
+  else if (context.prepare_for_round.participant == mn_type::producer)
   {
     MINFO(log_prefix(context) << "We are the block producer for height " << context.wait_for_next_block.height << " in round " << +context.prepare_for_round.round << ", awaiting handshake bitsets.");
     return round_state::wait_for_handshake_bitsets;
@@ -1275,7 +1275,7 @@ round_state send_and_wait_for_handshakes(round_context &context, void *quorumnet
   //
   // NOTE: Send
   //
-  assert(context.prepare_for_round.participant == sn_type::validator);
+  assert(context.prepare_for_round.participant == mn_type::validator);
   if (!context.transient.send_and_wait_for_handshakes.sent)
   {
     context.transient.send_and_wait_for_handshakes.sent = true;
@@ -1300,7 +1300,7 @@ round_state send_and_wait_for_handshakes(round_context &context, void *quorumnet
   bool const timed_out          = pulse::clock::now() >= stage.end_time;
   bool const all_handshakes     = stage.msgs_received == quorum.size();
 
-  assert(context.prepare_for_round.participant == sn_type::validator);
+  assert(context.prepare_for_round.participant == mn_type::validator);
   assert(context.prepare_for_round.my_quorum_position < quorum.size());
 
   if (all_handshakes || timed_out)
@@ -1359,7 +1359,7 @@ round_state wait_for_handshake_bitsets(round_context &context, master_nodes::mas
     }
 
     bool i_am_not_participating = false;
-    if (best_bitset != 0 && context.prepare_for_round.participant == sn_type::validator)
+    if (best_bitset != 0 && context.prepare_for_round.participant == mn_type::validator)
       i_am_not_participating = ((best_bitset & (1 << context.prepare_for_round.my_quorum_position)) == 0);
 
     if (count < master_nodes::PULSE_BLOCK_REQUIRED_SIGNATURES || best_bitset == 0 || i_am_not_participating)
@@ -1391,11 +1391,11 @@ round_state wait_for_handshake_bitsets(round_context &context, master_nodes::mas
     context.transient.wait_for_handshake_bitsets.best_count  = count;
     MINFO(log_prefix(context) << count << "/" << quorum.size()
                               << " validators agreed on the participating nodes in the quorum " << bitset_view16(best_bitset)
-                              << (context.prepare_for_round.participant == sn_type::producer
+                              << (context.prepare_for_round.participant == mn_type::producer
                                       ? ""
                                       : ". Awaiting block template from block producer"));
 
-    if (context.prepare_for_round.participant == sn_type::producer)
+    if (context.prepare_for_round.participant == mn_type::producer)
       return round_state::send_block_template;
     else
       return round_state::wait_for_block_template;
@@ -1406,7 +1406,7 @@ round_state wait_for_handshake_bitsets(round_context &context, master_nodes::mas
 
 round_state send_block_template(round_context &context, void *quorumnet_state, master_nodes::master_node_keys const &key, cryptonote::Blockchain &blockchain)
 {
-  assert(context.prepare_for_round.participant == sn_type::producer);
+  assert(context.prepare_for_round.participant == mn_type::producer);
   std::vector<master_nodes::master_node_pubkey_info> list_state = blockchain.get_master_node_list().get_master_node_list_state({key.pub});
 
   // Invariants
@@ -1462,7 +1462,7 @@ round_state wait_for_block_template(round_context &context, master_nodes::master
   handle_messages_received_early_for(context.transient.wait_for_block_template.stage, quorumnet_state);
   pulse_wait_stage const &stage = context.transient.wait_for_block_template.stage;
 
-  assert(context.prepare_for_round.participant == sn_type::validator);
+  assert(context.prepare_for_round.participant == mn_type::validator);
   bool timed_out = pulse::clock::now() >= context.transient.wait_for_block_template.stage.end_time;
   bool received = context.transient.wait_for_block_template.stage.msgs_received == 1;
   if (timed_out || received)
@@ -1489,7 +1489,7 @@ round_state wait_for_block_template(round_context &context, master_nodes::master
 
 round_state send_and_wait_for_random_value_hashes(round_context &context, master_nodes::master_node_list &node_list, void *quorumnet_state, master_nodes::master_node_keys const &key)
 {
-  assert(context.prepare_for_round.participant == sn_type::validator);
+  assert(context.prepare_for_round.participant == mn_type::validator);
 
   //
   // NOTE: Send
@@ -1531,7 +1531,7 @@ round_state send_and_wait_for_random_value(round_context &context, master_nodes:
   //
   // NOTE: Send
   //
-  assert(context.prepare_for_round.participant == sn_type::validator);
+  assert(context.prepare_for_round.participant == mn_type::validator);
   if (context.transient.random_value.send.one_time_only())
   {
     // Message
@@ -1608,7 +1608,7 @@ round_state send_and_wait_for_random_value(round_context &context, master_nodes:
 
 round_state send_and_wait_for_signed_blocks(round_context &context, master_nodes::master_node_list &node_list, void *quorumnet_state, master_nodes::master_node_keys const &key, cryptonote::core &core)
 {
-  assert(context.prepare_for_round.participant == sn_type::validator);
+  assert(context.prepare_for_round.participant == mn_type::validator);
 
   //
   // NOTE: Send

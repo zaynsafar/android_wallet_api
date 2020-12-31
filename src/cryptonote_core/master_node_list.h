@@ -382,7 +382,7 @@ namespace master_nodes
     void init() override;
     bool validate_miner_tx(cryptonote::block const &block, cryptonote::block_reward_parts const &base_reward) const override;
     bool alt_block_added(const cryptonote::block& block, const std::vector<cryptonote::transaction>& txs, cryptonote::checkpoint_t const *checkpoint) override;
-    payout get_block_leader() const { std::lock_guard lock{m_sn_mutex}; return m_state.get_block_leader(); }
+    payout get_block_leader() const { std::lock_guard lock{m_mn_mutex}; return m_state.get_block_leader(); }
     bool is_master_node(const crypto::public_key& pubkey, bool require_active = true) const;
     bool is_key_image_locked(crypto::key_image const &check_image, uint64_t *unlock_height = nullptr, master_node_info::contribution_t *the_locked_contribution = nullptr) const;
     uint64_t height() const { return m_state.height; }
@@ -406,7 +406,7 @@ namespace master_nodes
     /// at all for the given pubkey then Func will not be called.
     template <typename Func>
     void access_proof(const crypto::public_key &pubkey, Func f) const {
-      std::unique_lock lock{m_sn_mutex};
+      std::unique_lock lock{m_mn_mutex};
       auto it = proofs.find(pubkey);
       if (it != proofs.end())
         f(it->second);
@@ -431,7 +431,7 @@ namespace master_nodes
     template <typename It, typename Func>
     void for_each_master_node_info_and_proof(It begin, It end, Func f) const {
       static const proof_info empty_proof{};
-      std::lock_guard lock{m_sn_mutex};
+      std::lock_guard lock{m_mn_mutex};
       for (auto sni_end = m_state.master_nodes_infos.end(); begin != end; ++begin) {
         auto it = m_state.master_nodes_infos.find(*begin);
         if (it != sni_end) {
@@ -444,7 +444,7 @@ namespace master_nodes
     /// Copies x25519 pubkeys (as strings) of all currently active MNs into the given output iterator
     template <typename OutputIt>
     void copy_active_x25519_pubkeys(OutputIt out) const {
-      std::lock_guard lock{m_sn_mutex};
+      std::lock_guard lock{m_mn_mutex};
       for (const auto& pk_info : m_state.master_nodes_infos) {
         if (!pk_info.second->is_active())
           continue;
@@ -546,9 +546,9 @@ namespace master_nodes
       std::vector<key_image_blacklist_entry> key_image_blacklist;
       block_height                           height{0};
       mutable quorum_manager                 quorums;          // Mutable because we are allowed to (and need to) change it via std::set iterator
-      master_node_list*                     sn_list;
+      master_node_list*                     mn_list;
 
-      state_t(master_node_list* snl) : sn_list{snl} {}
+      state_t(master_node_list* snl) : mn_list{snl} {}
       state_t(master_node_list* snl, state_serialized &&state);
 
       friend bool operator<(const state_t &a, const state_t &b) { return a.height < b.height; }
@@ -601,7 +601,7 @@ namespace master_nodes
     void reset(bool delete_db_entry = false);
     bool load(uint64_t current_height);
 
-    mutable std::recursive_mutex  m_sn_mutex;
+    mutable std::recursive_mutex  m_mn_mutex;
     cryptonote::Blockchain&       m_blockchain;
     const master_node_keys      *m_master_node_keys;
     uint64_t                      m_store_quorum_history = 0;

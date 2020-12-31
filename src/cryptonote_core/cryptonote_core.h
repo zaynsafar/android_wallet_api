@@ -1006,7 +1006,7 @@ namespace cryptonote
      std::atomic<time_t> m_last_storage_server_ping, m_last_beldexnet_ping;
      std::atomic<uint16_t> m_storage_lmq_port;
 
-     uint32_t sn_public_ip() const { return m_sn_public_ip; }
+     uint32_t mn_public_ip() const { return m_mn_public_ip; }
      uint16_t storage_port() const { return m_storage_port; }
      uint16_t quorumnet_port() const { return m_quorumnet_port; }
 
@@ -1199,7 +1199,7 @@ namespace cryptonote
      tools::periodic_task m_block_rate_interval{90s, false}; //!< interval for checking block rate
      tools::periodic_task m_blockchain_pruning_interval{5h}; //!< interval for incremental blockchain pruning
      tools::periodic_task m_master_node_vote_relayer{2min, false};
-     tools::periodic_task m_sn_proof_cleanup_interval{1h, false};
+     tools::periodic_task m_mn_proof_cleanup_interval{1h, false};
      tools::periodic_task m_systemd_notify_interval{10s};
 
      std::atomic<bool> m_starter_message_showed; //!< has the "daemon will sync now" message been shown?
@@ -1217,7 +1217,7 @@ namespace cryptonote
      master_keys m_master_keys; // Always set, even for non-MN mode -- these can be used for public lokimq rpc
 
      /// Master Node's public IP and storage server port (http and lokimq)
-     uint32_t m_sn_public_ip;
+     uint32_t m_mn_public_ip;
      uint16_t m_storage_port;
      uint16_t m_quorumnet_port;
 

@@ -8024,7 +8024,7 @@ bool wallet2::is_output_blackballed(const std::pair<uint64_t, uint64_t> &output)
   catch (const std::exception &e) { return false; }
 }
 
-wallet2::stake_result wallet2::check_stake_allowed(const crypto::public_key& sn_key, const cryptonote::address_parse_info& addr_info, uint64_t& amount, double fraction)
+wallet2::stake_result wallet2::check_stake_allowed(const crypto::public_key& mn_key, const cryptonote::address_parse_info& addr_info, uint64_t& amount, double fraction)
 {
   wallet2::stake_result result = {};
   result.status                = wallet2::stake_result_status::invalid;
@@ -8053,7 +8053,7 @@ wallet2::stake_result wallet2::check_stake_allowed(const crypto::public_key& sn_
   }
 
   /// check that the master node is registered
-  const auto [success, response] = get_master_nodes({ tools::type_to_hex(sn_key) });
+  const auto [success, response] = get_master_nodes({ tools::type_to_hex(mn_key) });
   if (!success)
   {
     result.status = stake_result_status::master_node_list_query_failed;

@@ -51,7 +51,7 @@ static void add_master_nodes(beldex_chain_generator &gen, size_t count)
 }
 
 #undef BELDEX_DEFAULT_LOG_CATEGORY
-#define BELDEX_DEFAULT_LOG_CATEGORY "sn_core_tests"
+#define BELDEX_DEFAULT_LOG_CATEGORY "mn_core_tests"
 
 // Suppose we have checkpoint and alt block at height 40 and the main chain is at height 40 with a differing block.
 // Main chain receives checkpoints for height 40 on the alt chain via votes and reorgs back to height 39.
@@ -2737,11 +2737,11 @@ bool beldex_master_nodes_gen_nodes::generate(std::vector<test_event_entry> &even
   return true;
 }
 
-using sn_info_t = master_nodes::master_node_pubkey_info;
-static bool contains(const std::vector<sn_info_t>& infos, const crypto::public_key& key)
+using mn_info_t = master_nodes::master_node_pubkey_info;
+static bool contains(const std::vector<mn_info_t>& infos, const crypto::public_key& key)
 {
   const auto it =
-    std::find_if(infos.begin(), infos.end(), [&key](const sn_info_t& info) { return info.pubkey == key; });
+    std::find_if(infos.begin(), infos.end(), [&key](const mn_info_t& info) { return info.pubkey == key; });
   return it != infos.end();
 }
 
@@ -2774,7 +2774,7 @@ bool beldex_master_nodes_test_rollback::generate(std::vector<test_event_entry>& 
   beldex_register_callback(events, "test_registrations", [&events, deregister_index](cryptonote::core &c, size_t ev_index)
   {
     DEFINE_TESTS_ERROR_CONTEXT("test_registrations");
-    const auto sn_list = c.get_master_node_list_state({});
+    const auto mn_list = c.get_master_node_list_state({});
     /// Test that node A is still registered
     {
       /// obtain public key of node A
@@ -2792,7 +2792,7 @@ bool beldex_master_nodes_test_rollback::generate(std::vector<test_event_entry>& 
       const auto pk_a = uptime_quorum->workers.at(deregistration.master_node_index);
 
       /// Check present
-      const bool found_a = contains(sn_list, pk_a);
+      const bool found_a = contains(mn_list, pk_a);
       CHECK_AND_ASSERT_MES(found_a, false, "Node deregistered in alt chain is not found in the main chain after reorg.");
     }
 
@@ -2811,7 +2811,7 @@ bool beldex_master_nodes_test_rollback::generate(std::vector<test_event_entry>& 
       }
 
       /// Check not present
-      const bool found_b = contains(sn_list, pk_b);
+      const bool found_b = contains(mn_list, pk_b);
       CHECK_AND_ASSERT_MES(!found_b, false, "Node registered in alt chain is present in the main chain after reorg.");
     }
     return true;
@@ -2845,9 +2845,9 @@ bool beldex_master_nodes_test_swarms_basic::generate(std::vector<test_event_entr
   beldex_register_callback(events, "test_initial_swarms", [](cryptonote::core &c, size_t ev_index)
   {
     DEFINE_TESTS_ERROR_CONTEXT("test_swarms_basic::test_initial_swarms");
-    const auto sn_list = c.get_master_node_list_state({}); /// Check that there is one active swarm and the swarm queue is not empty
+    const auto mn_list = c.get_master_node_list_state({}); /// Check that there is one active swarm and the swarm queue is not empty
     std::map<master_nodes::swarm_id_t, std::vector<crypto::public_key>> swarms;
-    for (const auto& entry : sn_list)
+    for (const auto& entry : mn_list)
     {
       const auto id = entry.info->swarm_id;
       swarms[id].push_back(entry.pubkey);
@@ -2864,12 +2864,12 @@ bool beldex_master_nodes_test_swarms_basic::generate(std::vector<test_event_entr
     gen.create_and_add_next_block({tx});
   }
 
-  beldex_register_callback(events, "test_with_one_more_sn", [](cryptonote::core &c, size_t ev_index) /// test that another swarm has been created
+  beldex_register_callback(events, "test_with_one_more_mn", [](cryptonote::core &c, size_t ev_index) /// test that another swarm has been created
   {
-    DEFINE_TESTS_ERROR_CONTEXT("test_with_one_more_sn");
-    const auto sn_list = c.get_master_node_list_state({});
+    DEFINE_TESTS_ERROR_CONTEXT("test_with_one_more_mn");
+    const auto mn_list = c.get_master_node_list_state({});
     std::map<master_nodes::swarm_id_t, std::vector<crypto::public_key>> swarms;
-    for (const auto& entry : sn_list)
+    for (const auto& entry : mn_list)
     {
       const auto id = entry.info->swarm_id;
       swarms[id].push_back(entry.pubkey);
@@ -2884,12 +2884,12 @@ bool beldex_master_nodes_test_swarms_basic::generate(std::vector<test_event_entr
     gen.create_and_add_next_block({tx});
   }
 
-  beldex_register_callback(events, "test_with_more_sn", [](cryptonote::core &c, size_t ev_index) /// test that another swarm has been created
+  beldex_register_callback(events, "test_with_more_mn", [](cryptonote::core &c, size_t ev_index) /// test that another swarm has been created
   {
-    DEFINE_TESTS_ERROR_CONTEXT("test_with_more_sn");
-    const auto sn_list = c.get_master_node_list_state({});
+    DEFINE_TESTS_ERROR_CONTEXT("test_with_more_mn");
+    const auto mn_list = c.get_master_node_list_state({});
     std::map<master_nodes::swarm_id_t, std::vector<crypto::public_key>> swarms;
-    for (const auto& entry : sn_list)
+    for (const auto& entry : mn_list)
     {
       const auto id = entry.info->swarm_id;
       swarms[id].push_back(entry.pubkey);
@@ -2912,9 +2912,9 @@ bool beldex_master_nodes_test_swarms_basic::generate(std::vector<test_event_entr
   beldex_register_callback(events, "test_after_first_deregisters", [](cryptonote::core &c, size_t ev_index)
   {
     DEFINE_TESTS_ERROR_CONTEXT("test_after_first_deregisters");
-    const auto sn_list = c.get_master_node_list_state({});
+    const auto mn_list = c.get_master_node_list_state({});
     std::map<master_nodes::swarm_id_t, std::vector<crypto::public_key>> swarms;
-    for (const auto& entry : sn_list)
+    for (const auto& entry : mn_list)
     {
       const auto id = entry.info->swarm_id;
       swarms[id].push_back(entry.pubkey);
@@ -2935,9 +2935,9 @@ bool beldex_master_nodes_test_swarms_basic::generate(std::vector<test_event_entr
   beldex_register_callback(events, "test_after_final_deregisters", [](cryptonote::core &c, size_t ev_index)
   {
     DEFINE_TESTS_ERROR_CONTEXT("test_after_first_deregisters");
-    const auto sn_list = c.get_master_node_list_state({});
+    const auto mn_list = c.get_master_node_list_state({});
     std::map<master_nodes::swarm_id_t, std::vector<crypto::public_key>> swarms;
-    for (const auto &entry : sn_list)
+    for (const auto &entry : mn_list)
     {
       const auto id = entry.info->swarm_id;
       swarms[id].push_back(entry.pubkey);
@@ -2961,21 +2961,21 @@ bool beldex_master_nodes_insufficient_contribution::generate(std::vector<test_ev
 
   uint64_t operator_portions                = STAKING_PORTIONS / 2;
   uint64_t remaining_portions               = STAKING_PORTIONS - operator_portions;
-  cryptonote::keypair sn_keys               = cryptonote::keypair::generate(hw::get_device("default"));
-  cryptonote::transaction register_tx       = gen.create_registration_tx(gen.first_miner_, sn_keys, operator_portions);
+  cryptonote::keypair mn_keys               = cryptonote::keypair::generate(hw::get_device("default"));
+  cryptonote::transaction register_tx       = gen.create_registration_tx(gen.first_miner_, mn_keys, operator_portions);
   gen.add_tx(register_tx);
   gen.create_and_add_next_block({register_tx});
 
-  cryptonote::transaction stake = gen.create_and_add_staking_tx(sn_keys.pub, gen.first_miner_, MK_COINS(1));
+  cryptonote::transaction stake = gen.create_and_add_staking_tx(mn_keys.pub, gen.first_miner_, MK_COINS(1));
   gen.create_and_add_next_block({stake});
 
-  beldex_register_callback(events, "test_insufficient_stake_does_not_get_accepted", [sn_keys](cryptonote::core &c, size_t ev_index)
+  beldex_register_callback(events, "test_insufficient_stake_does_not_get_accepted", [mn_keys](cryptonote::core &c, size_t ev_index)
   {
     DEFINE_TESTS_ERROR_CONTEXT("test_insufficient_stake_does_not_get_accepted");
-    const auto sn_list = c.get_master_node_list_state({sn_keys.pub});
-    CHECK_TEST_CONDITION(sn_list.size() == 1);
+    const auto mn_list = c.get_master_node_list_state({mn_keys.pub});
+    CHECK_TEST_CONDITION(mn_list.size() == 1);
 
-    master_nodes::master_node_pubkey_info const &pubkey_info = sn_list[0];
+    master_nodes::master_node_pubkey_info const &pubkey_info = mn_list[0];
     CHECK_EQ(pubkey_info.info->total_contributed, MK_COINS(50));
     return true;
   });

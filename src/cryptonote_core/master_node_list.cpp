@@ -91,7 +91,7 @@ namespace master_nodes
 
   void master_node_list::init()
   {
-    std::lock_guard lock(m_sn_mutex);
+    std::lock_guard lock(m_mn_mutex);
     if (m_blockchain.get_current_hard_fork_version() < 9)
     {
       reset(true);
@@ -135,7 +135,7 @@ namespace master_nodes
   std::shared_ptr<const quorum> master_node_list::get_quorum(quorum_type type, uint64_t height, bool include_old, std::vector<std::shared_ptr<const quorum>> *alt_quorums) const
   {
     height = offset_testing_quorum_height(type, height);
-    std::lock_guard lock(m_sn_mutex);
+    std::lock_guard lock(m_mn_mutex);
     quorum_manager const *quorums = nullptr;
     if (height == m_state.height)
       quorums = &m_state.quorums;
@@ -219,13 +219,13 @@ namespace master_nodes
 
   size_t master_node_list::get_master_node_count() const
   {
-    std::lock_guard lock(m_sn_mutex);
+    std::lock_guard lock(m_mn_mutex);
     return m_state.master_nodes_infos.size();
   }
 
   std::vector<master_node_pubkey_info> master_node_list::get_master_node_list_state(const std::vector<crypto::public_key> &master_node_pubkeys) const
   {
-    std::lock_guard lock(m_sn_mutex);
+    std::lock_guard lock(m_mn_mutex);
     std::vector<master_node_pubkey_info> result;
 
     if (master_node_pubkeys.empty())
@@ -251,7 +251,7 @@ namespace master_nodes
 
   void master_node_list::set_my_master_node_keys(const master_node_keys *keys)
   {
-    std::lock_guard lock(m_sn_mutex);
+    std::lock_guard lock(m_mn_mutex);
     m_master_node_keys = keys;
   }
 
@@ -263,7 +263,7 @@ namespace master_nodes
 
   bool master_node_list::is_master_node(const crypto::public_key& pubkey, bool require_active) const
   {
-    std::lock_guard lock(m_sn_mutex);
+    std::lock_guard lock(m_mn_mutex);
     auto it = m_state.master_nodes_infos.find(pubkey);
     return it != m_state.master_nodes_infos.end() && (!require_active || it->second->is_active());
   }
@@ -716,11 +716,11 @@ namespace master_nodes
           info.swarm_id = UNASSIGNED_SWARM_ID;
         }
 
-        if (sn_list && !sn_list->m_rescanning)
+        if (mn_list && !mn_list->m_rescanning)
         {
-          auto &proof = sn_list->proofs[key];
+          auto &proof = mn_list->proofs[key];
           proof.timestamp = proof.effective_timestamp = 0;
-          proof.store(key, sn_list->m_blockchain);
+          proof.store(key, mn_list->m_blockchain);
         }
         return true;
 
@@ -758,9 +758,9 @@ namespace master_nodes
         // the failure conditions.  We set only the effective but not *actual*
         // timestamp so that we delay obligations checks but don't prevent the
         // next actual proof from being sent/relayed.
-        if (sn_list)
+        if (mn_list)
         {
-          auto &proof = sn_list->proofs[key];
+          auto &proof = mn_list->proofs[key];
           proof.effective_timestamp = block.timestamp;
           proof.checkpoint_participation.reset();
           proof.pulse_participation.reset();
@@ -1010,11 +1010,11 @@ namespace master_nodes
 
       // Explicitly reset any stored proof to 0, and store it just in case this is a
       // re-registration: we want to wipe out any data from the previous registration.
-      if (sn_list && !sn_list->m_rescanning)
+      if (mn_list && !mn_list->m_rescanning)
       {
-        auto &proof = sn_list->proofs[key];
+        auto &proof = mn_list->proofs[key];
         proof = {};
-        proof.store(key, sn_list->m_blockchain);
+        proof.store(key, mn_list->m_blockchain);
       }
 
       if (my_keys && my_keys->pub == key) MGINFO_GREEN("Master node registered (yours): " << key << " on height: " << block_height);
@@ -1585,7 +1585,7 @@ namespace master_nodes
     if (block.major_version < cryptonote::network_version_9_master_nodes)
       return true;
 
-    std::lock_guard lock(m_sn_mutex);
+    std::lock_guard lock(m_mn_mutex);
     process_block(block, txs);
     bool result = verify_block(block, false /*alt_block*/, checkpoint);
     if (result && cryptonote::block_has_pulse_components(block))
@@ -2101,9 +2101,9 @@ namespace master_nodes
       /// Apply changes
       for (const auto& [swarm_id, mnodes] : existing_swarms) {
         for (const auto& mnode : mnodes) {
-          auto& sn_info_ptr = master_nodes_infos.at(mnode);
-          if (sn_info_ptr->swarm_id == swarm_id) continue; /// nothing changed for this mnode
-          duplicate_info(sn_info_ptr).swarm_id = swarm_id;
+          auto& mn_info_ptr = master_nodes_infos.at(mnode);
+          if (mn_info_ptr->swarm_id == swarm_id) continue; /// nothing changed for this mnode
+          duplicate_info(mn_info_ptr).swarm_id = swarm_id;
         }
       }
     }
@@ -2166,7 +2166,7 @@ namespace master_nodes
 
   void master_node_list::blockchain_detached(uint64_t height, bool /*by_pop_blocks*/)
   {
-    std::lock_guard lock(m_sn_mutex);
+    std::lock_guard lock(m_mn_mutex);
 
     uint64_t revert_to_height = height - 1;
     bool reinitialise         = false;
@@ -2370,7 +2370,7 @@ namespace master_nodes
     if (hf_version < cryptonote::network_version_9_master_nodes)
       return true;
 
-    std::lock_guard lock(m_sn_mutex);
+    std::lock_guard lock(m_mn_mutex);
     uint64_t const height                   = cryptonote::get_block_height(block);
     cryptonote::transaction const &miner_tx = block.miner_tx;
 
@@ -2668,7 +2668,7 @@ namespace master_nodes
 
     data_for_serialization *data[] = {&m_transient.cache_long_term_data, &m_transient.cache_short_term_data};
     auto const serialize_version   = data_for_serialization::get_version(hf_version);
-    std::lock_guard lock(m_sn_mutex);
+    std::lock_guard lock(m_mn_mutex);
 
     for (data_for_serialization *serialize_entry : data)
     {
@@ -2897,7 +2897,7 @@ namespace master_nodes
     if (proof.qnet_port == 0)
       REJECT_PROOF("invalid quorumnet port in uptime proof");
 
-    auto locks = tools::unique_locks(m_blockchain, m_sn_mutex, m_x25519_map_mutex);
+    auto locks = tools::unique_locks(m_blockchain, m_mn_mutex, m_x25519_map_mutex);
     auto it = m_state.master_nodes_infos.find(proof.pubkey);
     if (it == m_state.master_nodes_infos.end())
       REJECT_PROOF("no such master node is currently registered");
@@ -2948,7 +2948,7 @@ namespace master_nodes
   void master_node_list::cleanup_proofs()
   {
     MDEBUG("Cleaning up expired MN proofs");
-    auto locks = tools::unique_locks(m_sn_mutex, m_blockchain);
+    auto locks = tools::unique_locks(m_mn_mutex, m_blockchain);
     uint64_t now = std::time(nullptr);
     auto& db = m_blockchain.get_db();
     cryptonote::db_wtxn_guard guard{db};
@@ -2978,7 +2978,7 @@ namespace master_nodes
   }
 
   void master_node_list::initialize_x25519_map() {
-    auto locks = tools::unique_locks(m_sn_mutex, m_x25519_map_mutex);
+    auto locks = tools::unique_locks(m_mn_mutex, m_x25519_map_mutex);
 
     auto now = std::time(nullptr);
     for (const auto &pk_info : m_state.master_nodes_infos)
@@ -3026,7 +3026,7 @@ namespace master_nodes
 
   void master_node_list::record_checkpoint_participation(crypto::public_key const &pubkey, uint64_t height, bool participated)
   {
-    std::lock_guard lock(m_sn_mutex);
+    std::lock_guard lock(m_mn_mutex);
     if (!m_state.master_nodes_infos.count(pubkey))
       return;
 
@@ -3040,7 +3040,7 @@ namespace master_nodes
 
   void master_node_list::record_pulse_participation(crypto::public_key const &pubkey, uint64_t height, uint8_t round, bool participated)
   {
-    std::lock_guard lock(m_sn_mutex);
+    std::lock_guard lock(m_mn_mutex);
     if (!m_state.master_nodes_infos.count(pubkey))
       return;
 
@@ -3056,7 +3056,7 @@ namespace master_nodes
 
   bool master_node_list::set_storage_server_peer_reachable(crypto::public_key const &pubkey, bool value)
   {
-    std::lock_guard lock(m_sn_mutex);
+    std::lock_guard lock(m_mn_mutex);
 
     if (!m_state.master_nodes_infos.count(pubkey)) {
       LOG_PRINT_L2("No Master Node is known by this pubkey: " << pubkey);
@@ -3091,12 +3091,12 @@ namespace master_nodes
   , key_image_blacklist{std::move(state.key_image_blacklist)}
   , only_loaded_quorums{state.only_stored_quorums}
   , block_hash{state.block_hash}
-  , sn_list{snl}
+  , mn_list{snl}
   {
-    if (!sn_list)
+    if (!mn_list)
       throw std::logic_error("Cannot deserialize a state_t without a master_node_list");
     if (state.version == state_serialized::version_t::version_0)
-      block_hash = sn_list->m_blockchain.get_block_id_by_height(height);
+      block_hash = mn_list->m_blockchain.get_block_id_by_height(height);
 
     for (auto &pubkey_info : state.infos)
     {
@@ -3105,7 +3105,7 @@ namespace master_nodes
       if (info.version < version_t::v1_add_registration_hf_version)
       {
         info.version = version_t::v1_add_registration_hf_version;
-        info.registration_hf_version = sn_list->m_blockchain.get_hard_fork_version(pubkey_info.info->registration_height);
+        info.registration_hf_version = mn_list->m_blockchain.get_hard_fork_version(pubkey_info.info->registration_height);
       }
       if (info.version < version_t::v4_noproofs)
       {

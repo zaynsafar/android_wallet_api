@@ -409,16 +409,16 @@ namespace cryptonote
       const std::string pub_ip = command_line::get_arg(vm, arg_public_ip);
       if (pub_ip.size())
       {
-        if (!epee::string_tools::get_ip_int32_from_string(m_sn_public_ip, pub_ip)) {
+        if (!epee::string_tools::get_ip_int32_from_string(m_mn_public_ip, pub_ip)) {
           MERROR("Unable to parse IPv4 public address from: " << pub_ip);
           storage_ok = false;
         }
 
-        if (!epee::net_utils::is_ip_public(m_sn_public_ip)) {
+        if (!epee::net_utils::is_ip_public(m_mn_public_ip)) {
           if (m_master_node_list.debug_allow_local_ips) {
             MWARNING("Address given for public-ip is not public; allowing it because dev-allow-local-ips was specified. This master node WILL NOT WORK ON THE PUBLIC BELDEX NETWORK!");
           } else {
-            MERROR("Address given for public-ip is not public: " << epee::string_tools::get_ip_string_from_int32(m_sn_public_ip));
+            MERROR("Address given for public-ip is not public: " << epee::string_tools::get_ip_string_from_int32(m_mn_public_ip));
             storage_ok = false;
           }
         }
@@ -436,7 +436,7 @@ namespace cryptonote
       }
 
       MGINFO("Storage server endpoint is set to: "
-             << (epee::net_utils::ipv4_network_address{ m_sn_public_ip, m_storage_port }).str());
+             << (epee::net_utils::ipv4_network_address{ m_mn_public_ip, m_storage_port }).str());
 
     }
 
@@ -1850,7 +1850,7 @@ namespace cryptonote
     if (!m_master_node)
       return true;
 
-    NOTIFY_UPTIME_PROOF::request req = m_master_node_list.generate_uptime_proof(m_sn_public_ip, m_storage_port, m_storage_lmq_port, m_quorumnet_port);
+    NOTIFY_UPTIME_PROOF::request req = m_master_node_list.generate_uptime_proof(m_mn_public_ip, m_storage_port, m_storage_lmq_port, m_quorumnet_port);
 
     cryptonote_connection_context fake_context{};
     bool relayed = get_protocol()->relay_uptime_proof(req, fake_context);
@@ -2214,18 +2214,18 @@ namespace cryptonote
         }
 
         {
-          std::vector<crypto::public_key> sn_pks;
+          std::vector<crypto::public_key> mn_pks;
           auto sns = m_master_node_list.get_master_node_list_state();
-          sn_pks.reserve(sns.size());
+          mn_pks.reserve(sns.size());
           for (const auto& sni : sns)
-            sn_pks.push_back(sni.pubkey);
+            mn_pks.push_back(sni.pubkey);
 
-          m_master_node_list.for_each_master_node_info_and_proof(sn_pks.begin(), sn_pks.end(), [&](auto& pk, auto& sni, auto& proof) {
-            if (pk != m_master_keys.pub && proof.public_ip == m_sn_public_ip &&
+          m_master_node_list.for_each_master_node_info_and_proof(mn_pks.begin(), mn_pks.end(), [&](auto& pk, auto& sni, auto& proof) {
+            if (pk != m_master_keys.pub && proof.public_ip == m_mn_public_ip &&
                 (proof.quorumnet_port == m_quorumnet_port || proof.storage_port == m_storage_port || proof.storage_port == m_storage_lmq_port))
             MGINFO_RED(
                 "Another master node (" << pk << ") is broadcasting the same public IP and ports as this master node (" <<
-                epee::string_tools::get_ip_string_from_int32(m_sn_public_ip) << ":" << proof.quorumnet_port << "[qnet], :" <<
+                epee::string_tools::get_ip_string_from_int32(m_mn_public_ip) << ":" << proof.quorumnet_port << "[qnet], :" <<
                 proof.storage_port << "[SS-HTTP], :" << proof.storage_lmq_port << "[SS-LMQ]). "
                 "This will lead to deregistration of one or both master nodes if not corrected. "
                 "(Do both master nodes have the correct IP for the master-node-public-ip setting?)");
@@ -2286,7 +2286,7 @@ namespace cryptonote
     m_master_node_vote_relayer.do_call([this] { return relay_master_node_votes(); });
     m_check_disk_space_interval.do_call([this] { return check_disk_space(); });
     m_block_rate_interval.do_call([this] { return check_block_rate(); });
-    m_sn_proof_cleanup_interval.do_call([&snl=m_master_node_list] { snl.cleanup_proofs(); return true; });
+    m_mn_proof_cleanup_interval.do_call([&snl=m_master_node_list] { snl.cleanup_proofs(); return true; });
 
     time_t const lifetime = time(nullptr) - get_start_time();
     int proof_delay = m_nettype == FAKECHAIN ? 5 : UPTIME_PROOF_INITIAL_DELAY_SECONDS;

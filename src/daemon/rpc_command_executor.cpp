@@ -468,29 +468,29 @@ bool rpc_command_executor::show_status() {
     }
   }
 
-  std::string my_sn_key;
+  std::string my_mn_key;
   int64_t my_decomm_remaining = 0;
-  uint64_t my_sn_last_uptime = 0;
-  bool my_sn_registered = false, my_sn_staked = false, my_sn_active = false;
+  uint64_t my_mn_last_uptime = 0;
+  bool my_mn_registered = false, my_mn_staked = false, my_mn_active = false;
   if (ires.master_node && *ires.master_node) {
     GET_MASTER_KEYS::response res{};
 
     if (!invoke<GET_MASTER_KEYS>({}, res, "Failed to retrieve master node keys"))
       return false;
 
-    my_sn_key = std::move(res.master_node_pubkey);
-    GET_MASTER_NODES::request sn_req{};
-    GET_MASTER_NODES::response sn_res{};
+    my_mn_key = std::move(res.master_node_pubkey);
+    GET_MASTER_NODES::request mn_req{};
+    GET_MASTER_NODES::response mn_res{};
 
-    sn_req.master_node_pubkeys.push_back(my_sn_key);
-    if (invoke<GET_MASTER_NODES>(std::move(sn_req), sn_res, "") && sn_res.master_node_states.size() == 1)
+    mn_req.master_node_pubkeys.push_back(my_mn_key);
+    if (invoke<GET_MASTER_NODES>(std::move(mn_req), mn_res, "") && mn_res.master_node_states.size() == 1)
     {
-      auto &entry = sn_res.master_node_states.front();
-      my_sn_registered = true;
-      my_sn_staked = entry.total_contributed >= entry.staking_requirement;
-      my_sn_active = entry.active;
+      auto &entry = mn_res.master_node_states.front();
+      my_mn_registered = true;
+      my_mn_staked = entry.total_contributed >= entry.staking_requirement;
+      my_mn_active = entry.active;
       my_decomm_remaining = entry.earned_downtime_blocks;
-      my_sn_last_uptime = entry.last_uptime_proof;
+      my_mn_last_uptime = entry.last_uptime_proof;
     }
   }
 
@@ -548,14 +548,14 @@ bool rpc_command_executor::show_status() {
 
   tools::success_msg_writer() << str.str();
 
-  if (!my_sn_key.empty()) {
+  if (!my_mn_key.empty()) {
     str.str("");
-    str << "MN: " << my_sn_key << ' ';
-    if (!my_sn_registered)
+    str << "MN: " << my_mn_key << ' ';
+    if (!my_mn_registered)
       str << "not registered";
     else
-      str << (!my_sn_staked ? "awaiting" : my_sn_active ? "active" : "DECOMMISSIONED (" + std::to_string(my_decomm_remaining) + " blocks credit)")
-        << ", proof: " << (my_sn_last_uptime ? get_human_time_ago(my_sn_last_uptime, time(nullptr)) : "(never)");
+      str << (!my_mn_staked ? "awaiting" : my_mn_active ? "active" : "DECOMMISSIONED (" + std::to_string(my_decomm_remaining) + " blocks credit)")
+        << ", proof: " << (my_mn_last_uptime ? get_human_time_ago(my_mn_last_uptime, time(nullptr)) : "(never)");
     str << ", last pings: ";
     if (*ires.last_storage_server_ping > 0)
         str << get_human_time_ago(*ires.last_storage_server_ping, time(nullptr), true /*abbreviate*/);

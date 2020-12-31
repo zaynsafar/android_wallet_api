@@ -324,7 +324,7 @@ bool Wallet::paymentIdValid(const std::string &payment_id)
 
 bool Wallet::masterNodePubkeyValid(const std::string &str)
 {
-    crypto::public_key sn_key;
+    crypto::public_key mn_key;
     return str.size() == 64 && lokimq::is_hex(str);
 }
 
@@ -2453,7 +2453,7 @@ PendingTransaction* WalletImpl::stakePending(const std::string& mn_key_str, cons
   /// Note(maxim): need to be careful to call `WalletImpl::disposeTransaction` when it is no longer needed
   PendingTransactionImpl * transaction = new PendingTransactionImpl(*this);
 
-  tools::wallet2::stake_result stake_result = m_wallet->create_stake_tx(sn_key, addr_info, amount);
+  tools::wallet2::stake_result stake_result = m_wallet->create_stake_tx(mn_key, addr_info, amount);
   if (stake_result.status != tools::wallet2::stake_result_status::success)
   {
     error_msg = "Failed to create a stake transaction: " + stake_result.msg;
@@ -2463,12 +2463,12 @@ PendingTransaction* WalletImpl::stakePending(const std::string& mn_key_str, cons
   return transaction;
 }
 
-StakeUnlockResult* WalletImpl::canRequestStakeUnlock(const std::string &sn_key)
+StakeUnlockResult* WalletImpl::canRequestStakeUnlock(const std::string &mn_key)
 {
     tools::wallet2::request_stake_unlock_result res = {};
 
     crypto::public_key mnode_key;
-    if (!tools::hex_to_type(sn_key, mnode_key))
+    if (!tools::hex_to_type(mn_key, mnode_key))
     {
       res.success = false;
       res.msg = "Failed to Parse Master Node Key";
@@ -2478,12 +2478,12 @@ StakeUnlockResult* WalletImpl::canRequestStakeUnlock(const std::string &sn_key)
     return new StakeUnlockResultImpl(m_wallet->can_request_stake_unlock(mnode_key));
 }
 
-StakeUnlockResult* WalletImpl::requestStakeUnlock(const std::string &sn_key)
+StakeUnlockResult* WalletImpl::requestStakeUnlock(const std::string &mn_key)
 {
     tools::wallet2::request_stake_unlock_result res = {};
 
     crypto::public_key mnode_key;
-    if (!tools::hex_to_type(sn_key, mnode_key))
+    if (!tools::hex_to_type(mn_key, mnode_key))
     {
       res.success = false;
       res.msg = "Failed to Parse Master Node Key";

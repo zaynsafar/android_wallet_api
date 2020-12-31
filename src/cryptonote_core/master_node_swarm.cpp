@@ -98,8 +98,8 @@ namespace master_nodes
 
   prod_static void remove_excess_mnode_from_swarm(const excess_pool_mnode& excess_mnode, swarm_mnode_map_t &swarm_to_mnodes)
   {
-    auto &swarm_sn_vec = swarm_to_mnodes.at(excess_mnode.swarm_id);
-    swarm_sn_vec.erase(std::remove(swarm_sn_vec.begin(), swarm_sn_vec.end(), excess_mnode.public_key), swarm_sn_vec.end());
+    auto &swarm_mn_vec = swarm_to_mnodes.at(excess_mnode.swarm_id);
+    swarm_mn_vec.erase(std::remove(swarm_mn_vec.begin(), swarm_mn_vec.end(), excess_mnode.public_key), swarm_mn_vec.end());
   }
 
   prod_static void get_excess_pool(size_t threshold, const swarm_mnode_map_t& swarm_to_mnodes, std::vector<excess_pool_mnode>& pool_mnodes, size_t& excess)
@@ -119,9 +119,9 @@ namespace master_nodes
       if (entry.second.size() > threshold)
       {
         excess += entry.second.size() - MIN_SWARM_SIZE;
-        for (const auto& sn_pk : entry.second)
+        for (const auto& mn_pk : entry.second)
         {
-          pool_mnodes.push_back({sn_pk, entry.first});
+          pool_mnodes.push_back({mn_pk, entry.first});
         }
       }
     }
@@ -183,7 +183,7 @@ namespace master_nodes
   prod_static void assign_mnodes(const std::vector<crypto::public_key> &mnode_pubkeys, swarm_mnode_map_t &swarm_to_mnodes, std::mt19937_64 &mt, size_t percentile)
   {
     std::vector<swarm_size> sorted_swarm_sizes;
-    for (const auto &sn_pk : mnode_pubkeys)
+    for (const auto &mn_pk : mnode_pubkeys)
     {
       calc_swarm_sizes(swarm_to_mnodes, sorted_swarm_sizes);
       const size_t percentile_index = percentile * (sorted_swarm_sizes.size() - 1) / 100;
@@ -201,7 +201,7 @@ namespace master_nodes
       }
       const size_t random_idx = tools::uniform_distribution_portable(mt, upper_index + 1);
       const swarm_id_t swarm_id = sorted_swarm_sizes[random_idx].swarm_id;
-      swarm_to_mnodes.at(swarm_id).push_back(sn_pk);
+      swarm_to_mnodes.at(swarm_id).push_back(mn_pk);
       /// run the excess/threshold round after each additional mnode
       create_new_swarm_from_excess(swarm_to_mnodes, mt);
     }

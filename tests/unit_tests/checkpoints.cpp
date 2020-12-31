@@ -271,7 +271,7 @@ TEST(checkpoints_is_alternative_block_allowed, handles_two_and_more_checkpoints)
   ASSERT_TRUE (cp.is_alternative_block_allowed(11, 11));
 }
 
-TEST(checkpoints_is_alternative_block_allowed, override_1_sn_checkpoint)
+TEST(checkpoints_is_alternative_block_allowed, override_1_mn_checkpoint)
 {
   std::unique_ptr<TestDB> test_db(new TestDB());
   checkpoints cp = {}; cp.init(cryptonote::FAKECHAIN, test_db.get());
@@ -294,7 +294,7 @@ TEST(checkpoints_is_alternative_block_allowed, override_1_sn_checkpoint)
   ASSERT_TRUE(cp.is_alternative_block_allowed(6, 6));
 }
 
-TEST(checkpoints_is_alternative_block_allowed, cant_override_2nd_oldest_sn_checkpoint)
+TEST(checkpoints_is_alternative_block_allowed, cant_override_2nd_oldest_mn_checkpoint)
 {
   std::unique_ptr<TestDB> test_db(new TestDB());
   checkpoints cp = {}; cp.init(cryptonote::FAKECHAIN, test_db.get());
@@ -325,7 +325,7 @@ TEST(checkpoints_is_alternative_block_allowed, cant_override_2nd_oldest_sn_check
   ASSERT_TRUE(cp.is_alternative_block_allowed(10, 6));
 }
 
-TEST(checkpoints_is_alternative_block_allowed, hardcoded_checkpoint_overrides_sn_checkpoint)
+TEST(checkpoints_is_alternative_block_allowed, hardcoded_checkpoint_overrides_mn_checkpoint)
 {
   std::unique_ptr<TestDB> test_db(new TestDB());
   checkpoints cp = {}; cp.init(cryptonote::FAKECHAIN, test_db.get());
