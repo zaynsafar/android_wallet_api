@@ -99,7 +99,7 @@ public:
 
   bool print_checkpoints(uint64_t start_height, uint64_t end_height, bool print_json);
 
-  bool print_sn_state_changes(uint64_t start_height, uint64_t end_height);
+  bool print_mn_state_changes(uint64_t start_height, uint64_t end_height);
 
   bool print_peer_list(bool white = true, bool gray = true, size_t limit = 0, bool pruned_only = false, bool publicrpc_only = false);
 

@@ -719,10 +719,10 @@ namespace cryptonote { namespace rpc {
       void operator()(const tx_extra_merge_mining_tag& x) { entry.mm_depth = x.depth; entry.mm_root = tools::type_to_hex(x.merkle_root); }
       void operator()(const tx_extra_additional_pub_keys& x) { entry.additional_pubkeys = hexify(x.data); }
       void operator()(const tx_extra_burn& x) { entry.burn_amount = x.amount; }
-      void operator()(const tx_extra_master_node_winner& x) { entry.sn_winner = tools::type_to_hex(x.m_master_node_key); }
-      void operator()(const tx_extra_master_node_pubkey& x) { entry.sn_pubkey = tools::type_to_hex(x.m_master_node_key); }
+      void operator()(const tx_extra_master_node_winner& x) { entry.mn_winner = tools::type_to_hex(x.m_master_node_key); }
+      void operator()(const tx_extra_master_node_pubkey& x) { entry.mn_pubkey = tools::type_to_hex(x.m_master_node_key); }
       void operator()(const tx_extra_master_node_register& x) {
-        auto& reg = entry.sn_registration.emplace();
+        auto& reg = entry.mn_registration.emplace();
         reg.fee = microportion(x.m_portions_for_operator);
         reg.expiry = x.m_expiration_timestamp;
         for (size_t i = 0; i < x.m_portions.size(); i++) {
@@ -732,12 +732,12 @@ namespace cryptonote { namespace rpc {
         }
       }
       void operator()(const tx_extra_master_node_contributor& x) {
-        entry.sn_contributor = get_account_address_as_str(nettype, false, {x.m_spend_public_key, x.m_view_public_key});
+        entry.mn_contributor = get_account_address_as_str(nettype, false, {x.m_spend_public_key, x.m_view_public_key});
       }
       template <typename T>
       auto& _state_change(const T& x) {
         // Common loading code for nearly-identical state_change and deregister_old variables:
-        auto& sc = entry.sn_state_change.emplace();
+        auto& sc = entry.mn_state_change.emplace();
         sc.height = x.block_height;
         sc.index = x.master_node_index;
         sc.voters.reserve(x.votes.size());
@@ -2303,7 +2303,7 @@ namespace cryptonote { namespace rpc {
     if (get_master_nodes_res.master_node_states.empty()) // Started in master node but not staked, no information on the blockchain yet
     {
       res.master_node_state.master_node_pubkey  = std::move(get_master_node_key_res.master_node_pubkey);
-      res.master_node_state.public_ip            = epee::string_tools::get_ip_string_from_int32(m_core.sn_public_ip());
+      res.master_node_state.public_ip            = epee::string_tools::get_ip_string_from_int32(m_core.mn_public_ip());
       res.master_node_state.storage_port         = m_core.storage_port();
       res.master_node_state.storage_lmq_port     = m_core.m_storage_lmq_port;
       res.master_node_state.quorumnet_port       = m_core.quorumnet_port();
@@ -2752,8 +2752,8 @@ namespace cryptonote { namespace rpc {
           pulse::convert_time_to_round(pulse::clock::now(), next_timings.r0_timestamp, &pulse_round))
       {
         auto entropy = master_nodes::get_pulse_entropy_for_next_block(blockchain.get_db(), pulse_round);
-        auto& sn_list = m_core.get_master_node_list();
-        auto quorum = generate_pulse_quorum(m_core.get_nettype(), sn_list.get_block_leader().key, hf_version, sn_list.active_master_nodes_infos(), entropy, pulse_round);
+        auto& mn_list = m_core.get_master_node_list();
+        auto quorum = generate_pulse_quorum(m_core.get_nettype(), mn_list.get_block_leader().key, hf_version, mn_list.active_master_nodes_infos(), entropy, pulse_round);
         if (verify_pulse_quorum_sizes(quorum))
         {
           auto& entry = res.quorums.emplace_back();
@@ -2891,10 +2891,10 @@ namespace cryptonote { namespace rpc {
     return res;
   }
   //------------------------------------------------------------------------------------------------------------------------------
-  void core_rpc_server::fill_sn_response_entry(GET_MASTER_NODES::response::entry& entry, const master_nodes::master_node_pubkey_info &sn_info, uint64_t current_height) {
+  void core_rpc_server::fill_mn_response_entry(GET_MASTER_NODES::response::entry& entry, const master_nodes::master_node_pubkey_info &mn_info, uint64_t current_height) {
 
-    const auto &info = *sn_info.info;
-    entry.master_node_pubkey           = tools::type_to_hex(sn_info.pubkey);
+    const auto &info = *mn_info.info;
+    entry.master_node_pubkey           = tools::type_to_hex(mn_info.pubkey);
     entry.registration_height           = info.registration_height;
     entry.requested_unlock_height       = info.requested_unlock_height;
     entry.last_reward_block_height      = info.last_reward_block_height;
@@ -2906,7 +2906,7 @@ namespace cryptonote { namespace rpc {
     entry.earned_downtime_blocks        = master_nodes::quorum_cop::calculate_decommission_credit(info, current_height);
     entry.decommission_count            = info.decommission_count;
 
-    m_core.get_master_node_list().access_proof(sn_info.pubkey, [&entry](const auto &proof) {
+    m_core.get_master_node_list().access_proof(mn_info.pubkey, [&entry](const auto &proof) {
         entry.master_node_version     = proof.version;
         entry.public_ip                = epee::string_tools::get_ip_string_from_int32(proof.public_ip);
         entry.storage_port             = proof.storage_port;
@@ -2989,20 +2989,20 @@ namespace cryptonote { namespace rpc {
             + " which is pubkey: " + req.master_node_pubkeys[i]};
     }
 
-    auto sn_infos = m_core.get_master_node_list_state(pubkeys);
+    auto mn_infos = m_core.get_master_node_list_state(pubkeys);
 
     if (req.active_only) {
       const auto end =
-        std::remove_if(sn_infos.begin(), sn_infos.end(), [](const master_nodes::master_node_pubkey_info& snpk_info) {
-          return !snpk_info.info->is_active();
+        std::remove_if(mn_infos.begin(), mn_infos.end(), [](const master_nodes::master_node_pubkey_info& mnpk_info) {
+          return !mnpk_info.info->is_active();
         });
 
-      sn_infos.erase(end, sn_infos.end());
+      mn_infos.erase(end, mn_infos.end());
     }
 
     if (req.limit != 0) {
 
-      const auto limit = std::min(sn_infos.size(), static_cast<size_t>(req.limit));
+      const auto limit = std::min(mn_infos.size(), static_cast<size_t>(req.limit));
 
       // We need to select N random elements, in random order, from yyyyyyyy.  We could (and used
       // to) just shuffle the entire list and return the first N, but that is quite inefficient when
@@ -3014,29 +3014,29 @@ namespace cryptonote { namespace rpc {
       // of the y's to just be left with [xxx], and only required N swaps in total.
       for (size_t i = 0; i < limit; i++)
       {
-        size_t j = std::uniform_int_distribution<size_t>{i, sn_infos.size()-1}(tools::rng);
+        size_t j = std::uniform_int_distribution<size_t>{i, mn_infos.size()-1}(tools::rng);
         using std::swap;
         if (i != j)
-          swap(sn_infos[i], sn_infos[j]);
+          swap(mn_infos[i], mn_infos[j]);
       }
 
-      sn_infos.resize(limit);
+      mn_infos.resize(limit);
     }
 
-    res.master_node_states.reserve(sn_infos.size());
+    res.master_node_states.reserve(mn_infos.size());
     res.fields = req.fields.value_or(all_fields);
 
     if (req.include_json)
     {
-      if (sn_infos.empty())
+      if (mn_infos.empty())
         res.as_json = "{}";
       else
-        res.as_json = cryptonote::obj_to_json_str(sn_infos);
+        res.as_json = cryptonote::obj_to_json_str(mn_infos);
     }
 
-    for (auto &pubkey_info : sn_infos) {
+    for (auto &pubkey_info : mn_infos) {
       res.master_node_states.emplace_back();
-      fill_sn_response_entry(res.master_node_states.back(), pubkey_info, res.height);
+      fill_mn_response_entry(res.master_node_states.back(), pubkey_info, res.height);
     }
 
     return res;

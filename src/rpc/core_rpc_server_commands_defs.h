@@ -276,7 +276,7 @@ namespace rpc {
     // when actually found in the transaction.  (Requires tx_extra=true in the request).
     struct extra_entry
     {
-      struct sn_reg_info
+      struct mn_reg_info
       {
         struct contribution
         {
@@ -321,11 +321,11 @@ namespace rpc {
       std::optional<uint32_t> mm_depth;             // (Merge-mining) the merge-mined depth
       std::optional<std::string> mm_root;           // (Merge-mining) the merge mining merkle root hash
       std::vector<std::string> additional_pubkeys;  // Additional public keys
-      std::optional<std::string> sn_winner;         // Master node block reward winner public key
-      std::optional<std::string> sn_pubkey;         // Master node public key (e.g. for registrations, stakes, unlocks)
-      std::optional<sn_reg_info> sn_registration;   // Master node registration details
-      std::optional<std::string> sn_contributor;    // Master node contributor wallet address (for stakes)
-      std::optional<state_change> sn_state_change;  // A state change transaction (deregistration, decommission, recommission, ip change)
+      std::optional<std::string> mn_winner;         // Master node block reward winner public key
+      std::optional<std::string> mn_pubkey;         // Master node public key (e.g. for registrations, stakes, unlocks)
+      std::optional<mn_reg_info> mn_registration;   // Master node registration details
+      std::optional<std::string> mn_contributor;    // Master node contributor wallet address (for stakes)
+      std::optional<state_change> mn_state_change;  // A state change transaction (deregistration, decommission, recommission, ip change)
       std::optional<std::string> tx_secret_key;     // The transaction secret key, included in registrations/stakes to decrypt transaction amounts and recipients
       std::vector<std::string> locked_key_images;   // Key image(s) locked by the transaction (for registrations, stakes)
       std::optional<std::string> key_image_unlock;  // A key image being unlocked in a stake unlock request (an unlock will be started for *all* key images locked in the same MN contributions).

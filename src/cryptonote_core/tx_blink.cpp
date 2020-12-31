@@ -43,7 +43,7 @@ static void check_args(blink_tx::subquorum q, int position, const char *func_nam
         throw std::invalid_argument("Invalid voter position passed to " + std::string(func_name));
 }
 
-crypto::public_key blink_tx::get_sn_pubkey(subquorum q, int position, const master_node_list &snl) const {
+crypto::public_key blink_tx::get_mn_pubkey(subquorum q, int position, const master_node_list &snl) const {
     check_args(q, position, __func__);
     uint64_t qheight = quorum_height(q);
     auto blink_quorum = snl.get_quorum(quorum_type::blink, qheight);
@@ -87,7 +87,7 @@ bool blink_tx::add_signature(subquorum q, int position, bool approved, const cry
 
 
 bool blink_tx::add_signature(subquorum q, int position, bool approved, const crypto::signature &sig, const master_node_list &snl) {
-    return add_signature(q, position, approved, sig, get_sn_pubkey(q, position, snl));
+    return add_signature(q, position, approved, sig, get_mn_pubkey(q, position, snl));
 }
 
 bool blink_tx::add_prechecked_signature(subquorum q, int position, bool approved, const crypto::signature &sig) {

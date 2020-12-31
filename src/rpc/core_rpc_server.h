@@ -309,7 +309,7 @@ namespace cryptonote { namespace rpc {
 private:
     bool check_core_ready();
 
-    void fill_sn_response_entry(GET_MASTER_NODES::response::entry& entry, const master_nodes::master_node_pubkey_info &sn_info, uint64_t current_height);
+    void fill_mn_response_entry(GET_MASTER_NODES::response::entry& entry, const master_nodes::master_node_pubkey_info &mn_info, uint64_t current_height);
 
     //utils
     uint64_t get_block_reward(const block& blk);

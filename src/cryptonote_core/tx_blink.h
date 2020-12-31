@@ -162,7 +162,7 @@ public:
     uint64_t quorum_height(subquorum q) const { return quorum_height(height, q); }
 
     /// Returns the pubkey of the referenced master node, or null if there is no such master node.
-    crypto::public_key get_sn_pubkey(subquorum q, int position, const master_nodes::master_node_list &snl) const;
+    crypto::public_key get_mn_pubkey(subquorum q, int position, const master_nodes::master_node_list &snl) const;
 
     /// Returns the hashed signing value for this blink TX for a tx with status `approved`.  The
     /// result is a fast hash of the height + tx hash + approval value.  Lock not required.
