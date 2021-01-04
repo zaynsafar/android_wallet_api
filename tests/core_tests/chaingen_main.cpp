@@ -42,10 +42,6 @@ namespace
   const command_line::arg_descriptor<bool>        arg_generate_test_data          = {"generate_test_data", ""};
   const command_line::arg_descriptor<bool>        arg_play_test_data              = {"play_test_data", ""};
   const command_line::arg_descriptor<bool>        arg_generate_and_play_test_data = {"generate_and_play_test_data", ""};
-<<<<<<< HEAD
-  const command_line::arg_descriptor<bool>        arg_master_nodes               = {"master_nodes", ""};
-=======
->>>>>>> v8.1.4
   const command_line::arg_descriptor<bool>        arg_test_transactions           = {"test_transactions", ""};
   const command_line::arg_descriptor<std::string> arg_filter                      = { "filter", "Regular expression filter for which tests to run" };
   const command_line::arg_descriptor<bool>        arg_list_tests                  = {"list_tests", ""};
@@ -67,10 +63,6 @@ int main(int argc, char* argv[])
   command_line::add_arg(desc_options, arg_generate_test_data);
   command_line::add_arg(desc_options, arg_play_test_data);
   command_line::add_arg(desc_options, arg_generate_and_play_test_data);
-<<<<<<< HEAD
-  command_line::add_arg(desc_options, arg_master_nodes);
-=======
->>>>>>> v8.1.4
   command_line::add_arg(desc_options, arg_test_transactions);
   command_line::add_arg(desc_options, arg_filter);
   command_line::add_arg(desc_options, arg_list_tests);
