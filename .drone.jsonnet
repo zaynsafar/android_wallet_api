@@ -53,7 +53,7 @@ local debian_pipeline(name, image,
                 'mkdir build',
                 'cd build',
                 'cmake .. -G Ninja -DCMAKE_CXX_FLAGS=-fdiagnostics-color=always -DCMAKE_BUILD_TYPE='+build_type+' ' +
-                    '-DLOCAL_MIRROR=https://builds.lokinet.dev/deps -DUSE_LTO=' + (if lto then 'ON ' else 'OFF ') +
+                    '-DLOCAL_MIRROR=https://builds.beldexnet.dev/deps -DUSE_LTO=' + (if lto then 'ON ' else 'OFF ') +
                     (if werror then '-DWARNINGS_AS_ERRORS=ON ' else '') +
                     (if build_tests || run_tests then '-DBUILD_TESTS=ON ' else '') +
                     cmake_extra
@@ -105,7 +105,7 @@ local mac_builder(name,
                 'mkdir build',
                 'cd build',
                 'cmake .. -G Ninja -DCMAKE_CXX_FLAGS=-fcolor-diagnostics -DCMAKE_BUILD_TYPE='+build_type+' ' +
-                    '-DLOCAL_MIRROR=https://builds.lokinet.dev/deps -DUSE_LTO=' + (if lto then 'ON ' else 'OFF ') +
+                    '-DLOCAL_MIRROR=https://builds.beldexnet.dev/deps -DUSE_LTO=' + (if lto then 'ON ' else 'OFF ') +
                     (if werror then '-DWARNINGS_AS_ERRORS=ON ' else '') +
                     (if build_tests || run_tests then '-DBUILD_TESTS=ON ' else '') +
                     cmake_extra,

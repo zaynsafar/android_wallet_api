@@ -23,7 +23,7 @@ struct tx_extra_beldex_name_system;
 class Blockchain;
 }; // namespace cryptonote
 
-namespace lns
+namespace bns
 {
 
 constexpr size_t WALLET_NAME_MAX                  = 97; // mainnet addresses are 95 but testnet/devnet are 97
@@ -58,7 +58,7 @@ struct mapping_value
   bool operator==(mapping_value const &other) const { return encrypted == other.encrypted && other.to_view() == to_view(); }
   bool operator==(std::string_view other)     const { return other == to_view(); }
 
-  // Encrypts the mapping value in-place given the name, suitable for storing into the LNS DB.  Only
+  // Encrypts the mapping value in-place given the name, suitable for storing into the BNS DB.  Only
   // basic overflow validation is attempted, values should be pre-validated in the validate*
   // functions.
   //
@@ -96,7 +96,7 @@ struct mapping_value
 
   // Validate a human readable mapping value representation in 'value' and write the binary form into 'blob'.
   // value: if type is session, 66 character hex string of an ed25519 public key (with 05 prefix)
-  //                   lokinet, 52 character base32z string of an ed25519 public key
+  //                   beldexnet, 52 character base32z string of an ed25519 public key
   //                   wallet,  the wallet public address string
   // blob: (optional) if function returns true, validate will load the binary data into blob (ready for encryption via encrypt())
   static bool validate(cryptonote::network_type nettype, mapping_type type, std::string_view value, mapping_value *blob = nullptr, std::string *reason = nullptr);
@@ -110,10 +110,10 @@ inline std::string_view mapping_type_str(mapping_type type)
 {
   switch(type)
   {
-    case mapping_type::lokinet:         return "lokinet"sv; // general type stored in the database; 1 year when in a purchase tx
-    case mapping_type::lokinet_2years:  return "lokinet_2years"sv;  // Only used in a buy tx, not in the DB
-    case mapping_type::lokinet_5years:  return "lokinet_5years"sv;  // "
-    case mapping_type::lokinet_10years: return "lokinet_10years"sv; // "
+    case mapping_type::beldexnet:         return "beldexnet"sv; // general type stored in the database; 1 year when in a purchase tx
+    case mapping_type::beldexnet_2years:  return "beldexnet_2years"sv;  // Only used in a buy tx, not in the DB
+    case mapping_type::beldexnet_5years:  return "beldexnet_5years"sv;  // "
+    case mapping_type::beldexnet_10years: return "beldexnet_10years"sv; // "
     case mapping_type::session:         return "session"sv;
     case mapping_type::wallet:          return "wallet"sv;
     default: assert(false);             return "xx_unhandled_type"sv;
@@ -123,22 +123,22 @@ inline std::ostream &operator<<(std::ostream &os, mapping_type type) { return os
 
 constexpr bool mapping_type_allowed(uint8_t hf_version, mapping_type type) {
   return (type == mapping_type::session && hf_version >= cryptonote::network_version_15_bns)
-      || (is_lokinet_type(type) && hf_version >= cryptonote::network_version_16_pulse);
+      || (is_beldexnet_type(type) && hf_version >= cryptonote::network_version_16_pulse);
 }
 
 // Returns all mapping types supported for lookup as of the given hardfork.  (Note that this does
-// not return the dedicated length types such as mapping_type::lokinet_5years as those are only
-// relevant within a LNS buy tx).
+// not return the dedicated length types such as mapping_type::beldexnet_5years as those are only
+// relevant within a BNS buy tx).
 std::vector<mapping_type> all_mapping_types(uint8_t hf_version);
 
 sqlite3 *init_beldex_name_system(const fs::path& file_path, bool read_only);
 
 /// Returns the integer value used in the database and in RPC lookup calls for the given mapping
-/// type.  In particularly this maps all mapping_type::lokinet_Xyears values to the underlying value
-/// of mapping_type::lokinet.
-constexpr uint16_t db_mapping_type(lns::mapping_type type) {
-  if (is_lokinet_type(type))
-    return static_cast<uint16_t>(mapping_type::lokinet);
+/// type.  In particularly this maps all mapping_type::beldexnet_Xyears values to the underlying value
+/// of mapping_type::beldexnet.
+constexpr uint16_t db_mapping_type(bns::mapping_type type) {
+  if (is_beldexnet_type(type))
+    return static_cast<uint16_t>(mapping_type::beldexnet);
   return static_cast<uint16_t>(type);
 }
 
@@ -160,7 +160,7 @@ std::string name_hash_bytes_to_base64(std::string_view bytes);
 // otherwise.
 std::optional<std::string> name_hash_input_to_base64(std::string_view input);
 
-bool validate_lns_name(mapping_type type, std::string name, std::string *reason = nullptr);
+bool validate_bns_name(mapping_type type, std::string name, std::string *reason = nullptr);
 
 generic_signature  make_ed25519_signature(crypto::hash const &hash, crypto::ed25519_secret_key const &skey);
 generic_owner      make_monero_owner(cryptonote::account_public_address const &owner, bool is_subaddress);
@@ -168,16 +168,16 @@ generic_owner      make_ed25519_owner(crypto::ed25519_public_key const &pkey);
 bool               parse_owner_to_generic_owner(cryptonote::network_type nettype, std::string_view owner, generic_owner &key, std::string *reason);
 std::string        tx_extra_signature(std::string_view value, generic_owner const *owner, generic_owner const *backup_owner, crypto::hash const &prev_txid);
 
-enum struct lns_tx_type { lookup, buy, update, renew };
-// Converts a human readable case-insensitive string denoting the mapping type into a value suitable for storing into the LNS DB.
-// Currently accepts "session" or "lokinet" for lookups, buys, updates, and renewals; for buys and renewals also accepts "lokinet_Ny[ear]" for N=2,5,10
+enum struct bns_tx_type { lookup, buy, update, renew };
+// Converts a human readable case-insensitive string denoting the mapping type into a value suitable for storing into the BNS DB.
+// Currently accepts "session" or "beldexnet" for lookups, buys, updates, and renewals; for buys and renewals also accepts "beldexnet_Ny[ear]" for N=2,5,10
 // Lookups are implied by none of buy/update/renew.
 // mapping_type: (optional) if function returns true, the uint16_t value of the 'type' will be set
-bool         validate_mapping_type(std::string_view type, uint8_t hf_version, lns_tx_type txtype, mapping_type *mapping_type, std::string *reason);
+bool         validate_mapping_type(std::string_view type, uint8_t hf_version, bns_tx_type txtype, mapping_type *mapping_type, std::string *reason);
 
-// Hashes an LNS name.  The name must already be lower-case (but this is only checked in debug builds).
+// Hashes an BNS name.  The name must already be lower-case (but this is only checked in debug builds).
 crypto::hash name_to_hash(std::string_view name, const std::optional<crypto::hash>& key = std::nullopt); // Takes a human readable name and hashes it.  Takes an optional value to use as a key to produce a keyed hash.
-std::string  name_to_base64_hash(std::string_view name); // Takes a human readable name, hashes it and returns a base64 representation of the hash, suitable for storage into the LNS DB.
+std::string  name_to_base64_hash(std::string_view name); // Takes a human readable name, hashes it and returns a base64 representation of the hash, suitable for storage into the BNS DB.
 
 struct owner_record
 {
@@ -201,9 +201,9 @@ struct settings_record
 struct mapping_record
 {
   // NOTE: We keep expired entries in the DB indefinitely because we need to
-  // keep all LNS entries indefinitely to support large blockchain detachments.
+  // keep all BNS entries indefinitely to support large blockchain detachments.
   // A mapping_record forms a linked list of TXID's which allows us to revert
-  // the LNS DB to any arbitrary height at a small additional storage cost.
+  // the BNS DB to any arbitrary height at a small additional storage cost.
   // return: if the record exists and hasn't expired.
   bool active(uint64_t blockchain_height) const;
   operator bool() const { return loaded; }
@@ -293,9 +293,9 @@ struct name_system_db
   // not found or expired, otherwise returns the encrypted value.
   std::optional<mapping_value> resolve(mapping_type type, std::string_view name_hash_b64, uint64_t blockchain_height);
 
-  // Validates an LNS transaction.  If the function returns true then entry will be populated with
-  // the LNS details.  On a false return, `reason` is instead populated with the failure reason.
-  bool validate_lns_tx(uint8_t hf_version, uint64_t blockchain_height, cryptonote::transaction const &tx, cryptonote::tx_extra_beldex_name_system &entry, std::string *reason);
+  // Validates an BNS transaction.  If the function returns true then entry will be populated with
+  // the BNS details.  On a false return, `reason` is instead populated with the failure reason.
+  bool validate_bns_tx(uint8_t hf_version, uint64_t blockchain_height, cryptonote::transaction const &tx, cryptonote::tx_extra_beldex_name_system &entry, std::string *reason);
 
   // Destructor; closes the sqlite3 database if one is open
   ~name_system_db();

@@ -1002,8 +1002,8 @@ namespace cryptonote
       */
      bool set_storage_server_peer_reachable(crypto::public_key const &pubkey, bool value);
 
-     /// Time point at which the storage server and lokinet last pinged us
-     std::atomic<time_t> m_last_storage_server_ping, m_last_lokinet_ping;
+     /// Time point at which the storage server and beldexnet last pinged us
+     std::atomic<time_t> m_last_storage_server_ping, m_last_beldexnet_ping;
      std::atomic<uint16_t> m_storage_lmq_port;
 
      uint32_t mn_public_ip() const { return m_mn_public_ip; }

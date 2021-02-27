@@ -77,17 +77,17 @@ struct extra_printer {
   void operator()(const tx_extra_tx_key_image_unlock& x) { std::cout << "TX key image unlock: " << x.key_image; }
   void operator()(const tx_extra_burn& x) { std::cout << "Transaction burned fee/payment: " << print_money(x.amount); }
   void operator()(const tx_extra_beldex_name_system& x) {
-    std::cout << "LNS " << (x.is_buying() ? "registration" : x.is_updating() ? "update" : "(unknown)");
+    std::cout << "BNS " << (x.is_buying() ? "registration" : x.is_updating() ? "update" : "(unknown)");
     switch (x.type)
     {
-      case lns::mapping_type::lokinet: std::cout << " - Beldexnet (1y)"; break;
-      case lns::mapping_type::lokinet_2years: std::cout << " - Beldexnet (2y)"; break;
-      case lns::mapping_type::lokinet_5years: std::cout << " - Beldexnet (5y)"; break;
-      case lns::mapping_type::lokinet_10years: std::cout << " - Beldexnet (10y)"; break;
-      case lns::mapping_type::session: std::cout << " - Session address"; break;
-      case lns::mapping_type::wallet: std::cout << " - Wallet address"; break;
-      case lns::mapping_type::update_record_internal:
-      case lns::mapping_type::_count:
+      case bns::mapping_type::beldex: std::cout << " - Beldexnet (1y)"; break;
+      case bns::mapping_type::beldex_2years: std::cout << " - Beldexnet (2y)"; break;
+      case bns::mapping_type::beldex_5years: std::cout << " - Beldexnet (5y)"; break;
+      case bns::mapping_type::beldex_10years: std::cout << " - Beldexnet (10y)"; break;
+      case bns::mapping_type::session: std::cout << " - Session address"; break;
+      case bns::mapping_type::wallet: std::cout << " - Wallet address"; break;
+      case bns::mapping_type::update_record_internal:
+      case bns::mapping_type::_count:
           break;
     }
   }

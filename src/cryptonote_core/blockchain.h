@@ -149,7 +149,7 @@ namespace cryptonote
      *
      * @return true on success, false if any initialization steps fail
      */
-    bool init(BlockchainDB* db, sqlite3 *lns_db, const network_type nettype = MAINNET, bool offline = false, const cryptonote::test_options *test_options = NULL, difficulty_type fixed_difficulty = 0, const GetCheckpointsCallback& get_checkpoints = nullptr);
+    bool init(BlockchainDB* db, sqlite3 *bns_db, const network_type nettype = MAINNET, bool offline = false, const cryptonote::test_options *test_options = NULL, difficulty_type fixed_difficulty = 0, const GetCheckpointsCallback& get_checkpoints = nullptr);
 
     /**
      * @brief Initialize the Blockchain state
@@ -161,7 +161,7 @@ namespace cryptonote
      *
      * @return true on success, false if any initialization steps fail
      */
-    bool init(BlockchainDB* db, HardFork*& hf, sqlite3 *lns_db, const network_type nettype = MAINNET, bool offline = false);
+    bool init(BlockchainDB* db, HardFork*& hf, sqlite3 *bns_db, const network_type nettype = MAINNET, bool offline = false);
 
     /**
      * @brief Uninitializes the blockchain state
@@ -1077,9 +1077,9 @@ namespace cryptonote
      */
     bool blink_rollback(uint64_t rollback_height);
 
-    lns::name_system_db &name_system_db() { return m_lns_db; }
+    bns::name_system_db &name_system_db() { return m_bns_db; }
 
-    const lns::name_system_db &name_system_db() const { return m_lns_db; }
+    const bns::name_system_db &name_system_db() const { return m_bns_db; }
 
     /**
      * @brief flush the invalid blocks set
@@ -1127,7 +1127,7 @@ namespace cryptonote
 
     tx_memory_pool&                   m_tx_pool;
     master_nodes::master_node_list& m_master_node_list;
-    lns::name_system_db               m_lns_db;
+    bns::name_system_db               m_bns_db;
 
     mutable std::recursive_mutex m_blockchain_lock; // TODO: add here reader/writer lock
 

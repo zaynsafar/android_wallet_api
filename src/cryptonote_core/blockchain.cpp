@@ -300,21 +300,21 @@ uint64_t Blockchain::get_current_blockchain_height(bool lock) const
 bool Blockchain::load_missing_blocks_into_beldex_subsystems()
 {
   uint64_t const snl_height   = std::max(m_hardfork->get_earliest_ideal_height_for_version(network_version_9_master_nodes), m_master_node_list.height() + 1);
-  uint64_t const lns_height   = std::max(m_hardfork->get_earliest_ideal_height_for_version(network_version_15_bns),          m_lns_db.height() + 1);
+  uint64_t const bns_height   = std::max(m_hardfork->get_earliest_ideal_height_for_version(network_version_15_bns),          m_bns_db.height() + 1);
   uint64_t const end_height   = m_db->height();
-  uint64_t const start_height = std::min(end_height, std::min(lns_height, snl_height));
+  uint64_t const start_height = std::min(end_height, std::min(bns_height, snl_height));
 
   int64_t const total_blocks = static_cast<int64_t>(end_height) - static_cast<int64_t>(start_height);
   if (total_blocks <= 0) return true;
   if (total_blocks > 1)
-    MGINFO("Loading blocks into beldex subsystems, scanning blockchain from height: " << start_height << " to: " << end_height << " (snl: " << snl_height << ", lns: " << lns_height << ")");
+    MGINFO("Loading blocks into beldex subsystems, scanning blockchain from height: " << start_height << " to: " << end_height << " (snl: " << snl_height << ", bns: " << bns_height << ")");
 
   using clock                   = std::chrono::steady_clock;
   using work_time               = std::chrono::duration<float>;
   int64_t constexpr BLOCK_COUNT = 1000;
   auto work_start               = clock::now();
   auto scan_start               = work_start;
-  work_time lns_duration{}, snl_duration{}, lns_iteration_duration{}, snl_iteration_duration{};
+  work_time bns_duration{}, snl_duration{}, bns_iteration_duration{}, snl_iteration_duration{};
 
   std::vector<cryptonote::block> blocks;
   std::vector<cryptonote::transaction> txs;
@@ -329,7 +329,7 @@ bool Blockchain::load_missing_blocks_into_beldex_subsystems()
     {
       m_master_node_list.store();
       auto duration = work_time{clock::now() - work_start};
-      MGINFO("... scanning height " << start_height + (index * BLOCK_COUNT) << " (" << duration.count() << "s) (snl: " << snl_iteration_duration.count() << "s; lns: " << lns_iteration_duration.count() << "s)");
+      MGINFO("... scanning height " << start_height + (index * BLOCK_COUNT) << " (" << duration.count() << "s) (snl: " << snl_iteration_duration.count() << "s; bns: " << bns_iteration_duration.count() << "s)");
 #ifdef ENABLE_SYSTEMD
       // Tell systemd that we're doing something so that it should let us continue starting up
       // (giving us 120s until we have to send the next notification):
@@ -337,9 +337,9 @@ bool Blockchain::load_missing_blocks_into_beldex_subsystems()
 #endif
       work_start = clock::now();
 
-      lns_duration += lns_iteration_duration;
+      bns_duration += bns_iteration_duration;
       snl_duration += snl_iteration_duration;
-      lns_iteration_duration = snl_iteration_duration = {};
+      bns_iteration_duration = snl_iteration_duration = {};
     }
 
     blocks.clear();
@@ -358,7 +358,7 @@ bool Blockchain::load_missing_blocks_into_beldex_subsystems()
       missed_txs.clear();
       if (!get_transactions(blk.tx_hashes, txs, missed_txs))
       {
-        MERROR("Unable to get transactions for block for updating LNS DB: " << cryptonote::get_block_hash(blk));
+        MERROR("Unable to get transactions for block for updating BNS DB: " << cryptonote::get_block_hash(blk));
         return false;
       }
 
@@ -379,15 +379,15 @@ bool Blockchain::load_missing_blocks_into_beldex_subsystems()
         snl_iteration_duration += clock::now() - snl_start;
       }
 
-      if (m_lns_db.db && (block_height >= lns_height))
+      if (m_bns_db.db && (block_height >= bns_height))
       {
-        auto lns_start = clock::now();
-        if (!m_lns_db.add_block(blk, txs))
+        auto bns_start = clock::now();
+        if (!m_bns_db.add_block(blk, txs))
         {
-          MERROR("Unable to process block for updating LNS DB: " << cryptonote::get_block_hash(blk));
+          MERROR("Unable to process block for updating BNS DB: " << cryptonote::get_block_hash(blk));
           return false;
         }
-        lns_iteration_duration += clock::now() - lns_start;
+        bns_iteration_duration += clock::now() - bns_start;
       }
     }
   }
@@ -395,7 +395,7 @@ bool Blockchain::load_missing_blocks_into_beldex_subsystems()
   if (total_blocks > 1)
   {
     auto duration = work_time{clock::now() - scan_start};
-    MGINFO("Done recalculating beldex subsystems (" << duration.count() << "s) (snl: " << snl_duration.count() << "s; lns: " << lns_duration.count() << "s)");
+    MGINFO("Done recalculating beldex subsystems (" << duration.count() << "s) (snl: " << snl_duration.count() << "s; bns: " << bns_duration.count() << "s)");
   }
 
   if (total_blocks > 0)
@@ -406,7 +406,7 @@ bool Blockchain::load_missing_blocks_into_beldex_subsystems()
 //------------------------------------------------------------------
 //FIXME: possibly move this into the constructor, to avoid accidentally
 //       dereferencing a null BlockchainDB pointer
-bool Blockchain::init(BlockchainDB* db, sqlite3 *lns_db, const network_type nettype, bool offline, const cryptonote::test_options *test_options, difficulty_type fixed_difficulty, const GetCheckpointsCallback& get_checkpoints/* = nullptr*/)
+bool Blockchain::init(BlockchainDB* db, sqlite3 *bns_db, const network_type nettype, bool offline, const cryptonote::test_options *test_options, difficulty_type fixed_difficulty, const GetCheckpointsCallback& get_checkpoints/* = nullptr*/)
 {
   LOG_PRINT_L3("Blockchain::" << __func__);
 
@@ -584,9 +584,9 @@ bool Blockchain::init(BlockchainDB* db, sqlite3 *lns_db, const network_type nett
       return false;
   }
 
-  if (lns_db && !m_lns_db.init(this, nettype, lns_db))
+  if (bns_db && !m_bns_db.init(this, nettype, bns_db))
   {
-    MERROR("LNS failed to initialise");
+    MERROR("BNS failed to initialise");
     return false;
   }
 
@@ -604,11 +604,11 @@ bool Blockchain::init(BlockchainDB* db, sqlite3 *lns_db, const network_type nett
   return true;
 }
 //------------------------------------------------------------------
-bool Blockchain::init(BlockchainDB* db, HardFork*& hf, sqlite3 *lns_db, const network_type nettype, bool offline)
+bool Blockchain::init(BlockchainDB* db, HardFork*& hf, sqlite3 *bns_db, const network_type nettype, bool offline)
 {
   if (hf != nullptr)
     m_hardfork = hf;
-  bool res = init(db, lns_db, nettype, offline, NULL);
+  bool res = init(db, bns_db, nettype, offline, NULL);
   if (hf == nullptr)
     hf = m_hardfork;
   return res;
@@ -763,7 +763,7 @@ block Blockchain::pop_block_from_blockchain()
 
   // make sure the hard fork object updates its current version
   m_hardfork->on_block_popped(1);
-  m_lns_db.block_detach(*this, m_db->height());
+  m_bns_db.block_detach(*this, m_db->height());
 
   // return transactions from popped block to the tx_pool
   size_t pruned = 0;
@@ -3567,9 +3567,9 @@ bool Blockchain::check_tx_inputs(transaction& tx, tx_verification_context &tvc, 
     {
       cryptonote::tx_extra_beldex_name_system data;
       std::string fail_reason;
-      if (!m_lns_db.validate_lns_tx(hf_version, get_current_blockchain_height(), tx, data, &fail_reason))
+      if (!m_bns_db.validate_bns_tx(hf_version, get_current_blockchain_height(), tx, data, &fail_reason))
       {
-        MERROR_VER("Failed to validate LNS TX reason: " << fail_reason);
+        MERROR_VER("Failed to validate BNS TX reason: " << fail_reason);
         tvc.m_verbose_error = std::move(fail_reason);
         return false;
       }
@@ -4473,9 +4473,9 @@ bool Blockchain::handle_block_to_main_chain(const block& bl, const crypto::hash&
     return false;
   }
 
-  if (!m_lns_db.add_block(bl, only_txs))
+  if (!m_bns_db.add_block(bl, only_txs))
   {
-    MGINFO_RED("Failed to add block to LNS DB.");
+    MGINFO_RED("Failed to add block to BNS DB.");
     bvc.m_verifivation_failed = true;
     return false;
   }

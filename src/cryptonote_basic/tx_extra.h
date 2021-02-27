@@ -72,7 +72,7 @@ constexpr char
 
 }
 
-namespace lns
+namespace bns
 {
 enum struct extra_field : uint8_t
 {
@@ -127,7 +127,7 @@ struct alignas(size_t) generic_owner
     }
   END_SERIALIZE()
 };
-static_assert(sizeof(generic_owner) == 80, "Unexpected padding, we store binary blobs into the LNS DB");
+static_assert(sizeof(generic_owner) == 80, "Unexpected padding, we store binary blobs into the BNS DB");
 
 struct generic_signature
 {
@@ -148,18 +148,18 @@ struct generic_signature
   END_SERIALIZE()
 };
 
-static_assert(sizeof(crypto::ed25519_signature) == sizeof(crypto::signature), "LNS allows storing either ed25519 or monero style signatures, we store all signatures into crypto::signature in LNS");
+static_assert(sizeof(crypto::ed25519_signature) == sizeof(crypto::signature), "BNS allows storing either ed25519 or monero style signatures, we store all signatures into crypto::signature in BNS");
 inline std::ostream &operator<<(std::ostream &o, const generic_signature &v) {
     return o << '<' << tools::type_to_hex(v.data) << '>';
 }
 
-} // namespace lns
+} // namespace bns
 
 namespace std {
-  static_assert(sizeof(lns::generic_owner) >= sizeof(std::size_t) && alignof(lns::generic_owner) >= alignof(std::size_t),
+  static_assert(sizeof(bns::generic_owner) >= sizeof(std::size_t) && alignof(bns::generic_owner) >= alignof(std::size_t),
                 "Size and alignment of hash must be at least that of size_t");
-  template <> struct hash<lns::generic_owner> {
-    std::size_t operator()(const lns::generic_owner &v) const { return reinterpret_cast<const std::size_t &>(v); }
+  template <> struct hash<bns::generic_owner> {
+    std::size_t operator()(const bns::generic_owner &v) const { return reinterpret_cast<const std::size_t &>(v); }
   };
 }
 
@@ -481,55 +481,55 @@ namespace cryptonote
   struct tx_extra_beldex_name_system
   {
     uint8_t                 version = 0;
-    lns::mapping_type       type;
+    bns::mapping_type       type;
     crypto::hash            name_hash;
     crypto::hash            prev_txid = crypto::null_hash;  // previous txid that purchased the mapping
-    lns::extra_field        fields;
-    lns::generic_owner      owner        = {};
-    lns::generic_owner      backup_owner = {};
-    lns::generic_signature  signature    = {};
+    bns::extra_field        fields;
+    bns::generic_owner      owner        = {};
+    bns::generic_owner      backup_owner = {};
+    bns::generic_signature  signature    = {};
     std::string             encrypted_value; // binary format of the name->value mapping
 
-    bool field_is_set (lns::extra_field bit) const { return (fields & bit) == bit; }
-    bool field_any_set(lns::extra_field bit) const { return (fields & bit) != lns::extra_field::none; }
+    bool field_is_set (bns::extra_field bit) const { return (fields & bit) == bit; }
+    bool field_any_set(bns::extra_field bit) const { return (fields & bit) != bns::extra_field::none; }
 
-    // True if this is updating some LNS info: has a signature and 1 or more updating field
-    bool is_updating() const { return field_is_set(lns::extra_field::signature) && field_any_set(lns::extra_field::updatable_fields); }
-    // True if this is buying a new LNS record
-    bool is_buying()   const { return (fields == lns::extra_field::buy || fields == lns::extra_field::buy_no_backup); }
-    // True if this is renewing an existing LNS: has no fields at all, is a renewal registration (i.e. beldexnet),
+    // True if this is updating some BNS info: has a signature and 1 or more updating field
+    bool is_updating() const { return field_is_set(bns::extra_field::signature) && field_any_set(bns::extra_field::updatable_fields); }
+    // True if this is buying a new BNS record
+    bool is_buying()   const { return (fields == bns::extra_field::buy || fields == bns::extra_field::buy_no_backup); }
+    // True if this is renewing an existing BNS: has no fields at all, is a renewal registration (i.e. beldexnet),
     // and has a non-null txid set (which should point to the most recent registration or update).
-    bool is_renewing() const { return fields == lns::extra_field::none && prev_txid && is_beldexnet_type(type); }
+    bool is_renewing() const { return fields == bns::extra_field::none && prev_txid && is_beldexnet_type(type); }
 
     static tx_extra_beldex_name_system make_buy(
-        lns::generic_owner const& owner,
-        lns::generic_owner const* backup_owner,
-        lns::mapping_type type,
+        bns::generic_owner const& owner,
+        bns::generic_owner const* backup_owner,
+        bns::mapping_type type,
         const crypto::hash& name_hash,
         const std::string& encrypted_value,
         const crypto::hash& prev_txid);
 
-    static tx_extra_beldex_name_system make_renew(lns::mapping_type type, const crypto::hash& name_hash, const crypto::hash& prev_txid);
+    static tx_extra_beldex_name_system make_renew(bns::mapping_type type, const crypto::hash& name_hash, const crypto::hash& prev_txid);
 
     static tx_extra_beldex_name_system make_update(
-        const lns::generic_signature& signature,
-        lns::mapping_type type,
+        const bns::generic_signature& signature,
+        bns::mapping_type type,
         const crypto::hash& name_hash,
         std::string_view encrypted_value,
-        const lns::generic_owner* owner,
-        const lns::generic_owner* backup_owner,
+        const bns::generic_owner* owner,
+        const bns::generic_owner* backup_owner,
         const crypto::hash& prev_txid);
 
     BEGIN_SERIALIZE()
       FIELD(version)
-      ENUM_FIELD(type, type < lns::mapping_type::_count)
+      ENUM_FIELD(type, type < bns::mapping_type::_count)
       FIELD(name_hash)
       FIELD(prev_txid)
-      ENUM_FIELD(fields, fields <= lns::extra_field::all)
-      if (field_is_set(lns::extra_field::owner)) FIELD(owner);
-      if (field_is_set(lns::extra_field::backup_owner)) FIELD(backup_owner);
-      if (field_is_set(lns::extra_field::signature)) FIELD(signature);
-      if (field_is_set(lns::extra_field::encrypted_value)) FIELD(encrypted_value);
+      ENUM_FIELD(fields, fields <= bns::extra_field::all)
+      if (field_is_set(bns::extra_field::owner)) FIELD(owner);
+      if (field_is_set(bns::extra_field::backup_owner)) FIELD(backup_owner);
+      if (field_is_set(bns::extra_field::signature)) FIELD(signature);
+      if (field_is_set(bns::extra_field::encrypted_value)) FIELD(encrypted_value);
     END_SERIALIZE()
   };
 

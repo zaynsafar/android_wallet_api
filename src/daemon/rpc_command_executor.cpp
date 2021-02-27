@@ -561,11 +561,11 @@ bool rpc_command_executor::show_status() {
         str << "NOT RECEIVED";
     str << " (storage), ";
 
-    if (*ires.last_lokinet_ping > 0)
-        str << get_human_time_ago(*ires.last_lokinet_ping, time(nullptr), true /*abbreviate*/);
+    if (*ires.last_beldexnet_ping > 0)
+        str << get_human_time_ago(*ires.last_beldexnet_ping, time(nullptr), true /*abbreviate*/);
     else
         str << "NOT RECEIVED";
-    str << " (lokinet)";
+    str << " (beldexnet)";
 
     tools::success_msg_writer() << str.str();
   }

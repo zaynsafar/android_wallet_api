@@ -281,7 +281,7 @@ namespace cryptonote
   , m_last_json_checkpoints_update(0)
   , m_nettype(UNDEFINED)
   , m_last_storage_server_ping(0)
-  , m_last_lokinet_ping(0)
+  , m_last_beldexnet_ping(0)
   , m_pad_transactions(false)
   {
     m_checkpoints_updating.clear();
@@ -540,8 +540,8 @@ namespace cryptonote
         s += time_ago_str(now, last_proof);
         s += ", storage: ";
         s += time_ago_str(now, m_last_storage_server_ping);
-        s += ", lokinet: ";
-        s += time_ago_str(now, m_last_lokinet_ping);
+        s += ", beldexnet: ";
+        s += time_ago_str(now, m_last_beldexnet_ping);
       }
     }
     return s;
@@ -632,7 +632,7 @@ namespace cryptonote
       return false;
     }
 
-    auto lns_db_file_path = folder / "lns.db";
+    auto bns_db_file_path = folder / "bns.db";
 
     folder /= db->get_db_name();
     MGINFO("Loading blockchain from folder " << folder << " ...");
@@ -651,7 +651,7 @@ namespace cryptonote
         MERROR("Failed to remove data file in " << folder);
         return false;
       }
-      fs::remove(lns_db_file_path);
+      fs::remove(bns_db_file_path);
     }
 #endif
 
@@ -802,13 +802,13 @@ namespace cryptonote
     // Checkpoints
     m_checkpoints_path = m_config_folder / fs::u8path(JSON_HASH_FILE_NAME);
 
-    sqlite3 *lns_db = lns::init_beldex_name_system(lns_db_file_path, db->is_read_only());
-    if (!lns_db) return false;
+    sqlite3 *bns_db = bns::init_beldex_name_system(bns_db_file_path, db->is_read_only());
+    if (!bns_db) return false;
 
     init_oxenmq(vm);
 
     const difficulty_type fixed_difficulty = command_line::get_arg(vm, arg_fixed_difficulty);
-    r = m_blockchain_storage.init(db.release(), lns_db, m_nettype, m_offline, regtest ? &regtest_test_options : test_options, fixed_difficulty, get_checkpoints);
+    r = m_blockchain_storage.init(db.release(), bns_db, m_nettype, m_offline, regtest ? &regtest_test_options : test_options, fixed_difficulty, get_checkpoints);
     CHECK_AND_ASSERT_MES(r, false, "Failed to initialize blockchain storage");
 
     r = m_mempool.init(max_txpool_weight);
@@ -2133,7 +2133,7 @@ namespace cryptonote
 
   void core::update_lmq_sns()
   {
-    // TODO: let callers (e.g. lokinet, ss) subscribe to callbacks when this fires
+    // TODO: let callers (e.g. beldexnet, ss) subscribe to callbacks when this fires
     oxenmq::pubkey_set active_sns;
     m_master_node_list.copy_active_x25519_pubkeys(std::inserter(active_sns, active_sns.end()));
     m_lmq->set_active_sns(std::move(active_sns));
@@ -2241,10 +2241,10 @@ namespace cryptonote
                 "is running! It is required to run alongside the Beldex daemon");
             return;
           }
-          if (!check_external_ping(m_last_lokinet_ping, LOKINET_PING_LIFETIME, "Lokinet"))
+          if (!check_external_ping(m_last_beldexnet_ping, LOKINET_PING_LIFETIME, "Lokinet"))
           {
             MGINFO_RED(
-                "Failed to submit uptime proof: have not heard from lokinet recently. Make sure that it "
+                "Failed to submit uptime proof: have not heard from beldexnet recently. Make sure that it "
                 "is running! It is required to run alongside the Beldex daemon");
             return;
           }
