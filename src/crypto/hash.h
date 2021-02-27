@@ -68,7 +68,8 @@ namespace crypto {
     cn_fast_hash(data, length, reinterpret_cast<char *>(&h));
     return h;
   }
-
+  
+  
   enum struct cn_slow_hash_type
   {
 #ifdef ENABLE_MONERO_SLOW_HASH
@@ -82,19 +83,21 @@ namespace crypto {
     heavy_v2,
     turtle_lite_v2,
   };
-
+  
+  
   inline void cn_slow_hash(const void *data, std::size_t length, hash &hash, cn_slow_hash_type type) {
-    switch(type)
+    
+	
+	switch(type)
     {
-      case cn_slow_hash_type::heavy_v1:
-      case cn_slow_hash_type::heavy_v2:
-      {
-        static thread_local cn_heavy_hash_v2 v2;
-        static thread_local cn_heavy_hash_v1 v1 = cn_heavy_hash_v1::make_borrowed(v2);
-
-        if (type == cn_slow_hash_type::heavy_v1) v1.hash(data, length, hash.data);
-        else                                     v2.hash(data, length, hash.data);
-      }
+      case cn_slow_hash_type::heavy_v0:
+		cn_slow_hash(data, length, reinterpret_cast<char *>(&hash), 0, 0/*prehashed*/);
+	  break;
+      case cn_slow_hash_type::heavy_v7:
+		cn_slow_hash(data, length, reinterpret_cast<char *>(&hash), 1, 0/*prehashed*/);
+	  break;
+      case cn_slow_hash_type::heavy_v8:
+		cn_slow_hash(data, length, reinterpret_cast<char *>(&hash), 2, 0/*prehashed*/);
       break;
 
 #ifdef ENABLE_MONERO_SLOW_HASH
@@ -132,7 +135,10 @@ namespace crypto {
       }
       break;
     }
+	
   }
+
+
 
   inline void tree_hash(const hash *hashes, std::size_t count, hash &root_hash) {
     tree_hash(reinterpret_cast<const char (*)[HASH_SIZE]>(hashes), count, reinterpret_cast<char *>(&root_hash));

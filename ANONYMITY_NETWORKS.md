@@ -1,6 +1,6 @@
 # Anonymity Networks with Beldex
 
-Currently only Tor and I2P have been integrated into beldex. The usage of
+Currently only Tor and I2P have been integrated into Beldex. The usage of
 these networks is still considered experimental - there are a few pessimistic
 cases where privacy is leaked. The design is intended to maximize privacy of
 the source of a transaction by broadcasting it over an anonymity network, while

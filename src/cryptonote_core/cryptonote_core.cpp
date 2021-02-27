@@ -36,7 +36,7 @@
 
 #include <unordered_set>
 #include <iomanip>
-#include <lokimq/base32z.h>
+#include <oxenmq/base32z.h>
 
 extern "C" {
 #include <sodium.h>
@@ -209,7 +209,7 @@ namespace cryptonote
   };
   static const command_line::arg_descriptor<bool> arg_lmq_quorumnet_public{
     "lmq-public-quorumnet",
-    "Allow the curve-enabled quorumnet address (for a master Node) to be used for public RPC commands as if passed to --lmq-curve-public. "
+    "Allow the curve-enabled quorumnet address (for a Master Node) to be used for public RPC commands as if passed to --lmq-curve-public. "
       "Note that even without this option the quorumnet port can be used for RPC commands by --lmq-admin and --lmq-user pubkeys.",
     false};
   static const command_line::arg_descriptor<std::string> arg_block_notify = {
@@ -281,7 +281,7 @@ namespace cryptonote
   , m_last_json_checkpoints_update(0)
   , m_nettype(UNDEFINED)
   , m_last_storage_server_ping(0)
-  , m_last_beldexnet_ping(0)
+  , m_last_lokinet_ping(0)
   , m_pad_transactions(false)
   {
     m_checkpoints_updating.clear();
@@ -348,7 +348,7 @@ namespace cryptonote
 
     command_line::add_arg(desc, arg_pad_transactions);
     command_line::add_arg(desc, arg_block_notify);
-#if 0 // TODO(beldex): Pruning not supported because of master Node List
+#if 0 // TODO(beldex): Pruning not supported because of Master Node List
     command_line::add_arg(desc, arg_prune_blockchain);
 #endif
     command_line::add_arg(desc, arg_reorg_notify);
@@ -409,7 +409,7 @@ namespace cryptonote
       const std::string pub_ip = command_line::get_arg(vm, arg_public_ip);
       if (pub_ip.size())
       {
-        if (!epee::string_tools::get_ip_int32_from_string(m_mn_public_ip, pub_ip)) {
+        if (!epee::string_tools::get_ip_int32_from_string(m_sn_public_ip, pub_ip)) {
           MERROR("Unable to parse IPv4 public address from: " << pub_ip);
           storage_ok = false;
         }
@@ -540,8 +540,8 @@ namespace cryptonote
         s += time_ago_str(now, last_proof);
         s += ", storage: ";
         s += time_ago_str(now, m_last_storage_server_ping);
-        s += ", beldexnet: ";
-        s += time_ago_str(now, m_last_beldexnet_ping);
+        s += ", lokinet: ";
+        s += time_ago_str(now, m_last_lokinet_ping);
       }
     }
     return s;
@@ -632,7 +632,7 @@ namespace cryptonote
       return false;
     }
 
-    auto bns_db_file_path = folder / "bns.db";
+    auto lns_db_file_path = folder / "lns.db";
 
     folder /= db->get_db_name();
     MGINFO("Loading blockchain from folder " << folder << " ...");
@@ -651,7 +651,7 @@ namespace cryptonote
         MERROR("Failed to remove data file in " << folder);
         return false;
       }
-      fs::remove(bns_db_file_path);
+      fs::remove(lns_db_file_path);
     }
 #endif
 
@@ -802,13 +802,13 @@ namespace cryptonote
     // Checkpoints
     m_checkpoints_path = m_config_folder / fs::u8path(JSON_HASH_FILE_NAME);
 
-    sqlite3 *bns_db = bns::init_beldex_name_system(bns_db_file_path, db->is_read_only());
-    if (!bns_db) return false;
+    sqlite3 *lns_db = lns::init_beldex_name_system(lns_db_file_path, db->is_read_only());
+    if (!lns_db) return false;
 
-    init_lokimq(vm);
+    init_oxenmq(vm);
 
     const difficulty_type fixed_difficulty = command_line::get_arg(vm, arg_fixed_difficulty);
-    r = m_blockchain_storage.init(db.release(), bns_db, m_nettype, m_offline, regtest ? &regtest_test_options : test_options, fixed_difficulty, get_checkpoints);
+    r = m_blockchain_storage.init(db.release(), lns_db, m_nettype, m_offline, regtest ? &regtest_test_options : test_options, fixed_difficulty, get_checkpoints);
     CHECK_AND_ASSERT_MES(r, false, "Failed to initialize blockchain storage");
 
     r = m_mempool.init(max_txpool_weight);
@@ -960,8 +960,8 @@ namespace cryptonote
       MGINFO_YELLOW("Master node public keys:");
       MGINFO_YELLOW("- primary: " << tools::type_to_hex(keys.pub));
       MGINFO_YELLOW("- ed25519: " << tools::type_to_hex(keys.pub_ed25519));
-      // .mnode address is the ed25519 pubkey, encoded with base32z and with .mnode appended:
-      MGINFO_YELLOW("- beldexnet: " << lokimq::to_base32z(tools::view_guts(keys.pub_ed25519)) << ".mnode");
+      // .snode address is the ed25519 pubkey, encoded with base32z and with .snode appended:
+      MGINFO_YELLOW("- beldexnet: " << oxenmq::to_base32z(tools::view_guts(keys.pub_ed25519)) << ".snode");
       MGINFO_YELLOW("-  x25519: " << tools::type_to_hex(keys.pub_x25519));
     } else {
       // Only print the x25519 version because it's the only thing useful for a non-MN (for
@@ -972,8 +972,8 @@ namespace cryptonote
     return true;
   }
 
-  static constexpr el::Level easylogging_level(lokimq::LogLevel level) {
-    using namespace lokimq;
+  static constexpr el::Level easylogging_level(oxenmq::LogLevel level) {
+    using namespace oxenmq;
     switch (level) {
         case LogLevel::fatal: return el::Level::Fatal;
         case LogLevel::error: return el::Level::Error;
@@ -985,11 +985,11 @@ namespace cryptonote
     }
   }
 
-  lokimq::AuthLevel core::lmq_check_access(const crypto::x25519_public_key& pubkey) const {
+  oxenmq::AuthLevel core::lmq_check_access(const crypto::x25519_public_key& pubkey) const {
     auto it = m_lmq_auth.find(pubkey);
     if (it != m_lmq_auth.end())
       return it->second;
-    return lokimq::AuthLevel::denied;
+    return oxenmq::AuthLevel::denied;
   }
 
   // Builds an allow function; takes `*this`, the default auth level, and whether this connection
@@ -1003,8 +1003,8 @@ namespace cryptonote
   // check_sn is whether we check an incoming key against known master nodes (and thus return
   // "true" for the master node access if it checks out).
   //
-  lokimq::AuthLevel core::lmq_allow(std::string_view ip, std::string_view x25519_pubkey_str, lokimq::AuthLevel default_auth) {
-    using namespace lokimq;
+  oxenmq::AuthLevel core::lmq_allow(std::string_view ip, std::string_view x25519_pubkey_str, oxenmq::AuthLevel default_auth) {
+    using namespace oxenmq;
     AuthLevel auth = default_auth;
     if (x25519_pubkey_str.size() == sizeof(crypto::x25519_public_key)) {
       crypto::x25519_public_key x25519_pubkey;
@@ -1024,10 +1024,10 @@ namespace cryptonote
     return auth;
   }
 
-  void core::init_lokimq(const boost::program_options::variables_map& vm) {
-    using namespace lokimq;
-    MGINFO("Starting lokimq");
-    m_lmq = std::make_unique<LokiMQ>(
+  void core::init_oxenmq(const boost::program_options::variables_map& vm) {
+    using namespace oxenmq;
+    MGINFO("Starting oxenmq");
+    m_lmq = std::make_unique<OxenMQ>(
         tools::copy_guts(m_master_keys.pub_x25519),
         tools::copy_guts(m_master_keys.key_x25519),
         m_master_node,
@@ -1037,7 +1037,7 @@ namespace cryptonote
           if (ELPP->vRegistry()->allowed(easylogging_level(level), "lmq"))
             el::base::Writer(easylogging_level(level), file, line, ELPP_FUNC, el::base::DispatchAction::NormalLog).construct("lmq") << msg;
         },
-        lokimq::LogLevel::trace
+        oxenmq::LogLevel::trace
     );
 
     // ping.ping: a simple debugging target for pinging the lmq listener
@@ -1050,7 +1050,7 @@ namespace cryptonote
 
     if (m_master_node)
     {
-      // master nodes always listen for quorumnet data on the p2p IP, quorumnet port
+      // Master nodes always listen for quorumnet data on the p2p IP, quorumnet port
       std::string listen_ip = vm["p2p-bind-ip"].as<std::string>();
       if (listen_ip.empty())
         listen_ip = "0.0.0.0";
@@ -1067,8 +1067,8 @@ namespace cryptonote
     quorumnet_init(*this, m_quorumnet_state);
   }
 
-  void core::start_lokimq() {
-      update_lmq_sns(); // Ensure we have MNs set for the current block before starting
+  void core::start_oxenmq() {
+      update_lmq_sns(); // Ensure we have SNs set for the current block before starting
 
       if (m_master_node)
       {
@@ -1208,14 +1208,14 @@ namespace cryptonote
         continue;
       const rct::rctSig &rv = tx_info[n].tx.rct_signatures;
       switch (rv.type) {
-        case rct::RCTTypeNull:
+        case rct::RCTType::Null:
           // coinbase should not come here, so we reject for all other types
           MERROR_VER("Unexpected Null rctSig type");
           set_semantics_failed(tx_info[n].tx_hash);
           tx_info[n].tvc.m_verifivation_failed = true;
           tx_info[n].result = false;
           break;
-        case rct::RCTTypeSimple:
+        case rct::RCTType::Simple:
           if (!rct::verRctSemanticsSimple(rv))
           {
             MERROR_VER("rct signature semantics check failed");
@@ -1225,7 +1225,7 @@ namespace cryptonote
             break;
           }
           break;
-        case rct::RCTTypeFull:
+        case rct::RCTType::Full:
           if (!rct::verRct(rv, true))
           {
             MERROR_VER("rct signature semantics check failed");
@@ -1235,9 +1235,9 @@ namespace cryptonote
             break;
           }
           break;
-        case rct::RCTTypeBulletproof:
-        case rct::RCTTypeBulletproof2:
-        case rct::RCTTypeCLSAG:
+        case rct::RCTType::Bulletproof:
+        case rct::RCTType::Bulletproof2:
+        case rct::RCTType::CLSAG:
           if (!is_canonical_bulletproof_layout(rv.p.bulletproofs))
           {
             MERROR_VER("Bulletproof does not have canonical form");
@@ -1249,7 +1249,7 @@ namespace cryptonote
           rvv.push_back(&rv); // delayed batch verification
           break;
         default:
-          MERROR_VER("Unknown rct type: " << rv.type);
+          MERROR_VER("Unknown rct type: " << (int)rv.type);
           set_semantics_failed(tx_info[n].tx_hash);
           tx_info[n].tvc.m_verifivation_failed = true;
           tx_info[n].result = false;
@@ -1850,7 +1850,7 @@ namespace cryptonote
     if (!m_master_node)
       return true;
 
-    NOTIFY_UPTIME_PROOF::request req = m_master_node_list.generate_uptime_proof(m_mn_public_ip, m_storage_port, m_storage_lmq_port, m_quorumnet_port);
+    NOTIFY_UPTIME_PROOF::request req = m_master_node_list.generate_uptime_proof(m_sn_public_ip, m_storage_port, m_storage_lmq_port, m_quorumnet_port);
 
     cryptonote_connection_context fake_context{};
     bool relayed = get_protocol()->relay_uptime_proof(req, fake_context);
@@ -1866,7 +1866,7 @@ namespace cryptonote
     bool result = m_master_node_list.handle_uptime_proof(proof, my_uptime_proof_confirmation, pkey);
     if (result && m_master_node_list.is_master_node(proof.pubkey, true /*require_active*/) && pkey)
     {
-      lokimq::pubkey_set added;
+      oxenmq::pubkey_set added;
       added.insert(tools::copy_guts(pkey));
       m_lmq->update_active_sns(added, {} /*removed*/);
     }
@@ -2133,8 +2133,8 @@ namespace cryptonote
 
   void core::update_lmq_sns()
   {
-    // TODO: let callers (e.g. beldexnet, ss) subscribe to callbacks when this fires
-    lokimq::pubkey_set active_sns;
+    // TODO: let callers (e.g. lokinet, ss) subscribe to callbacks when this fires
+    oxenmq::pubkey_set active_sns;
     m_master_node_list.copy_active_x25519_pubkeys(std::inserter(active_sns, active_sns.end()));
     m_lmq->set_active_sns(std::move(active_sns));
   }
@@ -2241,10 +2241,10 @@ namespace cryptonote
                 "is running! It is required to run alongside the Beldex daemon");
             return;
           }
-          if (!check_external_ping(m_last_beldexnet_ping, BELDEXNET_PING_LIFETIME, "Beldexnet"))
+          if (!check_external_ping(m_last_lokinet_ping, LOKINET_PING_LIFETIME, "Lokinet"))
           {
             MGINFO_RED(
-                "Failed to submit uptime proof: have not heard from beldexnet recently. Make sure that it "
+                "Failed to submit uptime proof: have not heard from lokinet recently. Make sure that it "
                 "is running! It is required to run alongside the Beldex daemon");
             return;
           }

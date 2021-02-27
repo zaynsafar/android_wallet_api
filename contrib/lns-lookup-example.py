@@ -11,9 +11,11 @@ import sys
 name = "Jason.beldex"
 type = 2 # 2 == beldexnet, 0 == session
 
+# Calculate the blake2b hash of the lower-case full name (including the .beldex):
 name_hash = nacl.hash.blake2b(name.lower().encode(), encoder=nacl.encoding.RawEncoder)
 
-# Encode name_hash in base64.  The RPC call will also accept hex, if easier.
+# Encode name_hash in base64.  (The RPC call below will also accept the value as hex, if easier, but
+# b64 is a bit smaller).
 name_hash_b64 = b64encode(name_hash)
 
 print("Name: {}, hashed+base64: {}".format(name, name_hash_b64.decode()))
@@ -38,7 +40,7 @@ if 'encrypted_value' not in r or 'nonce' not in r:
     print("{} does not exist".format(name))
     sys.exit(1)
 
-# Decryption key: another blake2b hash, this time with the first one as the key
+# Decryption key: another blake2b hash, but this time a keyed blake2b hash where the first hash is the key
 decrypt_key = nacl.hash.blake2b(name.lower().encode(), key=name_hash, encoder=nacl.encoding.RawEncoder);
 
 # XChaCha20+Poly1305 decryption:

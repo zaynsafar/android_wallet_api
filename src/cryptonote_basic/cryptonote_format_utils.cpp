@@ -32,7 +32,7 @@
 #include <atomic>
 #include <boost/algorithm/string.hpp>
 #include <limits>
-#include <lokimq/hex.h>
+#include <oxenmq/hex.h>
 #include <variant>
 #include "common/hex.h"
 #include "epee/wipeable_string.h"
@@ -134,7 +134,7 @@ namespace cryptonote
     if (tx.version >= txversion::v2_ringct && !is_coinbase(tx))
     {
       rct::rctSig &rv = tx.rct_signatures;
-      if (rv.type == rct::RCTTypeNull)
+      if (rv.type == rct::RCTType::Null)
         return true;
       if (rv.outPk.size() != tx.vout.size())
       {
@@ -452,7 +452,7 @@ namespace cryptonote
   {
     CHECK_AND_ASSERT_MES(tx.pruned, std::numeric_limits<uint64_t>::max(), "get_pruned_transaction_weight does not support non pruned txes");
     CHECK_AND_ASSERT_MES(tx.version >= txversion::v2_ringct, std::numeric_limits<uint64_t>::max(), "get_pruned_transaction_weight does not support v1 txes");
-    CHECK_AND_ASSERT_MES(tx.rct_signatures.type >= rct::RCTTypeBulletproof2,
+    CHECK_AND_ASSERT_MES(tx.rct_signatures.type >= rct::RCTType::Bulletproof2,
         std::numeric_limits<uint64_t>::max(), "get_pruned_transaction_weight does not support older range proof types");
     CHECK_AND_ASSERT_MES(!tx.vin.empty(), std::numeric_limits<uint64_t>::max(), "empty vin");
     CHECK_AND_ASSERT_MES(std::holds_alternative<cryptonote::txin_to_key>(tx.vin[0]), std::numeric_limits<uint64_t>::max(), "empty vin");
@@ -473,7 +473,7 @@ namespace cryptonote
 
     // calculate deterministic CLSAG/MLSAG data size
     const size_t ring_size = var::get<cryptonote::txin_to_key>(tx.vin[0]).key_offsets.size();
-    if (tx.rct_signatures.type == rct::RCTTypeCLSAG)
+    if (tx.rct_signatures.type == rct::RCTType::CLSAG)
       extra = tx.vin.size() * (ring_size + 2) * 32;
     else
       extra = tx.vin.size() * (ring_size * (1 + 1) * 32 + 32 /* cc */);
@@ -546,7 +546,7 @@ namespace cryptonote
     try {
       serialization::deserialize_all(ar, tx_extra_fields);
     } catch (const std::exception& e) {
-      MWARNING(__func__ << ": failed to deserialize extra field: " << e.what() << "; extra = " << lokimq::to_hex(tx_extra.begin(), tx_extra.end()));
+      MWARNING(__func__ << ": failed to deserialize extra field: " << e.what() << "; extra = " << oxenmq::to_hex(tx_extra.begin(), tx_extra.end()));
       return false;
     }
 
@@ -709,6 +709,61 @@ namespace cryptonote
     CHECK_AND_NO_ASSERT_MES_L1(result, false, "failed to serialize tx extra tx key image unlock");
     return result;
   }
+
+  crypto::hash make_security_hash_from(size_t block_height, block& b )
+  {
+      int needed_size=0;
+      for(crypto::hash &cur_hash: b.tx_hashes) {
+          needed_size+=sizeof(cur_hash);
+      }
+      char txhashbuf[needed_size];
+      char *txpointer=reinterpret_cast<char *>(&txhashbuf[0]);
+      for(crypto::hash &cur_hash: b.tx_hashes) {
+          LOG_PRINT_L1("TX hash added for signature:" << cur_hash);
+          memcpy(txpointer, reinterpret_cast<void *>(&cur_hash), sizeof(cur_hash));
+          txpointer+=sizeof(cur_hash);
+      }
+
+      const int buf_size = sizeof(block_height) + sizeof(b.prev_id) + sizeof(txhashbuf)+sizeof(b.timestamp) ;
+      char buf[buf_size];
+      LOG_PRINT_L1("hash buffer size:" << buf_size);
+
+      memcpy(buf, reinterpret_cast<void *>(&block_height), sizeof(block_height));
+      memcpy(buf + sizeof(block_height), reinterpret_cast<const char *>(&b.prev_id), sizeof(b.prev_id));
+      memcpy(buf + sizeof(block_height) + sizeof(b.prev_id), txhashbuf, sizeof(txhashbuf));
+      memcpy(buf + sizeof(block_height) + sizeof(b.prev_id)+ sizeof(txhashbuf), reinterpret_cast<const char *>(&b.timestamp), sizeof(b.timestamp));
+
+      crypto::hash result;
+      crypto::cn_fast_hash(buf, buf_size, result);
+
+      return result;
+  }
+  //---------------------------------------------------------------
+  bool get_security_signature_from_tx_extra(const std::vector<uint8_t>& tx_extra, crypto::signature& security_signature)
+  {
+        std::vector<tx_extra_field> tx_extra_fields;
+        parse_tx_extra(tx_extra, tx_extra_fields);
+        tx_extra_security_signature security_sig_struct;
+        bool result = find_tx_extra_field_by_type(tx_extra_fields, security_sig_struct);
+        if (!result)
+            return false;
+        security_signature = security_sig_struct.m_security_signature;
+        return true;
+  }
+  //---------------------------------------------------------------
+  bool add_security_signature_to_tx_extra(
+            std::vector<uint8_t>& tx_extra,
+            const crypto::signature& security_signature)
+    {
+        // convert to variant
+        tx_extra_field field =
+                tx_extra_security_signature{
+                        security_signature
+                };
+        bool r = add_tx_extra_field_to_tx_extra(tx_extra, field);
+        CHECK_AND_NO_ASSERT_MES_L1(r, false, "failed to serialize tx extra registration tx");
+        return true;
+    }
   //---------------------------------------------------------------
   bool get_master_node_contributor_from_tx_extra(const std::vector<uint8_t>& tx_extra, cryptonote::account_public_address& address)
   {
@@ -811,7 +866,7 @@ namespace cryptonote
           value(newar, field);
       } while (ar.remaining_bytes() > 0);
     } catch (const std::exception& e) {
-      LOG_PRINT_L1(__func__ << ": failed to deserialize extra field: " << e.what() << "; extra = " << lokimq::to_hex(tx_extra.begin(), tx_extra.end()));
+      LOG_PRINT_L1(__func__ << ": failed to deserialize extra field: " << e.what() << "; extra = " << oxenmq::to_hex(tx_extra.begin(), tx_extra.end()));
       return false;
     }
 
@@ -973,7 +1028,7 @@ namespace cryptonote
   //---------------------------------------------------------------
   std::string short_hash_str(const crypto::hash& h)
   {
-    return lokimq::to_hex(tools::view_guts(h).substr(0, 4)) + "....";
+    return oxenmq::to_hex(tools::view_guts(h).substr(0, 4)) + "....";
   }
   //---------------------------------------------------------------
   bool is_out_to_acc(const account_keys& acc, const txout_to_key& out_key, const crypto::public_key& tx_pub_key, const std::vector<crypto::public_key>& additional_tx_pub_keys, size_t output_index)
@@ -1105,7 +1160,7 @@ namespace cryptonote
     if (tvc.m_fee_too_low)               os << "Fee too low, ";
     if (tvc.m_invalid_version)           os << "TX has invalid version, ";
     if (tvc.m_invalid_type)              os << "TX has invalid type, ";
-    if (tvc.m_key_image_locked_by_mnode) os << "Key image is locked by master node, ";
+    if (tvc.m_key_image_locked_by_snode) os << "Key image is locked by master node, ";
     if (tvc.m_key_image_blacklisted)     os << "Key image is blacklisted on the master node network, ";
 
     if (tx)
@@ -1185,15 +1240,13 @@ namespace cryptonote
     }
     else
     {
-      transaction &tt = const_cast<transaction&>(t);
       serialization::binary_string_archiver ba;
-      const size_t inputs = t.vin.size();
-      const size_t outputs = t.vout.size();
       size_t mixin = 0;
       if (t.vin.size() > 0 && std::holds_alternative<txin_to_key>(t.vin[0]))
         mixin = var::get<txin_to_key>(t.vin[0]).key_offsets.size() - 1;
       try {
-        tt.rct_signatures.p.serialize_rctsig_prunable(ba, t.rct_signatures.type, inputs, outputs, mixin);
+        const_cast<transaction&>(t).rct_signatures.p.serialize_rctsig_prunable(
+                ba, t.rct_signatures.type, t.vin.size(), t.vout.size(), mixin);
       } catch (const std::exception& e) {
         LOG_ERROR("Failed to serialize rct signatures (prunable): " << e.what());
         return false;
@@ -1234,7 +1287,7 @@ namespace cryptonote
     }
 
     // prunable rct
-    if (t.rct_signatures.type == rct::RCTTypeNull)
+    if (t.rct_signatures.type == rct::RCTType::Null)
       hashes[2] = crypto::null_hash;
     else
       hashes[2] = pruned_data_hash;
@@ -1289,7 +1342,7 @@ namespace cryptonote
     }
 
     // prunable rct
-    if (t.rct_signatures.type == rct::RCTTypeNull)
+    if (t.rct_signatures.type == rct::RCTType::Null)
     {
       hashes[2] = crypto::null_hash;
     }
@@ -1530,7 +1583,7 @@ namespace cryptonote
   crypto::secret_key encrypt_key(crypto::secret_key key, const epee::wipeable_string &passphrase)
   {
     crypto::hash hash;
-    crypto::cn_slow_hash(passphrase.data(), passphrase.size(), hash, crypto::cn_slow_hash_type::heavy_v1);
+    crypto::cn_slow_hash(passphrase.data(), passphrase.size(), hash, crypto::cn_slow_hash_type::heavy_v0);
     sc_add((unsigned char*)key.data, (const unsigned char*)key.data, (const unsigned char*)hash.data);
     return key;
   }
@@ -1538,27 +1591,27 @@ namespace cryptonote
   crypto::secret_key decrypt_key(crypto::secret_key key, const epee::wipeable_string &passphrase)
   {
     crypto::hash hash;
-    crypto::cn_slow_hash(passphrase.data(), passphrase.size(), hash,crypto::cn_slow_hash_type::heavy_v1);
+    crypto::cn_slow_hash(passphrase.data(), passphrase.size(), hash,crypto::cn_slow_hash_type::heavy_v0);
     sc_sub((unsigned char*)key.data, (const unsigned char*)key.data, (const unsigned char*)hash.data);
     return key;
   }
 
 }
 
-std::string bns::generic_owner::to_string(cryptonote::network_type nettype) const
+std::string lns::generic_owner::to_string(cryptonote::network_type nettype) const
 {
-  if (type == bns::generic_owner_sig_type::monero)
+  if (type == lns::generic_owner_sig_type::monero)
     return cryptonote::get_account_address_as_str(nettype, wallet.is_subaddress, wallet.address);
   else
     return tools::type_to_hex(ed25519);
 }
 
-bool bns::generic_owner::operator==(generic_owner const &other) const
+bool lns::generic_owner::operator==(generic_owner const &other) const
 {
   if (type != other.type)
     return false;
 
-  if (type == bns::generic_owner_sig_type::monero)
+  if (type == lns::generic_owner_sig_type::monero)
     return wallet.is_subaddress == other.wallet.is_subaddress && wallet.address == other.wallet.address;
   else
     return ed25519 == other.ed25519;

@@ -53,7 +53,7 @@ set(CMAKE_OSX_DEPLOYMENT_TARGET 10.12 CACHE STRING "macOS deployment target (App
 project(beldex
     VERSION 8.1.4
     LANGUAGES CXX C)
-set(BELDEX_RELEASE_CODENAME "Salty Saga")
+  set(BELDEX_RELEASE_CODENAME "Salty Saga")
 
 # String value to append to the full version string; this is intended to easily identify whether a
 # binary was build from the release or development branches.  This should be permanently set to an
@@ -246,6 +246,8 @@ option(BUILD_TESTS "Build tests." OFF)
 if (BUILD_TESTS)
   add_definitions(-DUNIT_TEST)
 endif()
+
+OPTION(USE_DEVICE_TREZOR "Build Trezor support (currently non-functional)" OFF)
 
 find_package(Git)
 if(NOT MANUAL_SUBMODULES)
@@ -496,8 +498,9 @@ add_subdirectory(external)
 
 target_compile_definitions(easylogging PRIVATE AUTO_INITIALIZE_EASYLOGGINGPP)
 
-# Trezor support check
-include(CheckTrezor)
+if(USE_DEVICE_TREZOR)
+  include(CheckTrezor)
+endif()
 
 if(MSVC)
   add_definitions("/bigobj /MP /W3 /GS- /D_CRT_SECURE_NO_WARNINGS /wd4996 /wd4345 /D_WIN32_WINNT=0x0600 /DWIN32_LEAN_AND_MEAN /DGTEST_HAS_TR1_TUPLE=0 /FIinline_c.h /D__SSE4_1__")
@@ -894,7 +897,7 @@ if(CMAKE_C_COMPILER_ID STREQUAL "Clang" AND ARCH_WIDTH EQUAL "32" AND NOT IOS AN
   endif()
 endif()
 
-option(BELDEX_DEBUG_SHORT_PROOFS "Developer option to substantially reduce uptime proof intervals for local test network debugging (the result lokid will not be usable on the live networks)" OFF)
+option(BELDEX_DEBUG_SHORT_PROOFS "Developer option to substantially reduce uptime proof intervals for local test network debugging (the result beldexd will not be usable on the live networks)" OFF)
 if (BELDEX_DEBUG_SHORT_PROOFS)
   add_definitions(-DUPTIME_PROOF_BASE_MINUTE=3) # 20x faster uptime proofs
 endif()
@@ -981,8 +984,9 @@ add_custom_target(strip_binaries_all ${strip_binaries_all} DEPENDS ${beldex_exec
 execute_process(COMMAND tar --version RESULT_VARIABLE tar_exit_code OUTPUT_VARIABLE tar_vers)
 set(git_tag "-unknown")
 if(GIT_FOUND)
-  execute_process(COMMAND "${GIT_EXECUTABLE}" rev-parse --abbrev-ref HEAD RESULT_VARIABLE ret OUTPUT_VARIABLE branch OUTPUT_STRIP_TRAILING_WHITESPACE)
-  if(NOT ret AND branch STREQUAL "stable")
+  execute_process(COMMAND "${GIT_EXECUTABLE}" rev-parse HEAD RESULT_VARIABLE ret OUTPUT_VARIABLE curr_commit OUTPUT_STRIP_TRAILING_WHITESPACE)
+  execute_process(COMMAND "${GIT_EXECUTABLE}" rev-parse stable RESULT_VARIABLE ret2 OUTPUT_VARIABLE stable_commit OUTPUT_STRIP_TRAILING_WHITESPACE)
+  if(NOT ret AND NOT ret2 AND curr_commit STREQUAL "${stable_commit}")
     # Get the tag description; for a tagged release this will be just the tag (v1.2.3); for
     # something following a tag this will be something like "v1.2.3-2-abcdef" for something 2
     # commits beyond the tag, currently at commit "abcdef".

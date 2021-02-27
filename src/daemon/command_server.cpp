@@ -351,7 +351,7 @@ void command_server::init_commands(cryptonote::rpc::core_rpc_server* rpc_server)
     , [this](const auto &x) { return m_parser.version(x); }
     , "Print version information."
     );
-#if 0 // TODO(beldex): Pruning not supported because of master Node List
+#if 0 // TODO(beldex): Pruning not supported because of Master Node List
     m_command_lookup.set_handler(
       "prune_blockchain"
     , [this](const auto &x) { return m_parser.prune_blockchain(x); }

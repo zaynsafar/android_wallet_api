@@ -34,7 +34,7 @@
 #include "beldex_economy.h"
 #include "common/hex.h"
 #include "version.h"
-#include <lokimq/hex.h>
+#include <oxenmq/hex.h>
 
 #undef BELDEX_DEFAULT_LOG_CATEGORY
 #define BELDEX_DEFAULT_LOG_CATEGORY "debugtools.deserialize"
@@ -46,10 +46,10 @@ using namespace cryptonote;
 static std::string extra_nonce_to_string(const cryptonote::tx_extra_nonce &extra_nonce)
 {
   if (extra_nonce.nonce.size() == 9 && extra_nonce.nonce[0] == TX_EXTRA_NONCE_ENCRYPTED_PAYMENT_ID)
-    return "encrypted payment ID: " + lokimq::to_hex(extra_nonce.nonce.begin() + 1, extra_nonce.nonce.end());
+    return "encrypted payment ID: " + oxenmq::to_hex(extra_nonce.nonce.begin() + 1, extra_nonce.nonce.end());
   if (extra_nonce.nonce.size() == 33 && extra_nonce.nonce[0] == TX_EXTRA_NONCE_PAYMENT_ID)
-    return "plaintext payment ID: " + lokimq::to_hex(extra_nonce.nonce.begin() + 1, extra_nonce.nonce.end());
-  return lokimq::to_hex(extra_nonce.nonce);
+    return "plaintext payment ID: " + oxenmq::to_hex(extra_nonce.nonce.begin() + 1, extra_nonce.nonce.end());
+  return oxenmq::to_hex(extra_nonce.nonce);
 }
 
 struct extra_printer {
@@ -66,7 +66,7 @@ struct extra_printer {
       std::cout << pk;
     }
   }
-  void operator()(const tx_extra_mysterious_minergate& x) { std::cout << "minergate custom: " << lokimq::to_hex(x.data); }
+  void operator()(const tx_extra_mysterious_minergate& x) { std::cout << "minergate custom: " << oxenmq::to_hex(x.data); }
   void operator()(const tx_extra_master_node_winner& x) { std::cout << "MN reward winner: " << x.m_master_node_key; }
   void operator()(const tx_extra_master_node_register& x) { std::cout << "MN registration data"; } // TODO: could parse this further
   void operator()(const tx_extra_master_node_pubkey& x) { std::cout << "MN pubkey: " << x.m_master_node_key; }
@@ -77,17 +77,17 @@ struct extra_printer {
   void operator()(const tx_extra_tx_key_image_unlock& x) { std::cout << "TX key image unlock: " << x.key_image; }
   void operator()(const tx_extra_burn& x) { std::cout << "Transaction burned fee/payment: " << print_money(x.amount); }
   void operator()(const tx_extra_beldex_name_system& x) {
-    std::cout << "BNS " << (x.is_buying() ? "registration" : x.is_updating() ? "update" : "(unknown)");
+    std::cout << "LNS " << (x.is_buying() ? "registration" : x.is_updating() ? "update" : "(unknown)");
     switch (x.type)
     {
-      case bns::mapping_type::beldexnet: std::cout << " - Beldexnet (1y)"; break;
-      case bns::mapping_type::beldexnet_2years: std::cout << " - Beldexnet (2y)"; break;
-      case bns::mapping_type::beldexnet_5years: std::cout << " - Beldexnet (5y)"; break;
-      case bns::mapping_type::beldexnet_10years: std::cout << " - Beldexnet (10y)"; break;
-      case bns::mapping_type::session: std::cout << " - Session address"; break;
-      case bns::mapping_type::wallet: std::cout << " - Wallet address"; break;
-      case bns::mapping_type::update_record_internal:
-      case bns::mapping_type::_count:
+      case lns::mapping_type::lokinet: std::cout << " - Beldexnet (1y)"; break;
+      case lns::mapping_type::lokinet_2years: std::cout << " - Beldexnet (2y)"; break;
+      case lns::mapping_type::lokinet_5years: std::cout << " - Beldexnet (5y)"; break;
+      case lns::mapping_type::lokinet_10years: std::cout << " - Beldexnet (10y)"; break;
+      case lns::mapping_type::session: std::cout << " - Session address"; break;
+      case lns::mapping_type::wallet: std::cout << " - Wallet address"; break;
+      case lns::mapping_type::update_record_internal:
+      case lns::mapping_type::_count:
           break;
     }
   }

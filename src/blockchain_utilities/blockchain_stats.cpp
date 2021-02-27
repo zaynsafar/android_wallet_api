@@ -97,7 +97,7 @@ int main(int argc, char* argv[])
 
   if (command_line::get_arg(vm, command_line::arg_help))
   {
-    std::cout << "BELDEX '" << BELDEX_RELEASE_NAME << "' (v" << BELDEX_VERSION_FULL << ")\n\n";
+    std::cout << "Beldex '" << BELDEX_RELEASE_NAME << "' (v" << BELDEX_VERSION_FULL << ")\n\n";
     std::cout << desc_options << std::endl;
     return 1;
   }
@@ -143,7 +143,7 @@ int main(int argc, char* argv[])
     LOG_PRINT_L0("Error opening database: " << e.what());
     return 1;
   }
-  r = core_storage->init(db, nullptr /*bns_db*/, net_type);
+  r = core_storage->init(db, nullptr /*lns_db*/, net_type);
 
   CHECK_AND_ASSERT_MES(r, 1, "Failed to initialize source blockchain storage");
   LOG_PRINT_L0("Source blockchain storage initialized OK");

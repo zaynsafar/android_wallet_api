@@ -110,7 +110,7 @@ target_link_libraries(blockchain_stats PRIVATE blockchain_tools_common_libs)
 
 if (TARGET sodium_vendor OR NOT SODIUM_VERSION VERSION_LESS 1.0.17)
     beldex_add_executable(mn_key_tool "beldex-mn-keys" mn_key_tool.cpp)
-    target_link_libraries(mn_key_tool PRIVATE sodium lokimq filesystem)
+    target_link_libraries(mn_key_tool PRIVATE sodium oxenmq filesystem)
 else()
     message(STATUS "Not building beldex-mn-keys tool (requires libsodium >= 1.0.17)")
 endif()

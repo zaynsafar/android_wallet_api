@@ -50,8 +50,6 @@ public:
 
   bool print_checkpoints(const std::vector<std::string>& args);
 
-  bool print_mn_state_changes(const std::vector<std::string> &args);
-
   bool print_peer_list(const std::vector<std::string>& args);
 
   bool print_peer_list_stats(const std::vector<std::string>& args);
