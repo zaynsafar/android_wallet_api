@@ -608,7 +608,7 @@ sqlite3 *init_beldex_name_system(const fs::path& file_path, bool read_only)
 std::vector<mapping_type> all_mapping_types(uint8_t hf_version) {
   std::vector<mapping_type> result;
   result.reserve(2);
-  if (hf_version >= cryptonote::network_version_15_lns)
+  if (hf_version >= cryptonote::network_version_15_bns)
     result.push_back(mapping_type::session);
   if (hf_version >= cryptonote::network_version_16_pulse)
     result.push_back(mapping_type::lokinet);
@@ -1979,7 +1979,7 @@ bool name_system_db::add_block(const cryptonote::block &block, const std::vector
    return false;
 
   bool lns_parsed_from_block = false;
-  if (block.major_version >= cryptonote::network_version_15_lns)
+  if (block.major_version >= cryptonote::network_version_15_bns)
   {
     for (cryptonote::transaction const &tx : txs)
     {

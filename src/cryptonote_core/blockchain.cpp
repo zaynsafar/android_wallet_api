@@ -300,7 +300,7 @@ uint64_t Blockchain::get_current_blockchain_height(bool lock) const
 bool Blockchain::load_missing_blocks_into_beldex_subsystems()
 {
   uint64_t const snl_height   = std::max(m_hardfork->get_earliest_ideal_height_for_version(network_version_9_master_nodes), m_master_node_list.height() + 1);
-  uint64_t const lns_height   = std::max(m_hardfork->get_earliest_ideal_height_for_version(network_version_15_lns),          m_lns_db.height() + 1);
+  uint64_t const lns_height   = std::max(m_hardfork->get_earliest_ideal_height_for_version(network_version_15_bns),          m_lns_db.height() + 1);
   uint64_t const end_height   = m_db->height();
   uint64_t const start_height = std::min(end_height, std::min(lns_height, snl_height));
 
@@ -5019,7 +5019,7 @@ bool Blockchain::calc_batched_governance_reward(uint64_t height, uint64_t &rewar
   size_t num_blocks = cryptonote::get_config(nettype()).GOVERNANCE_REWARD_INTERVAL_IN_BLOCKS;
 
   // Fixed reward starting at HF15
-  if (hard_fork_version >= network_version_15_lns)
+  if (hard_fork_version >= network_version_15_bns)
   {
     reward = num_blocks * (
         hard_fork_version >= network_version_17 ? FOUNDATION_REWARD_HF17 :

@@ -2747,7 +2747,7 @@ namespace master_nodes
     auto buf = tools::memcpy_le(proof.pubkey.data, proof.timestamp, proof.public_ip, proof.storage_port, proof.pubkey_ed25519.data, proof.qnet_port, proof.storage_lmq_port);
     size_t buf_size = buf.size();
 
-    if (hf_version < cryptonote::network_version_15_lns) // TODO - can be removed post-HF15
+    if (hf_version < cryptonote::network_version_15_bns) // TODO - can be removed post-HF15
       buf_size -= sizeof(proof.storage_lmq_port);
 
     crypto::hash result;
