@@ -13005,7 +13005,7 @@ std::vector<rpc::GET_MASTER_NODES::response::entry> wallet2::list_current_stakes
       if (primary_address != address_info.address)
         continue;
 
-      service_node_states.push_back(node_info);
+      master_node_states.push_back(node_info);
     }
   }
 
