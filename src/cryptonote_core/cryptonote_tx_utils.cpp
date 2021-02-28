@@ -133,12 +133,12 @@ namespace cryptonote
   
   const uint64_t MASTER_NODE_BASE_REWARD_PERCENTAGE = 100;
 
-  uint64_t governance_reward_formula(uint64_t base_reward)
+  uint64_t governance_reward_formula(uint64_t base_reward, uint8_t hf_version)
   {
     return 0;// NO governance planned
   }
   
-  uint64_t derive_governance_from_block_reward(network_type nettype, const cryptonote::block &block)
+  uint64_t derive_governance_from_block_reward(network_type nettype, const cryptonote::block &block, uint8_t hf_version)
   {
     return 0;
   }  
@@ -171,7 +171,7 @@ namespace cryptonote
     uint64_t reward = 0;
     if(hard_fork_version >= 11)
         reward = (base_reward / 10) * (MASTER_NODE_BASE_REWARD_PERCENTAGE/10) ;
-	return reward;
+	      return reward;
   }
 
   uint64_t get_portion_of_reward(uint64_t portions, uint64_t total_master_node_reward)

@@ -1197,8 +1197,8 @@ difficulty_type Blockchain::get_difficulty_for_alternative_chain(const std::list
       before_hf16 = alt_chain.back().bl.major_version < network_version_17_pulse;
     else
     {
-      static const uint64_t hf17_height = HardFork::get_hardcoded_hard_fork_height(m_nettype, cryptonote::network_version_17_pulse);
-      before_hf16                       = get_current_blockchain_height() < hf17_height;
+      static const uint64_t hf16_height = HardFork::get_hardcoded_hard_fork_height(m_nettype, cryptonote::network_version_17_pulse);
+      before_hf16                       = get_current_blockchain_height() < hf16_height;
     }
 
     block_count = DIFFICULTY_BLOCKS_COUNT(before_hf16);
@@ -3048,7 +3048,7 @@ bool Blockchain::check_tx_outputs(const transaction& tx, tx_verification_context
   std::unique_lock lock{*this};
 
   for (const auto &o: tx.vout) {
-    if (o.amount != 0) { // in a v2 tx, all outputs must have 0 amount NOTE(beldex): All beldex tx's are atleast v2 from the beginning
+    if ( o.amount != 0) { // in a v2 tx, all outputs must have 0 amount NOTE(beldex): All beldex tx's are atleast v2 from the beginning
       tvc.m_invalid_output = true;
       return false;
     }
@@ -3370,7 +3370,7 @@ bool Blockchain::check_tx_inputs(transaction& tx, tx_verification_context &tvc, 
         }
       }
     }
-
+	
     if (hf_version >= HF_VERSION_ENFORCE_MIN_AGE)
     {
       CHECK_AND_ASSERT_MES(*pmax_used_block_height + CRYPTONOTE_DEFAULT_TX_SPENDABLE_AGE <= m_db->height(),
@@ -3600,10 +3600,10 @@ bool Blockchain::check_tx_inputs(transaction& tx, tx_verification_context &tvc, 
         return hf_version < cryptonote::network_version_13_checkpointing; // NOTE: Used to be allowed pre HF12.
       }
 
-      const auto& master_node_info = *master_node_array[0].info;
+      master_nodes::master_node_info const &master_node_info = *master_node_array[0].info;
       if (!master_node_info.can_transition_to_state(hf_version, state_change.block_height, state_change.state))
       {
-        MERROR_VER("State change trying to vote Master Node into the same state it invalid (expired, already applied, or impossible)");
+        MERROR_VER("State change trying to vote Master Node into the same state it already is in, (aka double spend)");
         tvc.m_double_spend = true;
         return false;
       }
@@ -3700,7 +3700,7 @@ byte_and_output_fees Blockchain::get_dynamic_base_fee(uint64_t block_reward, siz
     // In v12 we increase the reference transaction fee by 80 (to 240000), and so the
     // FEE_PER_BYTE fallback also goes up (to a conservative estimate of 17200).
     //
-    // This calculation was painful for large txes (in particular sweeps and SN stakes), which
+    // This calculation was painful for large txes (in particular sweeps and MN stakes), which
     // wasn't intended, so in v13 we reduce the reference tx fee back to what it was before and
     // introduce a per-output fee instead.  (This is why this is an hard == instead of a >=).
     const uint64_t reference_fee = version == HF_VERSION_INCREASE_FEE ? DYNAMIC_FEE_REFERENCE_TRANSACTION_WEIGHT_V12 : DYNAMIC_FEE_REFERENCE_TRANSACTION_WEIGHT;
@@ -4217,7 +4217,7 @@ bool Blockchain::handle_block_to_main_chain(const block& bl, const crypto::hash&
 
   if (pulse_block)
   {
-    // NOTE: Pulse blocks don't use PoW. They use Master Node signatures.
+    // NOTE: Pulse blocks don't use PoW. They use master Node signatures.
     // Delay signature verification until Master Node List adds the block in
     // the block_added hook.
   }
@@ -4992,15 +4992,15 @@ bool Blockchain::calc_batched_governance_reward(uint64_t height, uint64_t &rewar
 
   size_t num_blocks = cryptonote::get_config(nettype()).GOVERNANCE_REWARD_INTERVAL_IN_BLOCKS;
 
-  // // Fixed reward starting at HF15
-  // if (hard_fork_version >= network_version_16_bns)
-  // {
-  //   reward = num_blocks * (
-  //       hard_fork_version >= network_version_18 ? FOUNDATION_REWARD_HF18 :
-  //       hard_fork_version >= network_version_17_pulse ? FOUNDATION_REWARD_HF16 + CHAINFLIP_LIQUIDITY_HF17 :
-  //       FOUNDATION_REWARD_HF16);
-  //   return true;
-  // }
+  // Fixed reward starting at HF15
+  if (hard_fork_version >= network_version_16_bns)
+  {
+    reward = num_blocks * (
+        hard_fork_version >= network_version_18 ? FOUNDATION_REWARD_HF18 :
+        hard_fork_version >= network_version_17_pulse ? FOUNDATION_REWARD_HF16 + CHAINFLIP_LIQUIDITY_HF17 :
+        FOUNDATION_REWARD_HF16);
+    return true;
+  }
 
   uint64_t start_height = height - num_blocks;
   if (height < num_blocks)
