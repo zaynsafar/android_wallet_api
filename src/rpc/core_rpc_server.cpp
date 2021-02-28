@@ -1011,8 +1011,8 @@ namespace cryptonote { namespace rpc {
 
       if (req.stake_info) {
         auto hf_version = m_core.get_hard_fork_version(e.in_pool ? m_core.get_current_blockchain_height() : e.block_height);
-        service_nodes::staking_components sc;
-        if (service_nodes::tx_get_staking_components_and_amounts(nettype(), hf_version, t, e.block_height, &sc)
+        master_nodes::staking_components sc;
+        if (master_nodes::tx_get_staking_components_and_amounts(nettype(), hf_version, t, e.block_height, &sc)
             && sc.transferred > 0)
           e.stake_amount = sc.transferred;
       }
@@ -1466,7 +1466,7 @@ namespace cryptonote { namespace rpc {
 
     m_core.get_pool().get_transactions_and_spent_keys_info(res.transactions, res.spent_key_images, load_extra, context.admin);
     for (tx_info& txi : res.transactions)
-      txi.tx_blob = lokimq::to_hex(txi.tx_blob);
+      txi.tx_blob = oxenmq::to_hex(txi.tx_blob);
     res.status = STATUS_OK;
     return res;
   }

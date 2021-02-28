@@ -330,6 +330,7 @@ namespace cryptonote
     network_version_15_blink,
     network_version_16_bns,
     network_version_17_pulse,
+    network_version_18,
 
     network_version_count,
   };

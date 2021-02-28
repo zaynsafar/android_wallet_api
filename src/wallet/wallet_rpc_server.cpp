@@ -497,7 +497,7 @@ namespace tools
 
     m_restricted = command_line::get_arg(m_vm, arg_restricted);
 
-    m_server_header = "beldex-wallet-rpc/"s + (m_restricted ? std::to_string(BELDEX_VERSION[0]) : BELDEX_VERSION_STR);
+    m_server_header = "beldex-wallet-rpc/"s + (m_restricted ? std::to_string(BELDEX_VERSION[0]) : std::string{BELDEX_VERSION_STR});
 
     m_cors = {rpc_config.access_control_origins.begin(), rpc_config.access_control_origins.end()};
 
@@ -911,7 +911,7 @@ namespace tools
     {
       return "";
     }
-    return lokimq::to_hex(oss.str());
+    return oxenmq::to_hex(oss.str());
   }
   //------------------------------------------------------------------------------------------------------------------------------
   template<typename T> static bool is_error_value(const T &val) { return false; }
@@ -961,14 +961,14 @@ namespace tools
 
     if (m_wallet->multisig())
     {
-      multisig_txset = lokimq::to_hex(m_wallet->save_multisig_tx(ptx_vector));
+      multisig_txset = oxenmq::to_hex(m_wallet->save_multisig_tx(ptx_vector));
       if (multisig_txset.empty())
         throw wallet_rpc_error{error_code::UNKNOWN_ERROR, "Failed to save multisig tx set after creation"};
     }
     else
     {
       if (m_wallet->watch_only()){
-        unsigned_txset = lokimq::to_hex(m_wallet->dump_tx_to_str(ptx_vector));
+        unsigned_txset = oxenmq::to_hex(m_wallet->dump_tx_to_str(ptx_vector));
         if (unsigned_txset.empty())
           throw wallet_rpc_error{error_code::UNKNOWN_ERROR, "Failed to save unsigned tx set after creation"};
       }
@@ -979,7 +979,7 @@ namespace tools
       for (auto & ptx : ptx_vector)
       {
         bool r = fill(tx_hash, tools::type_to_hex(cryptonote::get_transaction_hash(ptx.tx)));
-        r = r && (!get_tx_hex || fill(tx_blob, lokimq::to_hex(tx_to_blob(ptx.tx))));
+        r = r && (!get_tx_hex || fill(tx_blob, oxenmq::to_hex(tx_to_blob(ptx.tx))));
         r = r && (!get_tx_metadata || fill(tx_metadata, ptx_to_string(ptx)));
         if (!r)
           throw wallet_rpc_error{error_code::UNKNOWN_ERROR, "Failed to save tx info"};
@@ -1079,7 +1079,7 @@ namespace tools
       if (ciphertext.empty())
         throw wallet_rpc_error{error_code::SIGN_UNSIGNED, "Failed to sign unsigned tx"};
 
-      res.signed_txset = lokimq::to_hex(ciphertext);
+      res.signed_txset = oxenmq::to_hex(ciphertext);
     }
 
     for (auto &ptx: ptxs)
@@ -1097,7 +1097,7 @@ namespace tools
     {
       for (auto &ptx: ptxs)
       {
-        res.tx_raw_list.push_back(lokimq::to_hex(cryptonote::tx_to_blob(ptx.tx)));
+        res.tx_raw_list.push_back(oxenmq::to_hex(cryptonote::tx_to_blob(ptx.tx)));
       }
     }
 
@@ -1695,6 +1695,9 @@ namespace tools
   SIGN::response wallet_rpc_server::invoke(SIGN::request&& req)
   {
     require_open();
+    if (m_wallet->watch_only())
+      throw wallet_rpc_error{error_code::WATCH_ONLY, "Unable to sign a value using a watch-only wallet."};
+
     SIGN::response res{};
 
     res.signature = m_wallet->sign(req.data, {req.account_index, req.address_index});
@@ -2093,7 +2096,7 @@ namespace tools
     if (m_wallet->key_on_device())
       throw wallet_rpc_error{error_code::UNKNOWN_ERROR, "command not supported by HW wallet"};
 
-    res.outputs_data_hex = lokimq::to_hex(m_wallet->export_outputs_to_str(req.all));
+    res.outputs_data_hex = oxenmq::to_hex(m_wallet->export_outputs_to_str(req.all));
 
     return res;
   }
@@ -2365,6 +2368,7 @@ namespace {
     if (ptr)
       throw wallet_rpc_error{error_code::UNKNOWN_ERROR, "Invalid filename"};
     fs::path wallet_file = req.filename.empty() ? fs::path{} : m_wallet_dir / fs::u8path(req.filename);
+    if (!req.hardware_wallet)
     {
       std::vector<std::string> languages;
       crypto::ElectrumWords::get_language_list(languages, false);
@@ -2383,15 +2387,21 @@ namespace {
     std::unique_ptr<tools::wallet2> wal = tools::wallet2::make_new(vm2, true, nullptr).first;
     if (!wal)
       throw wallet_rpc_error{error_code::UNKNOWN_ERROR, "Failed to create wallet"};
-    wal->set_seed_language(req.language);
+
+    if (!req.hardware_wallet)
+      wal->set_seed_language(req.language);
+
     rpc::GET_HEIGHT::request hreq{};
     rpc::GET_HEIGHT::response hres{};
     hres.height = 0;
     bool r = wal->invoke_http<rpc::GET_HEIGHT>(hreq, hres);
     if (r)
       wal->set_refresh_from_block_height(hres.height);
-    crypto::secret_key dummy_key;
-    wal->generate(wallet_file, req.password, dummy_key, false, false);
+
+    if (req.hardware_wallet)
+      wal->restore_from_device(wallet_file, req.password, req.device_name.empty() ? "Ledger" : req.device_name);
+    else
+      wal->generate(wallet_file, req.password);
 
     if (m_wallet)
       m_wallet->store();
@@ -2679,7 +2689,7 @@ namespace {
     cryptonote::blobdata info;
     info = m_wallet->export_multisig();
 
-    res.info = lokimq::to_hex(info);
+    res.info = oxenmq::to_hex(info);
 
     return res;
   }
@@ -2798,7 +2808,7 @@ namespace {
       throw wallet_rpc_error{error_code::MULTISIG_SIGNATURE, "Failed to sign multisig tx: "s + e.what()};
     }
 
-    res.tx_data_hex = lokimq::to_hex(m_wallet->save_multisig_tx(txs));
+    res.tx_data_hex = oxenmq::to_hex(m_wallet->save_multisig_tx(txs));
     if (!txids.empty())
     {
       for (const crypto::hash &txid: txids)
@@ -2945,8 +2955,7 @@ namespace {
     if (!tools::hex_to_type(req.master_node_key, mnode_key))
       throw wallet_rpc_error{error_code::WRONG_KEY, std::string("Unparsable master node key given: ") + req.master_node_key};
 
-    // NOTE(beldex): Pre-emptively set subaddr_account to 0. We don't support onwards from Infinite Staking which is when this call was implemented.
-    tools::wallet2::stake_result stake_result = m_wallet->create_stake_tx(mnode_key, addr_info, req.amount, 0 /*amount_fraction*/, req.priority, 0 /*subaddr_account*/, req.subaddr_indices);
+    tools::wallet2::stake_result stake_result = m_wallet->create_stake_tx(mnode_key, req.amount, 0 /*amount_fraction*/, req.priority, req.subaddr_indices);
     if (stake_result.status != tools::wallet2::stake_result_status::success)
       throw wallet_rpc_error{error_code::TX_NOT_POSSIBLE, stake_result.msg};
 
@@ -3272,12 +3281,12 @@ namespace {
             res_e.expired = *res_e.expiration_height < curr_height;
           res_e.txid = std::move(rec.txid);
 
-          if (req.decrypt && !res_e.encrypted_value.empty() && lokimq::is_hex(res_e.encrypted_value))
+          if (req.decrypt && !res_e.encrypted_value.empty() && oxenmq::is_hex(res_e.encrypted_value))
           {
             bns::mapping_value value;
             const auto type = entry_types[type_offset + rec.entry_index];
             std::string errmsg;
-            if (bns::mapping_value::validate_encrypted(type, lokimq::from_hex(res_e.encrypted_value), &value, &errmsg)
+            if (bns::mapping_value::validate_encrypted(type, oxenmq::from_hex(res_e.encrypted_value), &value, &errmsg)
                 && value.decrypt(res_e.name, type))
               res_e.value = value.to_readable_value(nettype, type);
             else
@@ -3341,7 +3350,7 @@ namespace {
     if (req.encrypted_value.size() >= (bns::mapping_value::BUFFER_SIZE * 2))
       throw wallet_rpc_error{error_code::BNS_VALUE_TOO_LONG, "Value too long to decrypt=" + req.encrypted_value};
 
-    if (!lokimq::is_hex(req.encrypted_value))
+    if (!oxenmq::is_hex(req.encrypted_value))
       throw wallet_rpc_error{error_code::BNS_VALUE_NOT_HEX, "Value is not hex=" + req.encrypted_value};
 
     // ---------------------------------------------------------------------------------------------
@@ -3370,7 +3379,7 @@ namespace {
     bns::mapping_value value = {};
     value.len = req.encrypted_value.size() / 2;
     value.encrypted = true;
-    lokimq::from_hex(req.encrypted_value.begin(), req.encrypted_value.end(), value.buffer.begin());
+    oxenmq::from_hex(req.encrypted_value.begin(), req.encrypted_value.end(), value.buffer.begin());
 
     if (!value.decrypt(req.name, type))
       throw wallet_rpc_error{error_code::BNS_VALUE_NOT_HEX, "Value decryption failure"};
@@ -3405,7 +3414,7 @@ namespace {
     if (!value.encrypt(req.name, nullptr, old_argon2))
       throw wallet_rpc_error{error_code::BNS_VALUE_ENCRYPT_FAILED, "Value encryption failure"};
 
-    return {lokimq::to_hex(value.to_view())};
+    return {oxenmq::to_hex(value.to_view())};
   }
 
   std::unique_ptr<tools::wallet2> wallet_rpc_server::load_wallet()

@@ -31,6 +31,7 @@
 #include "beldex_tests.h"
 #include "common/string_util.h"
 #include "cryptonote_basic/cryptonote_format_utils.h"
+#include "cryptonote_basic/tx_extra.h"
 #include "cryptonote_config.h"
 #include "cryptonote_core/beldex_name_system.h"
 #include "cryptonote_core/master_node_list.h"
@@ -67,7 +68,7 @@ static void add_master_nodes(beldex_chain_generator &gen, size_t count)
 // code path" again
 bool beldex_checkpointing_alt_chain_handle_alt_blocks_at_tip::generate(std::vector<test_event_entry>& events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = beldex_generate_sequential_hard_fork_table();
+  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = beldex_generate_hard_fork_table();
   beldex_chain_generator gen(events, hard_forks);
 
   gen.add_blocks_until_version(hard_forks.back().first);
@@ -126,7 +127,7 @@ bool beldex_checkpointing_alt_chain_handle_alt_blocks_at_tip::generate(std::vect
 // NOTE: - Checks that a chain with a checkpoint but less PoW is preferred over a chain that is longer with more PoW but no checkpoints
 bool beldex_checkpointing_alt_chain_more_master_node_checkpoints_less_pow_overtakes::generate(std::vector<test_event_entry>& events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = beldex_generate_sequential_hard_fork_table();
+  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = beldex_generate_hard_fork_table();
   beldex_chain_generator gen(events, hard_forks);
 
   gen.add_blocks_until_version(hard_forks.back().first);
@@ -163,7 +164,7 @@ bool beldex_checkpointing_alt_chain_more_master_node_checkpoints_less_pow_overta
 // NOTE: - A chain that receives checkpointing votes sufficient to form a checkpoint should reorg back accordingly
 bool beldex_checkpointing_alt_chain_receive_checkpoint_votes_should_reorg_back::generate(std::vector<test_event_entry>& events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = beldex_generate_sequential_hard_fork_table();
+  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = beldex_generate_hard_fork_table();
   beldex_chain_generator gen(events, hard_forks);
 
   gen.add_blocks_until_version(hard_forks.back().first);

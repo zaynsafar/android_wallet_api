@@ -2119,7 +2119,7 @@ bool simple_wallet::welcome(const std::vector<std::string> &args)
   message_writer() << tr("Welcome to Beldex, the private cryptocurrency based on Monero");
   message_writer() << "";
   message_writer() << tr("Beldex, like Bitcoin, is a cryptocurrency. That is, it is digital money.");
-  message_writer() << tr("Unlike Bitcoin, your Bedex transactions and balance stay private and are not visible to the world by default.");
+  message_writer() << tr("Unlike Bitcoin, your Beldex transactions and balance stay private and are not visible to the world by default.");
   message_writer() << tr("However, you have the option of making those available to select parties if you choose to.");
   message_writer() << "";
   message_writer() << tr("Beldex protects your privacy on the blockchain, and while Beldex strives to improve all the time,");
@@ -6684,7 +6684,7 @@ bool simple_wallet::bns_update_mapping(std::vector<std::string> args)
     }
 
     auto& enc_hex = response[0].encrypted_value;
-    if (!lokimq::is_hex(enc_hex) || enc_hex.size() % 2 != 0 || enc_hex.size() > 2*bns::mapping_value::BUFFER_SIZE)
+    if (!oxenmq::is_hex(enc_hex) || enc_hex.size() % 2 != 0 || enc_hex.size() > 2*bns::mapping_value::BUFFER_SIZE)
     {
       LOG_ERROR("invalid BNS data returned from beldexd");
       fail_msg_writer() << tr("invalid BNS data returned from beldexd");
@@ -6694,7 +6694,7 @@ bool simple_wallet::bns_update_mapping(std::vector<std::string> args)
     bns::mapping_value mval{};
     mval.len = enc_hex.size() / 2;
     mval.encrypted = true;
-    lokimq::from_hex(enc_hex.begin(), enc_hex.end(), mval.buffer.begin());
+    oxenmq::from_hex(enc_hex.begin(), enc_hex.end(), mval.buffer.begin());
 
     if (!mval.decrypt(tools::lowercase_ascii_string(name), type))
     {
@@ -6815,7 +6815,7 @@ bool simple_wallet::bns_encrypt(std::vector<std::string> args)
     return false;
   }
 
-  tools::success_msg_writer() << "encrypted value=" << lokimq::to_hex(mval.to_view());
+  tools::success_msg_writer() << "encrypted value=" << oxenmq::to_hex(mval.to_view());
   return true;
 }
 //----------------------------------------------------------------------------------------------------
@@ -6924,7 +6924,7 @@ bool simple_wallet::bns_print_name_to_owners(std::vector<std::string> args)
   for (auto const &mapping : response)
   {
     auto& enc_hex = mapping.encrypted_value;
-    if (mapping.entry_index >= args.size() || !lokimq::is_hex(enc_hex) || enc_hex.size() % 2 != 0 || enc_hex.size() > 2*bns::mapping_value::BUFFER_SIZE)
+    if (mapping.entry_index >= args.size() || !oxenmq::is_hex(enc_hex) || enc_hex.size() % 2 != 0 || enc_hex.size() > 2*bns::mapping_value::BUFFER_SIZE)
     {
       fail_msg_writer() << "Received invalid BNS mapping data from beldexd";
       return false;
@@ -6939,7 +6939,7 @@ bool simple_wallet::bns_print_name_to_owners(std::vector<std::string> args)
     bns::mapping_value value{};
     value.len = enc_hex.size() / 2;
     value.encrypted = true;
-    lokimq::from_hex(enc_hex.begin(), enc_hex.end(), value.buffer.begin());
+    oxenmq::from_hex(enc_hex.begin(), enc_hex.end(), value.buffer.begin());
 
     if (!value.decrypt(name, mapping.type))
     {

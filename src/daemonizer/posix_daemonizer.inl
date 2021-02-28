@@ -77,24 +77,8 @@ namespace daemonizer
     (void)name; (void)argc; (void)argv; // Only used for Windows
     if (command_line::has_arg(vm, arg_detach))
     {
-      tools::success_msg_writer() << "Forking to background...";
-      std::string pidfile;
-      if (command_line::has_arg(vm, arg_pidfile))
-      {
-        pidfile = command_line::get_arg(vm, arg_pidfile);
-      }
-      posix::fork(pidfile);
-      auto daemon = executor.create_daemon(vm);
-      return daemon.run();
-    }
-    else if (command_line::has_arg(vm, arg_non_interactive))
-    {
-      return executor.run_non_interactive(vm);
-    }
-    else
-    {
-      //LOG_PRINT_L0("Beldex '" << BELDEX_RELEASE_NAME << "' (v" << BELDEX_VERSION_FULL);
-      return executor.run_interactive(vm);
+      MFATAL("--detach is no longer supported. Use systemd (or another process manager), tmux, screen, or nohup instead");
+      return false;
     }
     bool interactive = !command_line::has_arg(vm, arg_non_interactive);
     return Application{std::move(vm), std::forward<Args>(args)...}.run(interactive);

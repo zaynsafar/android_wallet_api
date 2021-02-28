@@ -13009,7 +13009,7 @@ std::vector<rpc::GET_MASTER_NODES::response::entry> wallet2::list_current_stakes
     }
   }
 
-  return service_node_states;
+  return master_node_states;
 }
 
 void wallet2::set_bns_cache_record(wallet2::bns_detail detail)
