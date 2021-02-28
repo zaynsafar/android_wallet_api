@@ -13012,7 +13012,7 @@ std::vector<rpc::GET_MASTER_NODES::response::entry> wallet2::list_current_stakes
   return service_node_states;
 }
 
-void wallet2::set_bns_cache_record(wallet2::bns_detail.details)
+void wallet2::set_bns_cache_record(wallet2::bns_detail detail)
 {
   bns_records_cache[detail.hashed_name] = std::move(detail);
 }
