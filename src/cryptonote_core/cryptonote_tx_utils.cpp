@@ -171,7 +171,7 @@ namespace cryptonote
     uint64_t reward = 0;
     if(hard_fork_version >= 11)
         reward = (base_reward / 10) * (MASTER_NODE_BASE_REWARD_PERCENTAGE/10) ;
-	      return reward;
+	return reward;
   }
 
   uint64_t get_portion_of_reward(uint64_t portions, uint64_t total_master_node_reward)

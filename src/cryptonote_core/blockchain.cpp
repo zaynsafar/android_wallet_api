@@ -42,7 +42,6 @@
 #include "tx_pool.h"
 #include "blockchain.h"
 #include "blockchain_db/blockchain_db.h"
-#include "cryptonote_basic/cryptonote_format_utils.h"
 #include "cryptonote_basic/cryptonote_boost_serialization.h"
 #include "cryptonote_config.h"
 #include "cryptonote_basic/miner.h"
@@ -515,7 +514,6 @@ bool Blockchain::init(BlockchainDB* db, sqlite3 *bns_db, const network_type nett
   rtxn_guard.stop();
 
   uint64_t num_popped_blocks = 0;
-  MGINFO ("is read only" << m_db->is_read_only());
   while (!m_db->is_read_only())
   {
     uint64_t top_height;
@@ -960,8 +958,6 @@ difficulty_type Blockchain::get_difficulty_for_next_block(bool pulse)
   LOG_PRINT_L3("Blockchain::" << __func__);
   if (m_fixed_difficulty)
   {
-
-LOG_PRINT_L1("  -> fixed: " << (m_db->height() ? m_fixed_difficulty : 1));
     return m_db->height() ? m_fixed_difficulty : 1;
   }
 
@@ -1201,7 +1197,7 @@ difficulty_type Blockchain::get_difficulty_for_alternative_chain(const std::list
       before_hf16 = alt_chain.back().bl.major_version < network_version_17_pulse;
     else
     {
-      static const uint64_t hf16_height = HardFork::get_hardcoded_hard_fork_height(m_nettype, cryptonote::network_version_17_pulse);
+      static const uint64_t hf17_height = HardFork::get_hardcoded_hard_fork_height(m_nettype, cryptonote::network_version_17_pulse);
       before_hf16                       = get_current_blockchain_height() < hf16_height;
     }
 
@@ -3054,7 +3050,6 @@ bool Blockchain::check_tx_outputs(const transaction& tx, tx_verification_context
   for (const auto &o: tx.vout) {
     if (o.amount != 0) { // in a v2 tx, all outputs must have 0 amount NOTE(beldex): All beldex tx's are atleast v2 from the beginning
       tvc.m_invalid_output = true;
-	  LOG_PRINT_L0("o.amount!=0");
       return false;
     }
 
@@ -3072,20 +3067,17 @@ bool Blockchain::check_tx_outputs(const transaction& tx, tx_verification_context
 
   // from v10, allow bulletproofs
   const uint8_t hf_version = m_hardfork->get_current_version();
-  if (hf_version < network_version_8) {
-	if (tx.version >= 2) {
-       const bool bulletproof = rct::is_rct_bulletproof(tx.rct_signatures.type);
-	   if (bulletproof || !tx.rct_signatures.p.bulletproofs.empty())
-		{
-		  LOG_PRINT_L0("Bulletproofs are not allowed before v8");
-		  tvc.m_invalid_output = true;
-		  return false;
-		}
-	}
+  if (hf_version < network_version_10_bulletproofs) {
+    const bool bulletproof = rct::is_rct_bulletproof(tx.rct_signatures.type);
+    if (bulletproof || !tx.rct_signatures.p.bulletproofs.empty())
+    {
+      MERROR_VER("Bulletproofs are not allowed before v10");
+      tvc.m_invalid_output = true;
+      return false;
+    }
   }
-
-  if (hf_version> network_version_8){
-	  if (tx.version >= 2) {
+  else
+  {
     const bool borromean = rct::is_rct_borromean(tx.rct_signatures.type);
     if (borromean)
     {
@@ -3101,14 +3093,12 @@ bool Blockchain::check_tx_outputs(const transaction& tx, tx_verification_context
       }
       else
       {
-        LOG_PRINT_L0("Borromean range proofs are not allowed after v10");
+        MERROR_VER("Borromean range proofs are not allowed after v10");
         tvc.m_invalid_output = true;
         return false;
       }
-	}
     }
   }
-  
 
   if (hf_version < HF_VERSION_SMALLER_BP) {
     if (tx.rct_signatures.type == rct::RCTType::Bulletproof2)
@@ -3311,9 +3301,7 @@ bool Blockchain::check_tx_inputs(transaction& tx, tx_verification_context &tvc, 
         CHECK_AND_ASSERT_MES(in_to_key.key_offsets.size(), false, "empty in_to_key.key_offsets in transaction with id " << get_transaction_hash(tx));
 
         // Mixin Check, from hard fork 7, we require mixin at least 9, always.
-        if (((hf_version <=7) && (in_to_key.key_offsets.size() - 1 < 6) && tx.version==2) ||
-		    ((hf_version ==8) && (in_to_key.key_offsets.size() - 1 < 7) ) ||
-            ((hf_version >8 ) && (in_to_key.key_offsets.size() - 1 != CRYPTONOTE_DEFAULT_TX_MIXIN)))
+        if (in_to_key.key_offsets.size() - 1 != CRYPTONOTE_DEFAULT_TX_MIXIN)
         {
           MERROR_VER("Tx " << get_transaction_hash(tx) << " has incorrect ring size (" << in_to_key.key_offsets.size() - 1 << ", expected (" << CRYPTONOTE_DEFAULT_TX_MIXIN << ")");
           tvc.m_low_mixin = true;
@@ -3382,10 +3370,6 @@ bool Blockchain::check_tx_inputs(transaction& tx, tx_verification_context &tvc, 
         }
       }
     }
-	
-	if (tx.version >=2)
-	{
-	
 
     if (hf_version >= HF_VERSION_ENFORCE_MIN_AGE)
     {
@@ -3541,7 +3525,7 @@ bool Blockchain::check_tx_inputs(transaction& tx, tx_verification_context &tvc, 
     }
 
     // for bulletproofs, check they're only multi-output after v8
-    if (rct::is_rct_bulletproof(rv.type) && hf_version < network_version_8)
+    if (rct::is_rct_bulletproof(rv.type) && hf_version < network_version_10_bulletproofs)
     {
       for (const rct::Bulletproof &proof: rv.p.bulletproofs)
       {
