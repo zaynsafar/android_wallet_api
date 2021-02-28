@@ -1198,7 +1198,7 @@ difficulty_type Blockchain::get_difficulty_for_alternative_chain(const std::list
     else
     {
       static const uint64_t hf17_height = HardFork::get_hardcoded_hard_fork_height(m_nettype, cryptonote::network_version_17_pulse);
-      before_hf16                       = get_current_blockchain_height() < hf16_height;
+      before_hf16                       = get_current_blockchain_height() < hf17_height;
     }
 
     block_count = DIFFICULTY_BLOCKS_COUNT(before_hf16);
