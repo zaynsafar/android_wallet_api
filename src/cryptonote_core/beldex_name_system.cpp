@@ -608,9 +608,9 @@ sqlite3 *init_beldex_name_system(const fs::path& file_path, bool read_only)
 std::vector<mapping_type> all_mapping_types(uint8_t hf_version) {
   std::vector<mapping_type> result;
   result.reserve(2);
-  if (hf_version >= cryptonote::network_version_15_bns)
+  if (hf_version >= cryptonote::network_version_16_bns)
     result.push_back(mapping_type::session);
-  if (hf_version >= cryptonote::network_version_16_pulse)
+  if (hf_version >= cryptonote::network_version_17_pulse)
     result.push_back(mapping_type::beldexnet);
   return result;
 }
@@ -749,8 +749,8 @@ bool validate_bns_name(mapping_type type, std::string name, std::string *reason)
 
   if (is_beldexnet)
     max_name_len = name.find('-') != std::string::npos
-      ? LOKINET_DOMAIN_NAME_MAX
-      : LOKINET_DOMAIN_NAME_MAX_NOHYPHEN;
+      ? BELDEXNET_DOMAIN_NAME_MAX
+      : BELDEXNET_DOMAIN_NAME_MAX_NOHYPHEN;
   else if (type == mapping_type::session) max_name_len = bns::SESSION_DISPLAY_NAME_MAX;
   else if (type == mapping_type::wallet)  max_name_len = bns::WALLET_NAME_MAX;
   else
@@ -774,8 +774,8 @@ bool validate_bns_name(mapping_type type, std::string name, std::string *reason)
   // NOTE: Validate domain specific requirements
   if (is_beldexnet)
   {
-    // LOKINET
-    // Domain has to start with an alphanumeric, and can have (alphanumeric or hyphens) in between, the character before the suffix <char>'.loki' must be alphanumeric followed by the suffix '.loki'
+    // BELDEXNET
+    // Domain has to start with an alphanumeric, and can have (alphanumeric or hyphens) in between, the character before the suffix <char>'.beldex' must be alphanumeric followed by the suffix '.beldex'
     // It's *approximately* this regex, but there are some extra restrictions below
     // ^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\\.beldex$
 
@@ -912,7 +912,7 @@ bool mapping_value::validate(cryptonote::network_type nettype, mapping_type type
     // We need a 52 char base32z string that decodes to a 32-byte value, which really means we need
     // 51 base32z chars (=255 bits) followed by a 1-bit value ('y'=0, or 'o'=0b10000); anything else
     // in the last spot isn't a valid beldexnet address.
-    if (check_condition(value.size() != 57 || !tools::ends_with(value, ".beldex") || !lokimq::is_base32z(value.substr(0, 52)) || !(value[51] == 'y' || value[51] == 'o'),
+    if (check_condition(value.size() != 57 || !tools::ends_with(value, ".beldex") || !oxenmq::is_base32z(value.substr(0, 52)) || !(value[51] == 'y' || value[51] == 'o'),
                 reason, "'", value, "' is not a valid beldexnet address"))
       return false;
 
@@ -955,7 +955,7 @@ bool mapping_value::validate_encrypted(mapping_type type, std::string_view value
   if (blob) *blob = {};
   std::stringstream err_stream;
   int value_len = crypto_aead_xchacha20poly1305_ietf_ABYTES + crypto_aead_xchacha20poly1305_ietf_NPUBBYTES;
-  if (is_beldexnet_type(type)) value_len              += LOKINET_ADDRESS_BINARY_LENGTH;
+  if (is_beldexnet_type(type)) value_len              += BELDEXNET_ADDRESS_BINARY_LENGTH;
   else if (type == mapping_type::wallet)  value_len += WALLET_ACCOUNT_BINARY_LENGTH;
   else if (type == mapping_type::session)
   {
@@ -1204,7 +1204,7 @@ bool validate_mapping_type(std::string_view mapping_type_str, uint8_t hf_version
   std::optional<bns::mapping_type> mapping_type_;
   if (txtype != bns_tx_type::renew && tools::string_iequal(mapping, "session"))
     mapping_type_ = bns::mapping_type::session;
-  else if (hf_version >= cryptonote::network_version_16_pulse)
+  else if (hf_version >= cryptonote::network_version_17_pulse)
   {
     if (tools::string_iequal(mapping, "beldexnet"))
       mapping_type_ = bns::mapping_type::beldexnet;
@@ -1383,7 +1383,7 @@ bool mapping_value::decrypt(std::string_view name, mapping_type type, const cryp
   {
     switch(type) {
       case mapping_type::session: dec_length = SESSION_PUBLIC_KEY_BINARY_LENGTH; break;
-      case mapping_type::beldexnet: dec_length = LOKINET_ADDRESS_BINARY_LENGTH; break;
+      case mapping_type::beldexnet: dec_length = BELDEXNET_ADDRESS_BINARY_LENGTH; break;
       case mapping_type::wallet:  dec_length = WALLET_ACCOUNT_BINARY_LENGTH; break;
       default: MERROR("Invalid mapping_type passed to mapping_value::decrypt"); return false;
     }
@@ -1979,7 +1979,7 @@ bool name_system_db::add_block(const cryptonote::block &block, const std::vector
    return false;
 
   bool bns_parsed_from_block = false;
-  if (block.major_version >= cryptonote::network_version_15_bns)
+  if (block.major_version >= cryptonote::network_version_16_bns)
   {
     for (cryptonote::transaction const &tx : txs)
     {

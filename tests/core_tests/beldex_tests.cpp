@@ -436,12 +436,12 @@ bool beldex_checkpointing_master_node_checkpoints_check_reorg_windows::generate(
 
 bool beldex_core_block_reward_unpenalized_pre_pulse::generate(std::vector<test_event_entry>& events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = beldex_generate_sequential_hard_fork_table(cryptonote::network_version_16_pulse - 1);
+  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = beldex_generate_sequential_hard_fork_table(cryptonote::network_version_17_pulse - 1);
   beldex_chain_generator gen(events, hard_forks);
   gen.add_blocks_until_version(hard_forks.back().first);
 
   uint8_t newest_hf = hard_forks.back().first;
-  assert(newest_hf >= cryptonote::network_version_13_enforce_checkpoints);
+  assert(newest_hf >= cryptonote::network_version_14_enforce_checkpoints);
 
   gen.add_mined_money_unlock_blocks();
 
@@ -479,7 +479,7 @@ bool beldex_core_block_reward_unpenalized_post_pulse::generate(std::vector<test_
   beldex_chain_generator gen(events, hard_forks);
 
   uint8_t const newest_hf = hard_forks.back().first;
-  assert(newest_hf >= cryptonote::network_version_13_enforce_checkpoints);
+  assert(newest_hf >= cryptonote::network_version_14_enforce_checkpoints);
 
   gen.add_blocks_until_version(hard_forks.back().first);
   gen.add_mined_money_unlock_blocks();
@@ -543,7 +543,7 @@ bool beldex_core_fee_burning::generate(std::vector<test_event_entry>& events)
   gen.add_blocks_until_version(hard_forks.back().first);
 
   uint8_t newest_hf = hard_forks.back().first;
-  assert(newest_hf >= cryptonote::network_version_14_blink);
+  assert(newest_hf >= cryptonote::network_version_15_blink);
 
   gen.add_mined_money_unlock_blocks();
 
@@ -696,8 +696,8 @@ bool beldex_core_governance_batched_reward::generate(std::vector<test_event_entr
 bool beldex_core_block_rewards_lrc6::generate(std::vector<test_event_entry>& events)
 {
   constexpr auto& network = cryptonote::get_config(cryptonote::FAKECHAIN);
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = beldex_generate_sequential_hard_fork_table(cryptonote::network_version_15_bns);
-  hard_forks.emplace_back(cryptonote::network_version_16_pulse, hard_forks.back().second + network.GOVERNANCE_REWARD_INTERVAL_IN_BLOCKS + 10);
+  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = beldex_generate_sequential_hard_fork_table(cryptonote::network_version_16_bns);
+  hard_forks.emplace_back(cryptonote::network_version_17_pulse, hard_forks.back().second + network.GOVERNANCE_REWARD_INTERVAL_IN_BLOCKS + 10);
   hard_forks.emplace_back(cryptonote::network_version_17, hard_forks.back().second + network.GOVERNANCE_REWARD_INTERVAL_IN_BLOCKS);
   beldex_chain_generator batched_governance_generator(events, hard_forks);
   batched_governance_generator.add_blocks_until_version(cryptonote::network_version_17);
@@ -706,9 +706,9 @@ bool beldex_core_block_rewards_lrc6::generate(std::vector<test_event_entry>& eve
   uint64_t hf15_height = 0, hf16_height = 0, hf17_height = 0;
   for (const auto &hf : hard_forks)
   {
-    if (hf.first == cryptonote::network_version_15_bns)
+    if (hf.first == cryptonote::network_version_16_bns)
       hf15_height = hf.second;
-    else if (hf.first == cryptonote::network_version_16_pulse)
+    else if (hf.first == cryptonote::network_version_17_pulse)
       hf16_height = hf.second;
     else
       hf17_height = hf.second;
@@ -2066,7 +2066,7 @@ bool beldex_name_system_update_mapping_after_expiry_fails::generate(std::vector<
 }
 
 uint8_t beldex_name_system_update_mapping::hf() { return cryptonote::network_version_count - 1; }
-uint8_t beldex_name_system_update_mapping_argon2::hf() { return cryptonote::network_version_15_bns; }
+uint8_t beldex_name_system_update_mapping_argon2::hf() { return cryptonote::network_version_16_bns; }
 bool beldex_name_system_update_mapping::generate(std::vector<test_event_entry> &events)
 {
   std::vector<std::pair<uint8_t, uint64_t>> hard_forks = beldex_generate_sequential_hard_fork_table(hf());
@@ -2102,7 +2102,7 @@ bool beldex_name_system_update_mapping::generate(std::vector<test_event_entry> &
   });
 
   // Test update mapping with same name fails
-  if (hf() == cryptonote::network_version_15_bns) {
+  if (hf() == cryptonote::network_version_16_bns) {
     cryptonote::transaction tx1 = gen.create_beldex_name_system_tx_update(miner, gen.hardfork(), bns::mapping_type::session, session_name1, &miner_key.session_value);
     gen.add_tx(tx1, false /*can_be_added_to_blockchain*/, "Can not add a BNS TX that re-updates the underlying value to same value");
   }

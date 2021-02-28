@@ -132,7 +132,7 @@ namespace cryptonote
           continue;
         }
 
-        if (hard_fork_version >= cryptonote::network_version_12_checkpointing)
+        if (hard_fork_version >= cryptonote::network_version_13_checkpointing)
         {
           crypto::public_key master_node_to_change_in_the_pool;
           bool same_master_node = false;
@@ -1778,7 +1778,7 @@ end:
         return false;
       }
 
-      best_reward = version >= cryptonote::network_version_16_pulse ? 0 /*Empty block, starts with 0 fee*/ : reward_parts.base_miner;
+      best_reward = version >= cryptonote::network_version_17_pulse ? 0 /*Empty block, starts with 0 fee*/ : reward_parts.base_miner;
     }
 
     size_t const max_total_weight = 2 * median_weight - CRYPTONOTE_COINBASE_BLOB_RESERVED_SIZE;
@@ -1823,7 +1823,7 @@ end:
       // NOTE: Use the net fee for comparison (after penalty is applied).
       // After HF16, penalty is applied on the miner fee. Before, penalty is
       // applied on the base reward.
-      if (version >= cryptonote::network_version_16_pulse)
+      if (version >= cryptonote::network_version_17_pulse)
       {
         next_reward = next_reward_parts.miner_fee;
       }

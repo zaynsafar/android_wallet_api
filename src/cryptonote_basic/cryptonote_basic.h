@@ -405,7 +405,7 @@ namespace cryptonote
       VARINT_FIELD(timestamp)
       FIELD(prev_id)
       FIELD(nonce)
-      if (major_version >= cryptonote::network_version_16_pulse)
+      if (major_version >= cryptonote::network_version_17_pulse)
         FIELD(pulse)
     END_SERIALIZE()
   };
@@ -443,7 +443,7 @@ namespace cryptonote
       FIELD(tx_hashes)
       if (tx_hashes.size() > CRYPTONOTE_MAX_TX_PER_BLOCK)
         throw std::invalid_argument{"too many txs in block"};
-      if (major_version >= cryptonote::network_version_16_pulse)
+      if (major_version >= cryptonote::network_version_17_pulse)
         FIELD(signatures)
     END_SERIALIZE()
   };
@@ -529,8 +529,8 @@ namespace cryptonote
   constexpr txtype transaction_prefix::get_max_type_for_hf(uint8_t hf_version)
   {
     txtype result = txtype::standard;
-    if      (hf_version >= network_version_15_bns)              result = txtype::beldex_name_system;
-    else if (hf_version >= network_version_14_blink)            result = txtype::stake;
+    if      (hf_version >= network_version_16_bns)              result = txtype::beldex_name_system;
+    else if (hf_version >= network_version_15_blink)            result = txtype::stake;
     else if (hf_version >= network_version_11_infinite_staking) result = txtype::key_image_unlock;
     else if (hf_version >= network_version_9_master_nodes)     result = txtype::state_change;
 

@@ -171,7 +171,7 @@ namespace cryptonote
     uint64_t reward = 0;
     if(hard_fork_version >= 11)
         reward = (base_reward / 10) * (MASTER_NODE_BASE_REWARD_PERCENTAGE/10) ;
-	return reward;
+	      return reward;
   }
 
   uint64_t get_portion_of_reward(uint64_t portions, uint64_t total_master_node_reward)
@@ -331,7 +331,7 @@ namespace cryptonote
     {
       CHECK_AND_ASSERT_MES(miner_tx_context.pulse_block_producer.payouts.size(), false, "Constructing a reward for block produced by pulse but no payout entries specified");
       CHECK_AND_ASSERT_MES(miner_tx_context.pulse_block_producer.key, false, "Null Key given for Pulse Block Producer");
-      CHECK_AND_ASSERT_MES(hard_fork_version >= cryptonote::network_version_16_pulse, false, "Pulse Block Producer is not valid until HF16, current HF" << hard_fork_version);
+      CHECK_AND_ASSERT_MES(hard_fork_version >= cryptonote::network_version_17_pulse, false, "Pulse Block Producer is not valid until HF16, current HF" << hard_fork_version);
 
       uint64_t leader_reward = reward_parts.master_node_total;
       if (miner_tx_context.block_leader.key == miner_tx_context.pulse_block_producer.key)
@@ -373,7 +373,7 @@ namespace cryptonote
         std::vector<uint64_t> split_rewards =
             distribute_reward_by_portions(leader.payouts,
                                           reward_parts.master_node_total,
-                                          hard_fork_version >= cryptonote::network_version_16_pulse /*distribute_remainder*/);
+                                          hard_fork_version >= cryptonote::network_version_17_pulse /*distribute_remainder*/);
         for (size_t i = 0; i < leader.payouts.size(); i++)
         {
           auto const &payee = leader.payouts[i];
@@ -433,7 +433,7 @@ namespace cryptonote
     }
 
     uint64_t expected_amount = 0;
-    if (hard_fork_version <= cryptonote::network_version_15_bns)
+    if (hard_fork_version <= cryptonote::network_version_16_bns)
     {
       // NOTE: Use the amount actually paid out when we split the master node
       // reward (across up to 4 recipients) which may actually pay out less than
@@ -490,7 +490,7 @@ namespace cryptonote
     // We base governance fees and MN rewards based on the block reward formula.  (Prior to HF13,
     // however, they were accidentally based on the block reward formula *after* subtracting a
     // potential penalty if the block producer includes txes beyond the median size limit).
-    result.original_base_reward = hard_fork_version >= network_version_13_enforce_checkpoints ? base_reward_unpenalized : base_reward;
+    result.original_base_reward = hard_fork_version >= network_version_14_enforce_checkpoints ? base_reward_unpenalized : base_reward;
 
     // There is a goverance fee due every block.  Beginning in hardfork 10 this is still subtracted
     // from the block reward as if it was paid, but the actual payments get batched into rare, large
@@ -501,7 +501,7 @@ namespace cryptonote
         : result.governance_due;
 
     uint64_t const master_node_reward = master_node_reward_formula(result.original_base_reward, hard_fork_version);
-    if (hard_fork_version < cryptonote::network_version_16_pulse)
+    if (hard_fork_version < cryptonote::network_version_17_pulse)
     {
       result.master_node_total = calculate_sum_of_portions(beldex_context.block_leader_payouts, master_node_reward);
 
@@ -860,7 +860,7 @@ namespace cryptonote
       CHECK_AND_ASSERT_MES(key_image_proofs.proofs.size() >= 1, false, "No key image proofs were generated for staking tx");
       add_tx_key_image_proofs_to_tx_extra(tx.extra, key_image_proofs);
 
-      if (tx_params.hf_version <= cryptonote::network_version_13_enforce_checkpoints)
+      if (tx_params.hf_version <= cryptonote::network_version_14_enforce_checkpoints)
         tx.type = txtype::standard;
     }
 
@@ -1044,7 +1044,7 @@ namespace cryptonote
   crypto::hash get_altblock_longhash(cryptonote::network_type nettype, randomx_longhash_context const &randomx_context, const block& b, uint64_t height)
   {
     crypto::hash result = {};
-    if (nettype == FAKECHAIN || b.major_version < network_version_12_checkpointing)
+    if (nettype == FAKECHAIN || b.major_version < network_version_13_checkpointing)
     {
       result = get_block_longhash(nettype, randomx_context, b, height, 0);
     }
@@ -1062,7 +1062,7 @@ namespace cryptonote
                                                      const uint64_t height)
   {
     *this = {};
-    if (b.major_version >= network_version_12_checkpointing)
+    if (b.major_version >= network_version_13_checkpointing)
     {
       if (pbc) // null only happens when generating genesis block, 0 init randomx is ok
       {
@@ -1090,7 +1090,7 @@ namespace cryptonote
     }
     else
     {
-      if (hf_version >= network_version_12_checkpointing)
+      if (hf_version >= network_version_13_checkpointing)
       {
         rx_slow_hash(randomx_context.current_blockchain_height,
                      randomx_context.seed_height,

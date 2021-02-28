@@ -50,12 +50,12 @@
 #undef BELDEX_DEFAULT_LOG_CATEGORY
 #define BELDEX_DEFAULT_LOG_CATEGORY "daemon.rpc"
 
-namespace boost { namespace program_options {
+namespace boost::program_options {
 class options_description;
 class variables_map;
-}}
+}
 
-namespace cryptonote { namespace rpc {
+namespace cryptonote::rpc {
 
   /// Exception when trying to invoke an RPC command that indicate a parameter parse failure (will
   /// give an invalid params error for JSON-RPC, for example).
@@ -71,11 +71,11 @@ namespace cryptonote { namespace rpc {
   /// For JSON RPC these become an error response with the code as the error.code value and the
   /// string as the error.message.
   /// For HTTP JSON these become a 500 Internal Server Error response with the message as the body.
-  /// For LokiMQ the code becomes the first part of the response and the message becomes the
+  /// For OxenMQ the code becomes the first part of the response and the message becomes the
   /// second part of the response.
   struct rpc_error : std::runtime_error {
     /// \param code - a signed, 16-bit numeric code.  0 must not be used (as it is used for a
-    /// success code in LokiMQ), and values in the -32xxx range are reserved by JSON-RPC.
+    /// success code in OxenMQ), and values in the -32xxx range are reserved by JSON-RPC.
     ///
     /// \param message - a message to send along with the error code (see general description above).
     rpc_error(int16_t code, std::string message)
@@ -146,6 +146,11 @@ namespace cryptonote { namespace rpc {
   /// and then actually do the registration in core_rpc_server.cpp.
   extern const std::unordered_map<std::string, std::shared_ptr<const rpc_command>> rpc_commands;
 
+  // Function used for getting an output distribution; this is non-static because we need to get at
+  // it from the test suite, but should be considered internal.
+  namespace detail {
+    std::optional<output_distribution_data> get_output_distribution(const std::function<bool(uint64_t, uint64_t, uint64_t, uint64_t&, std::vector<uint64_t>&, uint64_t&)>& f, uint64_t amount, uint64_t from_height, uint64_t to_height, const std::function<crypto::hash(uint64_t)>& get_hash, bool cumulative, uint64_t blockchain_height);
+  }
 
   /**
    * Core RPC server.
@@ -331,6 +336,6 @@ private:
     bool m_was_bootstrap_ever_used;
   };
 
-}} // namespace cryptonote::rpc
+} // namespace cryptonote::rpc
 
 BOOST_CLASS_VERSION(nodetool::node_server<cryptonote::t_cryptonote_protocol_handler<cryptonote::core> >, 1);

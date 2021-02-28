@@ -519,13 +519,18 @@ private:
       const cryptonote::account_public_address &account_public_address,
       const crypto::secret_key& viewkey = crypto::secret_key(), bool create_address_file = true);
     /*!
-     * \brief Restore a wallet hold by an HW.
+     * \brief Restore a wallet from a hardware device
      * \param  wallet_        Name of wallet file
      * \param  password       Password of wallet file
      * \param  device_name    name of HW to use
      * \param  create_address_file     Whether to create an address file
+     * \param  hwdev_label    if non-nullopt, create a [wallet].hwdev.txt containing the
+     *                        specified string content (which can be empty).  Used to identify
+     *                        a hardware-backed wallet file with an optional comment.
+     * \param  status_callback callback to invoke with progress messages to display to the user
      */
-    void restore(const fs::path& wallet_, const epee::wipeable_string& password, const std::string &device_name, bool create_address_file = true);
+    void restore_from_device(const fs::path& wallet_, const epee::wipeable_string& password, const std::string &device_name,
+            bool create_address_file = false, std::optional<std::string> hwdev_label = std::nullopt, std::function<void(std::string msg)> status_callback = {});
 
     /*!
      * \brief Creates a multisig wallet
@@ -695,7 +700,7 @@ private:
     std::pair<size_t, size_t> get_subaddress_lookahead() const { return {m_subaddress_lookahead_major, m_subaddress_lookahead_minor}; }
     bool contains_address(const cryptonote::account_public_address& address) const;
     bool contains_key_image(const crypto::key_image& key_image) const;
-    bool generate_signature_for_request_stake_unlock(crypto::key_image const &key_image, crypto::signature &signature, uint32_t &nonce) const;
+    bool generate_signature_for_request_stake_unlock(crypto::key_image const &key_image, crypto::signature &signature) const;
     /*!
      * \brief Tells if the wallet file is deprecated.
      */
@@ -1107,8 +1112,28 @@ private:
      */
     void set_account_tag_description(const std::string& tag, const std::string& description);
 
+    /*!
+     * \brief Signs an arbitrary string using the wallet's secret spend key.
+     *
+     * \param data the data to sign
+     * \param index the subaccount/subaddress indices to use (if omitted: use main address)
+     *
+     * \return the signature.
+     *
+     * \throw std::logic_error if called on a view-only wallet.
+     */
     std::string sign(std::string_view data, cryptonote::subaddress_index index = {0, 0}) const;
-    bool verify(std::string_view data, const cryptonote::account_public_address &address, std::string_view signature) const;
+
+    /*!
+     * \brief Verifies a signed string.
+     *
+     * \param data - the data that has been signed.
+     * \param address - the public address of the wallet that signed the data.
+     * \param signature - the signature itself.
+     *
+     * \return true if the signature verified successfully, false if verification failed.
+     */
+    static bool verify(std::string_view data, const cryptonote::account_public_address &address, std::string_view signature);
 
     /*!
      * \brief sign_multisig_participant signs given message with the multisig public signer key
@@ -1187,7 +1212,9 @@ private:
 
     uint64_t get_blockchain_height_by_date(uint16_t year, uint8_t month, uint8_t day);    // 1<=month<=12, 1<=day<=31
 
-    bool is_synced() const;
+    /// Returns true if the wallet is synced with the chain; if grace_blocks > 0 then the check is
+    /// that we are within that many blocks of the top of the chain.
+    bool is_synced(uint64_t grace_blocks = 0) const;
 
     uint64_t get_fee_percent(uint32_t priority, cryptonote::txtype type) const;
     cryptonote::byte_and_output_fees get_base_fees() const;
@@ -1319,8 +1346,8 @@ private:
     /// Modifies the `amount` to maximum possible if too large, but rejects if insufficient.
     /// `fraction` is only used to determine the amount if specified zero.
     stake_result check_stake_allowed(const crypto::public_key& mn_key, const cryptonote::address_parse_info& addr_info, uint64_t& amount, double fraction = 0);
-    stake_result create_stake_tx    (const crypto::public_key& master_node_key, const cryptonote::address_parse_info& addr_info, uint64_t amount,
-                                     double amount_fraction = 0, uint32_t priority = 0, uint32_t subaddr_account = 0, std::set<uint32_t> subaddr_indices = {});
+    stake_result create_stake_tx    (const crypto::public_key& master_node_key, uint64_t amount,
+                                     double amount_fraction = 0, uint32_t priority = 0, std::set<uint32_t> subaddr_indices = {});
     enum struct register_master_node_result_status
     {
       invalid,

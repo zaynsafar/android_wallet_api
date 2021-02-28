@@ -2,9 +2,9 @@
 #include "http_server.h"
 #include <chrono>
 #include <exception>
-#include <lokimq/base64.h>
+#include <oxenmq/base64.h>
 #include <boost/endian/conversion.hpp>
-#include <lokimq/variant.h>
+#include <oxenmq/variant.h>
 #include "common/command_line.h"
 #include "common/string_util.h"
 #include "cryptonote_config.h"
@@ -573,7 +573,7 @@ namespace cryptonote::rpc {
     });
   }
 
-  static std::unordered_set<lokimq::LokiMQ*> timer_started;
+  static std::unordered_set<oxenmq::OxenMQ*> timer_started;
 
   void http_server::start()
   {

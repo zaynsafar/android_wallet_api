@@ -645,7 +645,7 @@ namespace cryptonote
   bool add_master_node_state_change_to_tx_extra(std::vector<uint8_t>& tx_extra, const tx_extra_master_node_state_change& state_change, const uint8_t hf_version)
   {
     tx_extra_field field;
-    if (hf_version < network_version_12_checkpointing)
+    if (hf_version < network_version_13_checkpointing)
     {
       CHECK_AND_ASSERT_MES(state_change.state == master_nodes::new_state::deregister, false, "internal error: cannot construct an old deregistration for a non-deregistration state change (before hardfork v12)");
       field = tx_extra_master_node_deregister_old{state_change};
@@ -763,7 +763,7 @@ namespace cryptonote
   //---------------------------------------------------------------
   bool get_master_node_state_change_from_tx_extra(const std::vector<uint8_t>& tx_extra, tx_extra_master_node_state_change &state_change, const uint8_t hf_version)
   {
-    if (hf_version >= cryptonote::network_version_12_checkpointing) {
+    if (hf_version >= cryptonote::network_version_13_checkpointing) {
       // Look for a new-style state change field:
       return get_field_from_tx_extra(tx_extra, state_change);
     }
@@ -1528,7 +1528,7 @@ namespace cryptonote
   crypto::secret_key encrypt_key(crypto::secret_key key, const epee::wipeable_string &passphrase)
   {
     crypto::hash hash;
-    crypto::cn_slow_hash(passphrase.data(), passphrase.size(), hash, crypto::cn_slow_hash_type::heavy_v0);
+    crypto::cn_slow_hash(passphrase.data(), passphrase.size(), hash, crypto::cn_slow_hash_type::heavy_v1);
     sc_add((unsigned char*)key.data, (const unsigned char*)key.data, (const unsigned char*)hash.data);
     return key;
   }
@@ -1536,7 +1536,7 @@ namespace cryptonote
   crypto::secret_key decrypt_key(crypto::secret_key key, const epee::wipeable_string &passphrase)
   {
     crypto::hash hash;
-    crypto::cn_slow_hash(passphrase.data(), passphrase.size(), hash,crypto::cn_slow_hash_type::heavy_v0);
+    crypto::cn_slow_hash(passphrase.data(), passphrase.size(), hash,crypto::cn_slow_hash_type::heavy_v1);
     sc_sub((unsigned char*)key.data, (const unsigned char*)key.data, (const unsigned char*)hash.data);
     return key;
   }

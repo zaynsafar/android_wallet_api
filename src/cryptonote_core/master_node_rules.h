@@ -212,7 +212,7 @@ namespace master_nodes {
   constexpr uint64_t VOTE_OR_TX_VERIFY_HEIGHT_BUFFER    = 5;
 
   constexpr std::array<int, 3> MIN_STORAGE_SERVER_VERSION{{2, 0, 7}};
-  constexpr std::array<int, 3> MIN_LOKINET_VERSION{{0, 8, 0}};
+  constexpr std::array<int, 3> MIN_BELDEXNET_VERSION{{0, 8, 0}};
 
   // The minimum accepted version number, broadcasted by Master Nodes via uptime proofs for each hardfork
   struct proof_version
@@ -222,11 +222,11 @@ namespace master_nodes {
   };
 
   constexpr proof_version MIN_UPTIME_PROOF_VERSIONS[] = {
-    {cryptonote::network_version_16_pulse,                {8,1,0}},
-    {cryptonote::network_version_15_bns,                  {7,1,2}},
-    {cryptonote::network_version_14_blink,                {6,1,0}},
-    {cryptonote::network_version_13_enforce_checkpoints,  {5,1,0}},
-    {cryptonote::network_version_12_checkpointing,        {4,0,3}},
+    {cryptonote::network_version_17_pulse,                {8,1,0}},
+    {cryptonote::network_version_16_bns,                  {7,1,2}},
+    {cryptonote::network_version_15_blink,                {6,1,0}},
+    {cryptonote::network_version_14_enforce_checkpoints,  {5,1,0}},
+    {cryptonote::network_version_13_checkpointing,        {4,0,3}},
   };
 
   using swarm_id_t                         = uint64_t;
@@ -243,9 +243,9 @@ namespace master_nodes {
   constexpr quorum_type max_quorum_type_for_hf(uint8_t hf_version)
   {
     return
-        hf_version <= cryptonote::network_version_12_checkpointing ? quorum_type::obligations :
-        hf_version <  cryptonote::network_version_14_blink         ? quorum_type::checkpointing :
-        hf_version <  cryptonote::network_version_16_pulse         ? quorum_type::blink :
+        hf_version <= cryptonote::network_version_13_checkpointing ? quorum_type::obligations :
+        hf_version <  cryptonote::network_version_15_blink         ? quorum_type::checkpointing :
+        hf_version <  cryptonote::network_version_17_pulse         ? quorum_type::blink :
         quorum_type::pulse;
   }
 

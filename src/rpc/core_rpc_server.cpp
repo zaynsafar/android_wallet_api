@@ -38,7 +38,7 @@
 #include <iterator>
 #include <type_traits>
 #include <variant>
-#include <lokimq/base64.h>
+#include <oxenmq/base64.h>
 #include "crypto/crypto.h"
 #include "cryptonote_basic/tx_extra.h"
 #include "cryptonote_core/beldex_name_system.h"
@@ -60,7 +60,6 @@
 #include "net/parse.h"
 #include "crypto/hash.h"
 #include "rpc/rpc_args.h"
-#include "rpc/rpc_handler.h"
 #include "core_rpc_server_error_codes.h"
 #include "p2p/net_node.h"
 #include "version.h"
@@ -712,9 +711,9 @@ namespace cryptonote { namespace rpc {
       void operator()(const tx_extra_nonce& x) {
         if ((x.nonce.size() == sizeof(crypto::hash) + 1 && x.nonce[0] == TX_EXTRA_NONCE_PAYMENT_ID)
             || (x.nonce.size() == sizeof(crypto::hash8) + 1 && x.nonce[0] == TX_EXTRA_NONCE_ENCRYPTED_PAYMENT_ID))
-          entry.payment_id = lokimq::to_hex(x.nonce.begin() + 1, x.nonce.end());
+          entry.payment_id = oxenmq::to_hex(x.nonce.begin() + 1, x.nonce.end());
         else
-          entry.extra_nonce = lokimq::to_hex(x.nonce);
+          entry.extra_nonce = oxenmq::to_hex(x.nonce);
       }
       void operator()(const tx_extra_merge_mining_tag& x) { entry.mm_depth = x.depth; entry.mm_root = tools::type_to_hex(x.merkle_root); }
       void operator()(const tx_extra_additional_pub_keys& x) { entry.additional_pubkeys = hexify(x.data); }
@@ -800,7 +799,7 @@ namespace cryptonote { namespace rpc {
           bns.renew = true;
         bns.name_hash = tools::type_to_hex(x.name_hash);
         if (!x.encrypted_value.empty())
-          bns.value = lokimq::to_hex(x.encrypted_value);
+          bns.value = oxenmq::to_hex(x.encrypted_value);
         _load_owner(bns.owner, x.owner);
         _load_owner(bns.backup_owner, x.backup_owner);
       }
@@ -948,9 +947,9 @@ namespace cryptonote { namespace rpc {
         }
         else
         {
-          e.pruned_as_hex = lokimq::to_hex(unprunable_data);
+          e.pruned_as_hex = oxenmq::to_hex(unprunable_data);
           if (!req.prune && prunable && !pruned)
-            e.prunable_as_hex = lokimq::to_hex(prunable_data);
+            e.prunable_as_hex = oxenmq::to_hex(prunable_data);
         }
       }
       else
@@ -959,12 +958,12 @@ namespace cryptonote { namespace rpc {
         tx_data = unprunable_data;
         tx_data += prunable_data;
         if (!req.decode_as_json)
-          e.as_hex = lokimq::to_hex(tx_data);
+          e.as_hex = oxenmq::to_hex(tx_data);
       }
 
-      if (req.decode_as_json || req.tx_extra)
+      cryptonote::transaction t;
+      if (req.decode_as_json || req.tx_extra || req.stake_info)
       {
-        cryptonote::transaction t;
         if (req.prune || pruned)
         {
           if (!cryptonote::parse_and_validate_tx_base_from_blob(tx_data, t))
@@ -1008,6 +1007,14 @@ namespace cryptonote { namespace rpc {
         e.relayed = false;
         if (e.block_height <= immutable_height)
             might_be_blink = false;
+      }
+
+      if (req.stake_info) {
+        auto hf_version = m_core.get_hard_fork_version(e.in_pool ? m_core.get_current_blockchain_height() : e.block_height);
+        service_nodes::staking_components sc;
+        if (service_nodes::tx_get_staking_components_and_amounts(nettype(), hf_version, t, e.block_height, &sc)
+            && sc.transferred > 0)
+          e.stake_amount = sc.transferred;
       }
 
       if (might_be_blink)
@@ -1293,7 +1300,7 @@ namespace cryptonote { namespace rpc {
     const uint8_t major_version = m_core.get_blockchain_storage().get_current_hard_fork_version();
 
     res.pow_algorithm =
-        major_version >= network_version_12_checkpointing    ? "RandomX (Beldex variant)"               :
+        major_version >= network_version_13_checkpointing    ? "RandomX (Beldex variant)"               :
         major_version == network_version_11_infinite_staking ? "Cryptonight Turtle Light (Variant 2)" :
                                                                "Cryptonight Heavy (Variant 2)";
 
@@ -1443,8 +1450,19 @@ namespace cryptonote { namespace rpc {
       return res;
 
     std::function<void(const transaction& tx, tx_info& txi)> load_extra;
-    if (req.tx_extra)
-        load_extra = [this](const transaction& tx, tx_info& txi) { load_tx_extra_data(txi.extra.emplace(), tx, nettype()); };
+    if (req.tx_extra || req.stake_info)
+        load_extra = [this, &req](const transaction& tx, tx_info& txi) {
+            if (req.tx_extra)
+                load_tx_extra_data(txi.extra.emplace(), tx, nettype());
+            if (req.stake_info) {
+                auto height = m_core.get_current_blockchain_height();
+                auto hf_version = m_core.get_hard_fork_version(height);
+                master_nodes::staking_components sc;
+                if (master_nodes::tx_get_staking_components_and_amounts(nettype(), hf_version, tx, height, &sc)
+                        && sc.transferred > 0)
+                    txi.stake_amount = sc.transferred;
+            }
+        };
 
     m_core.get_pool().get_transactions_and_spent_keys_info(res.transactions, res.spent_key_images, load_extra, context.admin);
     for (tx_info& txi : res.transactions)
@@ -1640,7 +1658,7 @@ namespace cryptonote { namespace rpc {
       throw rpc_error{ERROR_INTERNAL, "Internal error: failed to create block template"};
     }
 
-    if (b.major_version >= network_version_12_checkpointing)
+    if (b.major_version >= network_version_13_checkpointing)
     {
       uint64_t seed_height, next_height;
       crypto::hash seed_hash;
@@ -1678,8 +1696,8 @@ namespace cryptonote { namespace rpc {
     }
     blobdata hashing_blob = get_block_hashing_blob(b);
     res.prev_hash = tools::type_to_hex(b.prev_id);
-    res.blocktemplate_blob = lokimq::to_hex(block_blob);
-    res.blockhashing_blob =  lokimq::to_hex(hashing_blob);
+    res.blocktemplate_blob = oxenmq::to_hex(block_blob);
+    res.blockhashing_blob =  oxenmq::to_hex(hashing_blob);
     res.status = STATUS_OK;
     return res;
   }
@@ -1761,7 +1779,7 @@ namespace cryptonote { namespace rpc {
         return true;
       }, b, template_res.difficulty, template_res.height);
 
-      submit_req.blob[0] = lokimq::to_hex(block_to_blob(b));
+      submit_req.blob[0] = oxenmq::to_hex(block_to_blob(b));
       auto submit_res = invoke(std::move(submit_req), context);
       res.status = submit_res.status;
 
@@ -2043,7 +2061,7 @@ namespace cryptonote { namespace rpc {
     res.tx_hashes.reserve(blk.tx_hashes.size());
     for (const auto& tx_hash : blk.tx_hashes)
         res.tx_hashes.push_back(tools::type_to_hex(tx_hash));
-    res.blob = lokimq::to_hex(t_serializable_object_to_blob(blk));
+    res.blob = oxenmq::to_hex(t_serializable_object_to_blob(blk));
     res.json = obj_to_json_str(blk);
     res.status = STATUS_OK;
     return res;
@@ -2550,6 +2568,118 @@ namespace cryptonote { namespace rpc {
     res.status = STATUS_OK;
     return res;
   }
+
+  namespace {
+    output_distribution_data process_distribution(
+        bool cumulative,
+        std::uint64_t start_height,
+        std::vector<std::uint64_t> distribution,
+        std::uint64_t base)
+    {
+      if (!cumulative && !distribution.empty())
+      {
+        for (std::size_t n = distribution.size() - 1; 0 < n; --n)
+          distribution[n] -= distribution[n - 1];
+        distribution[0] -= base;
+      }
+
+      return {std::move(distribution), start_height, base};
+    }
+
+    static struct {
+      std::mutex mutex;
+      std::vector<std::uint64_t> cached_distribution;
+      std::uint64_t cached_from = 0, cached_to = 0, cached_start_height = 0, cached_base = 0;
+      crypto::hash cached_m10_hash = crypto::null_hash;
+      crypto::hash cached_top_hash = crypto::null_hash;
+      bool cached = false;
+    } output_dist_cache;
+  }
+
+  namespace detail {
+    std::optional<output_distribution_data> get_output_distribution(
+        const std::function<bool(uint64_t, uint64_t, uint64_t, uint64_t&, std::vector<uint64_t>&, uint64_t&)>& f,
+        uint64_t amount,
+        uint64_t from_height,
+        uint64_t to_height,
+        const std::function<crypto::hash(uint64_t)>& get_hash,
+        bool cumulative,
+        uint64_t blockchain_height)
+    {
+      auto& d = output_dist_cache;
+      const std::unique_lock lock{d.mutex};
+
+      crypto::hash top_hash = crypto::null_hash;
+      if (d.cached_to < blockchain_height)
+        top_hash = get_hash(d.cached_to);
+      if (d.cached && amount == 0 && d.cached_from == from_height && d.cached_to == to_height && d.cached_top_hash == top_hash)
+        return process_distribution(cumulative, d.cached_start_height, d.cached_distribution, d.cached_base);
+
+      std::vector<std::uint64_t> distribution;
+      std::uint64_t start_height, base;
+
+      // see if we can extend the cache - a common case
+      bool can_extend = d.cached && amount == 0 && d.cached_from == from_height && to_height > d.cached_to && top_hash == d.cached_top_hash;
+      if (!can_extend)
+      {
+        // we kept track of the hash 10 blocks below, if it exists, so if it matches,
+        // we can still pop the last 10 cached slots and try again
+        if (d.cached && amount == 0 && d.cached_from == from_height && d.cached_to - d.cached_from >= 10 && to_height > d.cached_to - 10)
+        {
+          crypto::hash hash10 = get_hash(d.cached_to - 10);
+          if (hash10 == d.cached_m10_hash)
+          {
+            d.cached_to -= 10;
+            d.cached_top_hash = hash10;
+            d.cached_m10_hash = crypto::null_hash;
+            CHECK_AND_ASSERT_MES(d.cached_distribution.size() >= 10, std::nullopt, "Cached distribution size does not match cached bounds");
+            for (int p = 0; p < 10; ++p)
+              d.cached_distribution.pop_back();
+            can_extend = true;
+          }
+        }
+      }
+      if (can_extend)
+      {
+        std::vector<std::uint64_t> new_distribution;
+        if (!f(amount, d.cached_to + 1, to_height, start_height, new_distribution, base))
+          return std::nullopt;
+        distribution = d.cached_distribution;
+        distribution.reserve(distribution.size() + new_distribution.size());
+        for (const auto &e: new_distribution)
+          distribution.push_back(e);
+        start_height = d.cached_start_height;
+        base = d.cached_base;
+      }
+      else
+      {
+        if (!f(amount, from_height, to_height, start_height, distribution, base))
+          return std::nullopt;
+      }
+
+      if (to_height > 0 && to_height >= from_height)
+      {
+        const std::uint64_t offset = std::max(from_height, start_height);
+        if (offset <= to_height && to_height - offset + 1 < distribution.size())
+          distribution.resize(to_height - offset + 1);
+      }
+
+      if (amount == 0)
+      {
+        d.cached_from = from_height;
+        d.cached_to = to_height;
+        d.cached_top_hash = get_hash(d.cached_to);
+        d.cached_m10_hash = d.cached_to >= 10 ? get_hash(d.cached_to - 10) : crypto::null_hash;
+        d.cached_distribution = distribution;
+        d.cached_start_height = start_height;
+        d.cached_base = base;
+        d.cached = true;
+      }
+
+      return process_distribution(cumulative, start_height, std::move(distribution), base);
+    }
+  }
+
   //------------------------------------------------------------------------------------------------------------------------------
   GET_OUTPUT_DISTRIBUTION::response core_rpc_server::invoke(GET_OUTPUT_DISTRIBUTION::request&& req, rpc_context context, bool binary)
   {
@@ -2565,7 +2695,7 @@ namespace cryptonote { namespace rpc {
       const uint64_t req_to_height = req.to_height ? req.to_height : (m_core.get_current_blockchain_height() - 1);
       for (uint64_t amount: req.amounts)
       {
-        auto data = RpcHandler::get_output_distribution(
+        auto data = detail::get_output_distribution(
             [this](auto&&... args) { return m_core.get_output_distribution(std::forward<decltype(args)>(args)...); },
             amount,
             req.from_height,
@@ -2741,7 +2871,7 @@ namespace cryptonote { namespace rpc {
     }
 
     if (uint8_t hf_version; add_curr_pulse
-        && (hf_version = m_core.get_hard_fork_version(curr_height)) >= network_version_16_pulse)
+        && (hf_version = m_core.get_hard_fork_version(curr_height)) >= network_version_17_pulse)
     {
       cryptonote::Blockchain const &blockchain   = m_core.get_blockchain_storage();
       cryptonote::block_header const &top_header = blockchain.get_db().get_block_header_from_height(curr_height - 1);
@@ -3422,7 +3552,7 @@ namespace cryptonote { namespace rpc {
         entry.name_hash                                        = record.name_hash;
         entry.owner                                            = record.owner.to_string(nettype());
         if (record.backup_owner) entry.backup_owner            = record.backup_owner.to_string(nettype());
-        entry.encrypted_value                                  = lokimq::to_hex(record.encrypted_value.to_view());
+        entry.encrypted_value                                  = oxenmq::to_hex(record.encrypted_value.to_view());
         entry.expiration_height                                = record.expiration_height;
         entry.update_height                                    = record.update_height;
         entry.txid                                             = tools::type_to_hex(record.txid);
@@ -3479,7 +3609,7 @@ namespace cryptonote { namespace rpc {
       entry.name_hash       = std::move(record.name_hash);
       if (record.owner) entry.owner = record.owner.to_string(nettype());
       if (record.backup_owner) entry.backup_owner = record.backup_owner.to_string(nettype());
-      entry.encrypted_value = lokimq::to_hex(record.encrypted_value.to_view());
+      entry.encrypted_value = oxenmq::to_hex(record.encrypted_value.to_view());
       entry.update_height   = record.update_height;
       entry.expiration_height = record.expiration_height;
       entry.txid            = tools::type_to_hex(record.txid);
@@ -3510,9 +3640,9 @@ namespace cryptonote { namespace rpc {
         type, *name_hash, m_core.get_current_blockchain_height()))
     {
       auto [val, nonce] = mapping->value_nonce(type);
-      res.encrypted_value = lokimq::to_hex(val);
+      res.encrypted_value = oxenmq::to_hex(val);
       if (val.size() < mapping->to_view().size())
-        res.nonce = lokimq::to_hex(nonce);
+        res.nonce = oxenmq::to_hex(nonce);
     }
     return res;
   }

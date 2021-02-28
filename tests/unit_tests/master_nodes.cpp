@@ -91,7 +91,7 @@ TEST(master_nodes, staking_requirement)
   // NOTE: Staking Requirement Algorithm Switch: Integer Math Variant ^____^
   {
     uint64_t height = 450000;
-    uint64_t mainnet_requirement  = master_nodes::get_staking_requirement(cryptonote::MAINNET, height, cryptonote::network_version_13_enforce_checkpoints);
+    uint64_t mainnet_requirement  = master_nodes::get_staking_requirement(cryptonote::MAINNET, height, cryptonote::network_version_14_enforce_checkpoints);
 
     uint64_t  mainnet_expected = (18898 * COIN) + 351896001;
     ASSERT_EQ(mainnet_requirement, mainnet_expected);
@@ -100,7 +100,7 @@ TEST(master_nodes, staking_requirement)
   // Just before 15k boundary
   {
     uint64_t height = 999999;
-    uint64_t mainnet_requirement  = master_nodes::get_staking_requirement(cryptonote::MAINNET, height, cryptonote::network_version_13_enforce_checkpoints);
+    uint64_t mainnet_requirement  = master_nodes::get_staking_requirement(cryptonote::MAINNET, height, cryptonote::network_version_14_enforce_checkpoints);
 
     uint64_t mainnet_expected = (15000 * COIN) + 3122689;
     ASSERT_EQ(mainnet_requirement, mainnet_expected);
@@ -109,7 +109,7 @@ TEST(master_nodes, staking_requirement)
   // 15k requirement boundary
   {
     uint64_t height = 1000000;
-    uint64_t mainnet_requirement  = master_nodes::get_staking_requirement(cryptonote::MAINNET, height, cryptonote::network_version_13_enforce_checkpoints);
+    uint64_t mainnet_requirement  = master_nodes::get_staking_requirement(cryptonote::MAINNET, height, cryptonote::network_version_14_enforce_checkpoints);
 
     uint64_t mainnet_expected = 15000 * COIN;
     ASSERT_EQ(mainnet_requirement, mainnet_expected);

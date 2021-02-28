@@ -409,7 +409,7 @@ namespace cryptonote
       const std::string pub_ip = command_line::get_arg(vm, arg_public_ip);
       if (pub_ip.size())
       {
-        if (!epee::string_tools::get_ip_int32_from_string(m_sn_public_ip, pub_ip)) {
+        if (!epee::string_tools::get_ip_int32_from_string(m_mn_public_ip, pub_ip)) {
           MERROR("Unable to parse IPv4 public address from: " << pub_ip);
           storage_ok = false;
         }
@@ -1850,7 +1850,7 @@ namespace cryptonote
     if (!m_master_node)
       return true;
 
-    NOTIFY_UPTIME_PROOF::request req = m_master_node_list.generate_uptime_proof(m_sn_public_ip, m_storage_port, m_storage_lmq_port, m_quorumnet_port);
+    NOTIFY_UPTIME_PROOF::request req = m_master_node_list.generate_uptime_proof(m_mn_public_ip, m_storage_port, m_storage_lmq_port, m_quorumnet_port);
 
     cryptonote_connection_context fake_context{};
     bool relayed = get_protocol()->relay_uptime_proof(req, fake_context);
@@ -2241,7 +2241,7 @@ namespace cryptonote
                 "is running! It is required to run alongside the Beldex daemon");
             return;
           }
-          if (!check_external_ping(m_last_beldexnet_ping, LOKINET_PING_LIFETIME, "Lokinet"))
+          if (!check_external_ping(m_last_beldexnet_ping, BELDEXNET_PING_LIFETIME, "Lokinet"))
           {
             MGINFO_RED(
                 "Failed to submit uptime proof: have not heard from beldexnet recently. Make sure that it "

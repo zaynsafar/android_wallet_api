@@ -183,17 +183,17 @@ constexpr uint64_t BLOCKS_EXPECTED_IN_YEARS(int years) { return BLOCKS_EXPECTED_
 #define HF_VERSION_PER_BYTE_FEE                 cryptonote::network_version_10_bulletproofs
 #define HF_VERSION_SMALLER_BP                   cryptonote::network_version_11_infinite_staking
 #define HF_VERSION_LONG_TERM_BLOCK_WEIGHT       cryptonote::network_version_11_infinite_staking
-#define HF_VERSION_INCREASE_FEE                 cryptonote::network_version_12_checkpointing
-#define HF_VERSION_PER_OUTPUT_FEE               cryptonote::network_version_13_enforce_checkpoints
-#define HF_VERSION_ED25519_KEY                  cryptonote::network_version_13_enforce_checkpoints
-#define HF_VERSION_FEE_BURNING                  cryptonote::network_version_14_blink
-#define HF_VERSION_BLINK                        cryptonote::network_version_14_blink
-#define HF_VERSION_MIN_2_OUTPUTS                cryptonote::network_version_16_pulse
-#define HF_VERSION_REJECT_SIGS_IN_COINBASE      cryptonote::network_version_16_pulse
-#define HF_VERSION_ENFORCE_MIN_AGE              cryptonote::network_version_16_pulse
-#define HF_VERSION_EFFECTIVE_SHORT_TERM_MEDIAN_IN_PENALTY cryptonote::network_version_16_pulse
-#define HF_VERSION_PULSE cryptonote::network_version_16_pulse
-#define HF_VERSION_CLSAG                        cryptonote::network_version_16_pulse
+#define HF_VERSION_INCREASE_FEE                 cryptonote::network_version_13_checkpointing
+#define HF_VERSION_PER_OUTPUT_FEE               cryptonote::network_version_14_enforce_checkpoints
+#define HF_VERSION_ED25519_KEY                  cryptonote::network_version_14_enforce_checkpoints
+#define HF_VERSION_FEE_BURNING                  cryptonote::network_version_15_blink
+#define HF_VERSION_BLINK                        cryptonote::network_version_15_blink
+#define HF_VERSION_MIN_2_OUTPUTS                cryptonote::network_version_17_pulse
+#define HF_VERSION_REJECT_SIGS_IN_COINBASE      cryptonote::network_version_17_pulse
+#define HF_VERSION_ENFORCE_MIN_AGE              cryptonote::network_version_17_pulse
+#define HF_VERSION_EFFECTIVE_SHORT_TERM_MEDIAN_IN_PENALTY cryptonote::network_version_17_pulse
+#define HF_VERSION_PULSE cryptonote::network_version_17_pulse
+#define HF_VERSION_CLSAG                        cryptonote::network_version_17_pulse
 
 #define PER_KB_FEE_QUANTIZATION_DECIMALS        8
 
@@ -324,12 +324,12 @@ namespace cryptonote
     network_version_9_master_nodes, // Proof Of Stake w/ Service Nodes
     network_version_10_bulletproofs, // Bulletproofs, Service Node Grace Registration Period, Batched Governance
     network_version_11_infinite_staking, // Infinite Staking, CN-Turtle
-    network_version_12_checkpointing, // Checkpointing, Relaxed Deregistration, RandomXL, Loki Storage Server
-    network_version_13_enforce_checkpoints,
-    network_version_14_blink,
-    network_version_15_bns,
-    network_version_16_pulse,
-    network_version_17, // future HF
+    network_version_12_security_signature,
+    network_version_13_checkpointing, // Checkpointing, Relaxed Deregistration, RandomXL, Loki Storage Server
+    network_version_14_enforce_checkpoints,
+    network_version_15_blink,
+    network_version_16_bns,
+    network_version_17_pulse,
 
     network_version_count,
   };

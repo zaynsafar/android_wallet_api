@@ -4781,7 +4781,7 @@ void BlockchainLMDB::fixup(cryptonote::network_type nettype)
 
           // NOTE: Calculate next block difficulty
           uint8_t const hf_version = get_hard_fork_version(curr_height);
-          if (hf_version >= cryptonote::network_version_16_pulse && block_header_has_pulse_components(get_block_header_from_height(curr_height)))
+          if (hf_version >= cryptonote::network_version_17_pulse && block_header_has_pulse_components(get_block_header_from_height(curr_height)))
           {
             diff = PULSE_FIXED_DIFFICULTY;
           }

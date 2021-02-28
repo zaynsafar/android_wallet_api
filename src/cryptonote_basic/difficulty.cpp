@@ -127,7 +127,7 @@ namespace cryptonote {
     timestamps.push_back(timestamp);
     difficulties.push_back(cumulative_difficulty);
 
-    static const uint64_t hf16_height = HardFork::get_hardcoded_hard_fork_height(nettype, cryptonote::network_version_16_pulse);
+    static const uint64_t hf16_height = HardFork::get_hardcoded_hard_fork_height(nettype, cryptonote::network_version_17_pulse);
     bool const before_hf16            = chain_height < hf16_height;
 
     // Trim down arrays
@@ -165,8 +165,8 @@ namespace cryptonote {
 
   difficulty_calc_mode difficulty_mode(cryptonote::network_type nettype, uint8_t hf_version, uint64_t height)
   {
-    static const uint64_t hf12_height = cryptonote::HardFork::get_hardcoded_hard_fork_height(nettype, cryptonote::network_version_12_checkpointing);
-    static const uint64_t hf16_height = cryptonote::HardFork::get_hardcoded_hard_fork_height(nettype, cryptonote::network_version_16_pulse);
+    static const uint64_t hf12_height = cryptonote::HardFork::get_hardcoded_hard_fork_height(nettype, cryptonote::network_version_13_checkpointing);
+    static const uint64_t hf16_height = cryptonote::HardFork::get_hardcoded_hard_fork_height(nettype, cryptonote::network_version_17_pulse);
     auto result = difficulty_calc_mode::normal;
 
     if (hf_version <= cryptonote::network_version_9_master_nodes)
@@ -258,51 +258,4 @@ namespace cryptonote {
 
     return next_difficulty;
   }
-  
- difficulty_type next_difficulty(std::vector<std::uint64_t> timestamps, std::vector<difficulty_type> cumulative_difficulties, size_t target_seconds) {
-
-    if(timestamps.size() > DIFFICULTY_WINDOW_V2)
-    {
-      timestamps.resize(DIFFICULTY_WINDOW_V2);
-      cumulative_difficulties.resize(DIFFICULTY_WINDOW_V2);
-    }
-
-
-    size_t length = timestamps.size();
-    assert(length == cumulative_difficulties.size());
-    if (length <= 1) {
-      return 1;
-    }
-    static_assert(DIFFICULTY_WINDOW_V2 >= 2, "Window is too small");
-    assert(length <= DIFFICULTY_WINDOW_V2);
-    sort(timestamps.begin(), timestamps.end());
-    size_t cut_begin, cut_end;
-    static_assert(2 * DIFFICULTY_CUT <= DIFFICULTY_WINDOW_V2 - 2, "Cut length is too large");
-    if (length <= DIFFICULTY_WINDOW_V2 - 2 * DIFFICULTY_CUT) {
-      cut_begin = 0;
-      cut_end = length;
-    } else {
-      cut_begin = (length - (DIFFICULTY_WINDOW_V2 - 2 * DIFFICULTY_CUT) + 1) / 2;
-      cut_end = cut_begin + (DIFFICULTY_WINDOW_V2 - 2 * DIFFICULTY_CUT);
-    }
-    assert(/*cut_begin >= 0 &&*/ cut_begin + 2 <= cut_end && cut_end <= length);
-    uint64_t time_span = timestamps[cut_end - 1] - timestamps[cut_begin];
-    if (time_span == 0) {
-      time_span = 1;
-    }
-    difficulty_type total_work = cumulative_difficulties[cut_end - 1] - cumulative_difficulties[cut_begin];
-    assert(total_work > 0);
-    uint64_t low, high;
-    mul(total_work, target_seconds, low, high);
-	LOG_PRINT_L2("next_difficultyLOG time_span: " << time_span << " low:" << low << " (low + time_span - 1) / time_span:" << ((low + time_span - 1) / time_span));
-    // blockchain errors "difficulty overhead" if this function returns zero.
-    // TODO: consider throwing an exception instead
-    if (high != 0 || low + time_span - 1 < low) {
-      return 0;
-    }
-    return (low + time_span - 1) / time_span;
-  }
-  
-  
 }
-
