@@ -151,18 +151,8 @@ namespace cryptonote
 
   bool height_has_governance_output(network_type nettype, uint8_t hard_fork_version, uint64_t height)
   {
-    if (height == 0)
-      return false;
 
-    if (hard_fork_version <= network_version_9_master_nodes)
-      return true;
-
-    if (height % cryptonote::get_config(nettype).GOVERNANCE_REWARD_INTERVAL_IN_BLOCKS != 0)
-    {
-      return false;
-    }
-
-    return true;
+    return false; // No governance planned
   }
 
   
@@ -386,12 +376,8 @@ namespace cryptonote
     // NOTE: Add Governance Payout
     if (already_generated_coins != 0)
     {
-      if (reward_parts.governance_paid == 0)
-      {
-        CHECK_AND_ASSERT_MES(hard_fork_version >= network_version_10_bulletproofs, false, "Governance reward can NOT be 0 before hardfork 10, hard_fork_version: " << hard_fork_version);
-      }
-      else
-      {
+      if (hard_fork_version >= network_version_10_bulletproofs && reward_parts.governance_paid != 0)
+      {        
         const network_type nettype = miner_tx_context.nettype;
         cryptonote::address_parse_info governance_wallet_address;
         cryptonote::get_account_address_from_str(governance_wallet_address, nettype, cryptonote::get_config(nettype).governance_wallet_address(hard_fork_version));
