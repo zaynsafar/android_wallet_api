@@ -129,7 +129,7 @@ static bool verify_vote(master_nodes::quorum_vote_t const &vote,
 TEST(master_nodes, vote_validation)
 {
   // Generate a quorum and the voter
-  cryptonote::keypair master_node_voter = cryptonote::keypair::generate(hw::get_device("default"));
+  cryptonote::keypair master_node_voter{hw::get_device("default")};
   int voter_index = 0;
 
   master_nodes::master_node_keys voter_keys;
@@ -143,8 +143,8 @@ TEST(master_nodes, vote_validation)
 
     for (size_t i = 0; i < state.validators.size(); ++i)
     {
-      state.validators[i] = (i == voter_index) ? master_node_voter.pub : cryptonote::keypair::generate(hw::get_device("default")).pub;
-      state.workers[i] = cryptonote::keypair::generate(hw::get_device("default")).pub;
+      state.validators[i] = (i == voter_index) ? master_node_voter.pub : cryptonote::keypair{hw::get_device("default")}.pub;
+      state.workers[i] = cryptonote::keypair{hw::get_device("default")}.pub;
     }
   }
 
@@ -185,7 +185,7 @@ TEST(master_nodes, vote_validation)
   // Signature not valid
   {
     auto vote                       = valid_vote;
-    cryptonote::keypair other_voter = cryptonote::keypair::generate(hw::get_device("default"));
+    cryptonote::keypair other_voter{hw::get_device("default")};
     vote.signature                  = {};
 
     cryptonote::vote_verification_context vvc = {};
@@ -220,11 +220,11 @@ TEST(master_nodes, tx_extra_state_change_validation)
 
     for (size_t i = 0; i < state.validators.size(); ++i)
     {
-      cryptonote::keypair voter = cryptonote::keypair::generate(hw::get_device("default"));
+      cryptonote::keypair voter{hw::get_device("default")};
       voters[i].pub = voter.pub;
       voters[i].key = voter.sec;
       state.validators[i] = voters[i].pub;
-      state.workers[i]    = cryptonote::keypair::generate(hw::get_device("default")).pub;
+      state.workers[i]    = cryptonote::keypair{hw::get_device("default")}.pub;
     }
   }
 

@@ -49,6 +49,7 @@
 #include "cryptonote_basic/cryptonote_format_utils.h"
 #include "cryptonote_basic/miner.h"
 #include "beldex_economy.h"
+#include "ringct/rctSigs.h"
 
 #include "chaingen.h"
 #include "device/device.hpp"
@@ -663,8 +664,12 @@ cryptonote::transaction beldex_chain_generator::create_beldex_name_system_tx_upd
   if (!signature)
   {
     signature = &signature_;
-    crypto::hash hash = bns::tx_extra_signature_hash(encrypted_value.to_view(), owner, backup_owner, prev_txid);
-    *signature = bns::make_monero_signature(hash, src.get_keys().m_account_address.m_spend_public_key, src.get_keys().m_spend_secret_key);
+    auto data = bns::tx_extra_signature(encrypted_value.to_view(), owner, backup_owner, prev_txid);
+    crypto::hash hash{};
+    if (!data.empty())
+        crypto_generichash(reinterpret_cast<unsigned char*>(hash.data), sizeof(hash), reinterpret_cast<const unsigned char*>(data.data()), data.size(), nullptr, 0);
+    generate_signature(hash, src.get_keys().m_account_address.m_spend_public_key, src.get_keys().m_spend_secret_key, signature->monero);
+    signature->type = bns::generic_owner_sig_type::monero;
   }
 
   std::vector<uint8_t> extra;
@@ -933,9 +938,9 @@ bool beldex_chain_generator::block_begin(beldex_blockchain_entry &entry, beldex_
     uint64_t start_height               = height - num_blocks;
 
     if (blk.major_version == cryptonote::network_version_16_bns)
-      miner_tx_context.batched_governance = FOUNDATION_REWARD_HF15 * num_blocks;
+      miner_tx_context.batched_governance = FOUNDATION_REWARD_HF18 * num_blocks;
     else if (blk.major_version == cryptonote::network_version_17_pulse)
-      miner_tx_context.batched_governance = (FOUNDATION_REWARD_HF15 + CHAINFLIP_LIQUIDITY_HF16) * num_blocks;
+      miner_tx_context.batched_governance = (FOUNDATION_REWARD_HF18 + CHAINFLIP_LIQUIDITY_HF17) * num_blocks;
     else
     {
       for (int i = (int)get_block_height(params.prev.block), count = 0;
@@ -1482,12 +1487,12 @@ uint64_t get_amount(const cryptonote::account_base& account, const cryptonote::t
   {
     if (rct::is_rct_simple(tx.rct_signatures.type))
       money_transferred = rct::decodeRctSimple(tx.rct_signatures, rct::sk2rct(scalar1), i, mask, hwdev);
-    else if (tx.rct_signatures.type == rct::RCTTypeFull)
+    else if (tx.rct_signatures.type == rct::RCTType::Full)
       money_transferred = rct::decodeRct(tx.rct_signatures, rct::sk2rct(scalar1), i, hwdev);
-    else if (tx.rct_signatures.type == rct::RCTTypeNull)
+    else if (tx.rct_signatures.type == rct::RCTType::Null)
       money_transferred = tx.vout[i].amount;
     else {
-      LOG_PRINT_L0(__func__ << ": Unsupported rct type: " << +tx.rct_signatures.type);
+      LOG_PRINT_L0(__func__ << ": Unsupported rct type: " << (int)tx.rct_signatures.type);
       return 0;
     }
   }
@@ -1712,7 +1717,7 @@ bool fill_tx_sources(std::vector<cryptonote::tx_source_entry>& sources, const st
             {
                 rct::decodeRctSimple(tx.rct_signatures, rct::sk2rct(amount_key), oi.out_no, ts.mask, hw::get_device("default"));
             }
-            else if (tx.rct_signatures.type == rct::RCTTypeFull)
+            else if (tx.rct_signatures.type == rct::RCTType::Full)
             {
                 rct::decodeRct(tx.rct_signatures, rct::sk2rct(amount_key), oi.out_no, ts.mask, hw::get_device("default"));
             }
