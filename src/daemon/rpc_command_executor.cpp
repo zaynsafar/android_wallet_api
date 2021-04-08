@@ -42,9 +42,9 @@
 #include "cryptonote_basic/hardfork.h"
 #include "checkpoints/checkpoints.h"
 #include <boost/format.hpp>
-
+#include "rpc_command_executor.h"
 #include "common/beldex_integration_test_hooks.h"
-
+#include <iostream>
 #include <fstream>
 #include <ctime>
 #include <string>
@@ -1153,24 +1153,29 @@ bool rpc_command_executor::out_peers(bool set, uint32_t limit)
 {
     OUT_PEERS::request req{set, limit};
 	OUT_PEERS::response res{};
+  req.out_peers = limit;
+  
     if (!invoke<OUT_PEERS>(std::move(req), res, "Failed to set max out peers"))
       return false;
 
 	const std::string s = res.out_peers == (uint32_t)-1 ? "unlimited" : std::to_string(res.out_peers);
-	tools::msg_writer() << "Max number of out peers set to " << s << std::endl;
+	tools::msg_writer() << "Max number of out peers set to " << limit;
 
 	return true;
 }
 
 bool rpc_command_executor::in_peers(bool set, uint32_t limit)
 {
-    IN_PEERS::request req{set, limit};
+	IN_PEERS::request req{set, limit};
 	IN_PEERS::response res{};
-    if (!invoke<IN_PEERS>(std::move(req), res, "Failed to set max in peers"))
-      return false;
 
-	const std::string s = res.in_peers == (uint32_t)-1 ? "unlimited" : std::to_string(res.in_peers);
-	tools::msg_writer() << "Max number of in peers set to " << s << std::endl;
+	req.in_peers = limit;
+
+	if (!invoke<IN_PEERS>(std::move(req), res, "Failed to set max out peers"))
+	
+			return false;
+      const std::string s = res.in_peers == (uint32_t)-1 ? "unlimited" : std::to_string(res.in_peers);
+	tools::msg_writer() << "Max number of in peers set to " << limit;
 
 	return true;
 }
@@ -2484,3 +2489,4 @@ bool rpc_command_executor::test_trigger_uptime_proof()
 }
 
 }// namespace daemonize
+
