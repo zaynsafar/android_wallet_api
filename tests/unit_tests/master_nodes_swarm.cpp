@@ -41,7 +41,7 @@
 using namespace master_nodes;
 
 crypto::public_key newPubKey() {
-  return cryptonote::keypair::generate(hw::get_device("default")).pub;
+  return cryptonote::keypair{hw::get_device("default")}.pub;
 };
 
 size_t calculateExcess(const swarm_mnode_map_t& swarm_to_mnodes) {
