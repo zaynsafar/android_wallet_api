@@ -2346,7 +2346,7 @@ Transaktion %llu/%llu: txid=%s</translation>
     <message>
         <location filename="../src/simplewallet/simplewallet.cpp" line="6078"/>
         <source>output key&apos;s originating block height shouldn&apos;t be higher than the blockchain height</source>
-        <translation>utgångsnyckelns ursprungsblockhöjd får inte vara högre än blockkedjans höjd</translation>
+        <translation>utgångsnyckebns ursprungsblockhöjd får inte vara högre än blockkedjans höjd</translation>
     </message>
     <message>
         <location filename="../src/simplewallet/simplewallet.cpp" line="6082"/>

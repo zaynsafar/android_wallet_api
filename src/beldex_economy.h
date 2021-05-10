@@ -2,35 +2,35 @@
 #include <cstdint>
 
 constexpr uint64_t COIN                       = (uint64_t)1000000000; // 1 BELDEX = pow(10, 9)
-constexpr uint64_t MONEY_SUPPLY               = ((uint64_t)(1500000000000000000)); // MONEY_SUPPLY - total number coins to be generated
+constexpr uint64_t MONEY_SUPPLY               = ((uint64_t)(-1)); // MONEY_SUPPLY - total number coins to be generated
 constexpr uint64_t EMISSION_LINEAR_BASE       = ((uint64_t)(1) << 58);
 constexpr uint64_t EMISSION_SUPPLY_MULTIPLIER = 19;
 constexpr uint64_t EMISSION_SUPPLY_DIVISOR    = 10;
 constexpr uint64_t EMISSION_DIVISOR           = 2000000;
 
 // HF15 money supply parameters:
-constexpr uint64_t BLOCK_REWARD_HF15      = 2 * COIN;
-constexpr uint64_t MINER_REWARD_HF15      = BLOCK_REWARD_HF15 * 10 / 100; // Only until HF16
-constexpr uint64_t MN_REWARD_HF15         = BLOCK_REWARD_HF15 * 90 / 100;
-constexpr uint64_t FOUNDATION_REWARD_HF15 = 0;
+constexpr uint64_t BLOCK_REWARD_HF16      = 2 * COIN;
+constexpr uint64_t MINER_REWARD_HF16      = BLOCK_REWARD_HF16 * 10 / 100; // Only until HF16
+constexpr uint64_t MN_REWARD_HF16         = BLOCK_REWARD_HF16 * 90 / 100;
+constexpr uint64_t FOUNDATION_REWARD_HF16 = 0;
 
-// HF16+ money supply parameters: same as HF15 except the miner fee goes away and is redirected to
+// HF16+ money supply parameters: same as HF16 except the miner fee goes away and is redirected to
 // LF to be used exclusively for Beldex Chainflip liquidity seeding and incentives.  See
 // https://github.com/beldex-project/beldex-improvement-proposals/issues/24 for more details.  This ends
 // after 6 months.
-constexpr uint64_t BLOCK_REWARD_HF16        = BLOCK_REWARD_HF15;
-constexpr uint64_t CHAINFLIP_LIQUIDITY_HF16 = BLOCK_REWARD_HF15 * 10 / 100;
+constexpr uint64_t BLOCK_REWARD_HF17        = BLOCK_REWARD_HF16;
+constexpr uint64_t CHAINFLIP_LIQUIDITY_HF17 = BLOCK_REWARD_HF16 * 10 / 100;
 
 // HF17: at most 6 months after HF16.  This is tentative and will likely be replaced before the
 // actual HF with a new reward schedule including Chainflip rewards, but as per the LRC linked
 // above, the liquidity funds end after 6 months.  That means that until HF17 is finalized, this is
 // the fallback if we hit the 6-months-after-HF16 point:
-constexpr uint64_t BLOCK_REWARD_HF17      = 1'800'000'000;
-constexpr uint64_t FOUNDATION_REWARD_HF17 = 0;
+constexpr uint64_t BLOCK_REWARD_HF18      = 1'800'000'000;
+constexpr uint64_t FOUNDATION_REWARD_HF18 = 0;
                                              
-static_assert(MINER_REWARD_HF15        + MN_REWARD_HF15 + FOUNDATION_REWARD_HF15 == BLOCK_REWARD_HF15);
-static_assert(CHAINFLIP_LIQUIDITY_HF16 + MN_REWARD_HF15 + FOUNDATION_REWARD_HF15 == BLOCK_REWARD_HF16);
-static_assert(                           MN_REWARD_HF15 + FOUNDATION_REWARD_HF17 == BLOCK_REWARD_HF17);
+static_assert(MINER_REWARD_HF16        + MN_REWARD_HF16 + FOUNDATION_REWARD_HF16 == BLOCK_REWARD_HF16);
+static_assert(CHAINFLIP_LIQUIDITY_HF17 + MN_REWARD_HF16 + FOUNDATION_REWARD_HF16 == BLOCK_REWARD_HF17);
+static_assert(                           MN_REWARD_HF16 + FOUNDATION_REWARD_HF18 == BLOCK_REWARD_HF18);
 
 // -------------------------------------------------------------------------------------------------
 //

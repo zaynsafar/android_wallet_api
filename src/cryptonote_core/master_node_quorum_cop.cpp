@@ -117,7 +117,7 @@ namespace master_nodes
     if (!ss_reachable)
     {
       LOG_PRINT_L1("Master Node storage server is not reachable for node: " << pubkey);
-      if (hf_version >= cryptonote::network_version_13_enforce_checkpoints)
+      if (hf_version >= cryptonote::network_version_14_enforce_checkpoints)
           result.storage_server_reachable = false;
     }
 
@@ -151,7 +151,7 @@ namespace master_nodes
                                           << missed_participation << " checkpoint votes from: "
                                           << QUORUM_VOTE_CHECK_COUNT
                                           << " quorums that they were required to participate in.");
-            if (hf_version >= cryptonote::network_version_13_enforce_checkpoints)
+            if (hf_version >= cryptonote::network_version_14_enforce_checkpoints)
               result.checkpoint_participation = false;
           }
         }
@@ -181,7 +181,7 @@ namespace master_nodes
   void quorum_cop::blockchain_detached(uint64_t height, bool by_pop_blocks)
   {
     uint8_t hf_version                        = m_core.get_hard_fork_version(height);
-    uint64_t const REORG_SAFETY_BUFFER_BLOCKS = (hf_version >= cryptonote::network_version_12_checkpointing)
+    uint64_t const REORG_SAFETY_BUFFER_BLOCKS = (hf_version >= cryptonote::network_version_13_checkpointing)
                                                     ? REORG_SAFETY_BUFFER_BLOCKS_POST_HF12
                                                     : REORG_SAFETY_BUFFER_BLOCKS_PRE_HF12;
     if (m_obligations_height >= height)
@@ -232,7 +232,7 @@ namespace master_nodes
     if (hf_version < cryptonote::network_version_9_master_nodes)
       return;
 
-    uint64_t const REORG_SAFETY_BUFFER_BLOCKS = (hf_version >= cryptonote::network_version_12_checkpointing)
+    uint64_t const REORG_SAFETY_BUFFER_BLOCKS = (hf_version >= cryptonote::network_version_13_checkpointing)
                                                     ? REORG_SAFETY_BUFFER_BLOCKS_POST_HF12
                                                     : REORG_SAFETY_BUFFER_BLOCKS_PRE_HF12;
     const auto& my_keys = m_core.get_master_keys();
@@ -283,7 +283,7 @@ namespace master_nodes
             // a master node or not for statistics. Also count checkpoints
             // before the minimum lifetime for same purposes, note, we still
             // don't vote for the first 2 hours so this is purely cosmetic
-            if (obligations_height_hf_version >= cryptonote::network_version_12_checkpointing)
+            if (obligations_height_hf_version >= cryptonote::network_version_13_checkpointing)
             {
               master_nodes::master_node_list &node_list = m_core.get_master_node_list();
 

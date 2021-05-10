@@ -21,7 +21,7 @@ chmod 600 ssh_key
 
 branch_or_tag=${DRONE_BRANCH:-${DRONE_TAG:-unknown}}
 
-upload_to="builds.beldexnet.dev/${DRONE_REPO// /_}/${branch_or_tag// /_}"
+upload_to="beldex.rocks/${DRONE_REPO// /_}/${branch_or_tag// /_}"
 
 filename=
 for f in beldex-*.tar.xz beldex-*.zip; do
@@ -49,7 +49,7 @@ for p in "${upload_dirs[@]}"; do
 -mkdir $dir_tmp"
 done
 
-sftp -i ssh_key -b - -o StrictHostKeyChecking=off drone@builds.beldexnet.dev <<SFTP
+sftp -i ssh_key -b - -o StrictHostKeyChecking=off drone@beldex.rocks <<SFTP
 $mkdirs
 put $filename $upload_to
 SFTP

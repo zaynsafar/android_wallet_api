@@ -386,18 +386,18 @@ namespace master_nodes
     {
       switch (tx.rct_signatures.type)
       {
-      case rct::RCTTypeSimple:
-      case rct::RCTTypeBulletproof:
-      case rct::RCTTypeBulletproof2:
-      case rct::RCTTypeCLSAG:
-        money_transferred = rct::decodeRctSimple(tx.rct_signatures, rct::sk2rct(scalar1), i, mask, hwdev);
-        break;
-      case rct::RCTTypeFull:
-        money_transferred = rct::decodeRct(tx.rct_signatures, rct::sk2rct(scalar1), i, mask, hwdev);
-        break;
-      default:
-        LOG_PRINT_L0(__func__ << ": Unsupported rct type: " << (int)tx.rct_signatures.type);
-        return 0;
+          case rct::RCTType::Simple:
+          case rct::RCTType::Bulletproof:
+          case rct::RCTType::Bulletproof2:
+          case rct::RCTType::CLSAG:
+              money_transferred = rct::decodeRctSimple(tx.rct_signatures, rct::sk2rct(scalar1), i, mask, hwdev);
+              break;
+          case rct::RCTType::Full:
+              money_transferred = rct::decodeRct(tx.rct_signatures, rct::sk2rct(scalar1), i, mask, hwdev);
+              break;
+          default:
+              LOG_PRINT_L0(__func__ << ": Unsupported rct type: " << (int)tx.rct_signatures.type);
+              return 0;
       }
     }
     catch (const std::exception &e)
@@ -538,10 +538,9 @@ namespace master_nodes
         // The signer can try falsify the key image, but the equation used to
         // construct the key image is re-derived by the verifier, false key
         // images will not match the re-derived key image.
-        crypto::public_key const *ephemeral_pub_key_ptr = &ephemeral_pub_key;
         for (auto proof = key_image_proofs.proofs.begin(); proof != key_image_proofs.proofs.end(); proof++)
         {
-          if (!crypto::check_ring_signature((const crypto::hash &)(proof->key_image), proof->key_image, &ephemeral_pub_key_ptr, 1, &proof->signature))
+          if (!crypto::check_key_image_signature(proof->key_image, ephemeral_pub_key, proof->signature))
             continue;
 
           contribution->locked_contributions.emplace_back(master_node_info::contribution_t::version_t::v0, ephemeral_pub_key, proof->key_image, transferred);
@@ -689,7 +688,7 @@ namespace master_nodes
         return true;
 
       case new_state::decommission:
-        if (hf_version < cryptonote::network_version_12_checkpointing) {
+        if (hf_version < cryptonote::network_version_13_checkpointing) {
           MERROR("Invalid decommission transaction seen before network v12");
           return false;
         }
@@ -708,7 +707,7 @@ namespace master_nodes
         info.last_decommission_height = block_height;
         info.decommission_count++;
 
-        if (hf_version >= cryptonote::network_version_13_enforce_checkpoints) {
+        if (hf_version >= cryptonote::network_version_14_enforce_checkpoints) {
           // Assigning invalid swarm id effectively kicks the node off
           // its current swarm; it will be assigned a new swarm id when it
           // gets recommissioned. Prior to HF13 this step was incorrectly
@@ -725,7 +724,7 @@ namespace master_nodes
         return true;
 
       case new_state::recommission: {
-        if (hf_version < cryptonote::network_version_12_checkpointing) {
+        if (hf_version < cryptonote::network_version_13_checkpointing) {
           MERROR("Invalid recommission transaction seen before network v12");
           return false;
         }
@@ -768,7 +767,7 @@ namespace master_nodes
         return true;
       }
       case new_state::ip_change_penalty:
-        if (hf_version < cryptonote::network_version_12_checkpointing) {
+        if (hf_version < cryptonote::network_version_13_checkpointing) {
           MERROR("Invalid ip_change_penalty transaction seen before network v12");
           return false;
         }
@@ -835,8 +834,8 @@ namespace master_nodes
       if (cit != contributor.locked_contributions.end())
       {
         // NOTE(beldex): This should be checked in blockchain check_tx_inputs already
-        crypto::hash const hash = master_nodes::generate_request_stake_unlock_hash(unlock.nonce);
-        if (crypto::check_signature(hash, cit->key_image_pub_key, unlock.signature))
+        if (crypto::check_signature(master_nodes::generate_request_stake_unlock_hash(unlock.nonce),
+                    cit->key_image_pub_key, unlock.signature))
         {
           duplicate_info(it->second).requested_unlock_height = unlock_height;
           return true;
@@ -895,7 +894,7 @@ namespace master_nodes
       return false;
     }
 
-    if (hf_version >= cryptonote::network_version_16_pulse)
+    if (hf_version >= cryptonote::network_version_17_pulse)
     {
       // In HF16 we start enforcing three things that were always done but weren't actually enforced:
       // 1. the staked amount in the tx must be a single output.
@@ -980,7 +979,7 @@ namespace master_nodes
     // In HF16 we require that the amount staked in the registration tx be at least the amount
     // reserved for the operator.  Before HF16 it only had to be >= 25%, even if the operator
     // reserved amount was higher (though wallets would never actually do this).
-    if (hf_version >= cryptonote::network_version_16_pulse && stake.transferred < info.contributors[0].reserved)
+    if (hf_version >= cryptonote::network_version_17_pulse && stake.transferred < info.contributors[0].reserved)
     {
       LOG_PRINT_L1("Register TX rejected: TX does not have sufficient operator stake");
       return false;
@@ -1126,7 +1125,7 @@ namespace master_nodes
         other_reservations++;
     }
 
-    if (hf_version >= cryptonote::network_version_16_pulse && stake.locked_contributions.size() != 1)
+    if (hf_version >= cryptonote::network_version_17_pulse && stake.locked_contributions.size() != 1)
     {
       // Nothing has ever created stake txes with multiple stake outputs, but we start enforcing
       // that in HF16.
@@ -1137,7 +1136,7 @@ namespace master_nodes
     // Check node contributor counts
     {
       bool too_many_contributions = false;
-      if (hf_version >= cryptonote::network_version_16_pulse)
+      if (hf_version >= cryptonote::network_version_17_pulse)
         // Before HF16 we didn't properly take into account unfilled reservation spots
         too_many_contributions = existing_contributions + other_reservations + 1 > MAX_NUMBER_OF_CONTRIBUTORS;
       else if (hf_version >= cryptonote::network_version_11_infinite_staking)
@@ -1163,7 +1162,7 @@ namespace master_nodes
     { // Follow-up contributions from an existing contributor could be any size before HF11
       min_contribution = 1;
     }
-    else if (hf_version < cryptonote::network_version_16_pulse)
+    else if (hf_version < cryptonote::network_version_17_pulse)
     {
       // The implementation before HF16 was a bit broken w.r.t. properly handling reserved amounts
       min_contribution = get_min_node_contribution(hf_version, curinfo.staking_requirement, curinfo.total_reserved, existing_contributions);
@@ -1242,7 +1241,7 @@ namespace master_nodes
     std::bitset<8 * sizeof(block.pulse.validator_bitset)> const validator_bitset = block.pulse.validator_bitset;
     stream << "Block(" << cryptonote::get_block_height(block) << "): " << cryptonote::get_block_hash(block) << "\n";
     stream << "Leader: ";
-    if (quorum) stream << (quorum->workers.empty() ? "(invalid leader)" : lokimq::to_hex(tools::view_guts(quorum->workers[0]))) << "\n";
+    if (quorum) stream << (quorum->workers.empty() ? "(invalid leader)" : oxenmq::to_hex(tools::view_guts(quorum->workers[0]))) << "\n";
     else        stream << "(invalid quorum)\n";
     stream << "Round: " << +block.pulse.round << "\n";
     stream << "Validator Bitset: " << validator_bitset << "\n";
@@ -1256,8 +1255,8 @@ namespace master_nodes
       stream << "  [" << +entry.voter_index << "] validator: ";
       if (quorum)
       {
-        stream << ((entry.voter_index >= quorum->validators.size()) ? "(invalid quorum index)" : lokimq::to_hex(tools::view_guts(quorum->validators[entry.voter_index])));
-        stream << ", signature: " << lokimq::to_hex(tools::view_guts(entry.signature));
+        stream << ((entry.voter_index >= quorum->validators.size()) ? "(invalid quorum index)" : oxenmq::to_hex(tools::view_guts(quorum->validators[entry.voter_index])));
+        stream << ", signature: " << oxenmq::to_hex(tools::view_guts(entry.signature));
       }
       else stream << "(invalid quorum)";
     }
@@ -1459,7 +1458,7 @@ namespace master_nodes
     //
     // NOTE: Verify the checkpoint given on this height that locks in a block in the past.
     //
-    if (block.major_version >= cryptonote::network_version_13_enforce_checkpoints && checkpoint)
+    if (block.major_version >= cryptonote::network_version_14_enforce_checkpoints && checkpoint)
     {
       std::vector<std::shared_ptr<const master_nodes::quorum>> alt_quorums;
       std::shared_ptr<const quorum> quorum = get_quorum(quorum_type::checkpointing, checkpoint->height, false, alt_block ? &alt_quorums : nullptr);
@@ -1495,7 +1494,7 @@ namespace master_nodes
     //
     pulse::timings timings = {};
     uint64_t height        = cryptonote::get_block_height(block);
-    if (block.major_version >= cryptonote::network_version_16_pulse)
+    if (block.major_version >= cryptonote::network_version_17_pulse)
     {
       uint64_t prev_timestamp = 0;
       if (alt_block)
@@ -1527,7 +1526,7 @@ namespace master_nodes
     //
     std::shared_ptr<const quorum>              pulse_quorum;
     std::vector<std::shared_ptr<const quorum>> alt_pulse_quorums;
-    bool pulse_hf = block.major_version >= cryptonote::network_version_16_pulse;
+    bool pulse_hf = block.major_version >= cryptonote::network_version_17_pulse;
 
     if (pulse_hf)
     {
@@ -1623,7 +1622,7 @@ namespace master_nodes
   static std::mt19937_64 quorum_rng(uint8_t hf_version, crypto::hash const &hash, quorum_type type)
   {
     std::mt19937_64 result;
-    if (hf_version >= cryptonote::network_version_16_pulse)
+    if (hf_version >= cryptonote::network_version_17_pulse)
     {
       std::array<uint32_t, (sizeof(hash) / sizeof(uint32_t)) + 1> src = {static_cast<uint32_t>(type)};
       std::memcpy(&src[1], &hash, sizeof(hash));
@@ -1692,7 +1691,7 @@ namespace master_nodes
     {
       cryptonote::block const &block = *it;
       crypto::hash hash              = {};
-      if (block.major_version >= cryptonote::network_version_16_pulse &&
+      if (block.major_version >= cryptonote::network_version_17_pulse &&
           cryptonote::block_has_pulse_components(block))
       {
         std::array<uint8_t, 1 + sizeof(block.pulse.random_value)> src = {pulse_round};
@@ -1865,7 +1864,7 @@ namespace master_nodes
     // (i.e. the nodes to be tested) also include decommissioned master nodes.  (Prior to v12 there
     // are no decommissioned nodes, so this distinction is irrelevant for network concensus).
     std::vector<pubkey_and_sninfo> decomm_mnode_list;
-    if (hf_version >= cryptonote::network_version_12_checkpointing)
+    if (hf_version >= cryptonote::network_version_13_checkpointing)
       decomm_mnode_list = state.decommissioned_master_nodes_infos();
 
     quorum_type const max_quorum_type = max_quorum_type_for_hf(hf_version);
@@ -1995,7 +1994,7 @@ namespace master_nodes
     //   i.e. before any deregistrations, registrations, decommissions, recommissions.
     //
     crypto::public_key winner_pubkey = cryptonote::get_master_node_winner_from_tx_extra(block.miner_tx.extra);
-    if (hf_version >= cryptonote::network_version_16_pulse)
+    if (hf_version >= cryptonote::network_version_17_pulse)
     {
       std::vector<crypto::hash> entropy = get_pulse_entropy_for_next_block(db, block.prev_id, block.pulse.round);
       quorum pulse_quorum = generate_pulse_quorum(nettype, winner_pubkey, hf_version, active_master_nodes_infos(), entropy, block.pulse.round);
@@ -2471,7 +2470,7 @@ namespace master_nodes
       return false;
     }
 
-    if (hf_version >= cryptonote::network_version_16_pulse)
+    if (hf_version >= cryptonote::network_version_17_pulse)
     {
       if (reward_parts.base_miner != 0)
       {
@@ -2494,7 +2493,7 @@ namespace master_nodes
 
         std::vector<uint64_t> split_rewards = cryptonote::distribute_reward_by_portions(block_leader.payouts,
                                                                                         reward_parts.master_node_total,
-                                                                                        hf_version >= cryptonote::network_version_16_pulse /*distribute_remainder*/);
+                                                                                        hf_version >= cryptonote::network_version_17_pulse /*distribute_remainder*/);
 
         for (size_t i = 0; i < block_leader.payouts.size(); i++)
         {
@@ -2748,7 +2747,7 @@ namespace master_nodes
     auto buf = tools::memcpy_le(proof.pubkey.data, proof.timestamp, proof.public_ip, proof.storage_port, proof.pubkey_ed25519.data, proof.qnet_port, proof.storage_lmq_port);
     size_t buf_size = buf.size();
 
-    if (hf_version < cryptonote::network_version_15_bns) // TODO - can be removed post-HF15
+    if (hf_version < cryptonote::network_version_16_bns) // TODO - can be removed post-HF15
       buf_size -= sizeof(proof.storage_lmq_port);
 
     crypto::hash result;
@@ -3580,60 +3579,70 @@ namespace master_nodes
   bool master_node_info::can_be_voted_on(uint64_t height) const
   {
     // If the MN expired and was reregistered since the height we'll be voting on it prematurely
-    if (!this->is_fully_funded() || this->registration_height >= height) return false;
-    if (this->is_decommissioned() && this->last_decommission_height >= height) return false;
-
-    if (this->is_active())
-    {
-      // NOTE: This cast is safe. The definition of is_active() is that active_since_height >= 0
-      assert(this->active_since_height >= 0);
-      if (static_cast<uint64_t>(this->active_since_height) >= height) return false;
+    if (!is_fully_funded()) {
+      MDEBUG("MN vote at height " << height << " invalid: not fully funded");
+      return false;
+    } else if (height <= registration_height) {
+      MDEBUG("MN vote at height " << height << " invalid: height <= reg height (" << registration_height << ")");
+      return false;
+    } else if (is_decommissioned() && height <= last_decommission_height) {
+      MDEBUG("MN vote at height " << height << " invalid: height <= last decomm height (" << last_decommission_height << ")");
+      return false;
+    } else if (is_active()) {
+      assert(active_since_height >= 0); // should be satisfied whenever is_active() is true
+      if (height <= static_cast<uint64_t>(active_since_height)) {
+        MDEBUG("MN vote at height " << height << " invalid: height <= active-since height (" << active_since_height << ")");
+        return false;
+      }
     }
 
+    MTRACE("SN vote at height " << height << " is valid.");
     return true;
   }
 
   bool master_node_info::can_transition_to_state(uint8_t hf_version, uint64_t height, new_state proposed_state) const
   {
-    if (hf_version >= cryptonote::network_version_13_enforce_checkpoints)
-    {
-      if (!can_be_voted_on(height))
+    if (hf_version >= cryptonote::network_version_14_enforce_checkpoints) {
+      if (!can_be_voted_on(height)) {
+        MDEBUG("MN state transition invalid: " << height << " is not a valid vote height");
         return false;
+      }
 
-      if (proposed_state == new_state::deregister)
-      {
-        if (height <= this->registration_height)
+      if (proposed_state == new_state::deregister) {
+        if (height <= registration_height) {
+          MDEBUG("MN deregister invalid: vote height (" << height << ") <= registration_height (" << registration_height << ")");
           return false;
-      }
-      else if (proposed_state == new_state::ip_change_penalty)
-      {
-        if (height <= this->last_ip_change_height)
+        }
+      } else if (proposed_state == new_state::ip_change_penalty) {
+        if (height <= last_ip_change_height) {
+          MDEBUG("SN ip change penality invalid: vote height (" << height << ") <= last_ip_change_height (" << last_ip_change_height << ")");
           return false;
+        }
       }
-
-      if (this->is_decommissioned())
-      {
-        return proposed_state != new_state::decommission && proposed_state != new_state::ip_change_penalty;
-      }
-
-      return (proposed_state != new_state::recommission);
-    }
-    else
-    {
-      if (proposed_state == new_state::deregister)
-      {
-        if (height < this->registration_height) return false;
-      }
-
-      if (this->is_decommissioned())
-      {
-        return proposed_state != new_state::decommission && proposed_state != new_state::ip_change_penalty;
-      }
-      else
-      {
-        return (proposed_state != new_state::recommission);
+    } else { // pre-HF13
+      if (proposed_state == new_state::deregister) {
+        if (height < registration_height) {
+          MDEBUG("MN deregister invalid: vote height (" << height << ") < registration_height (" << registration_height << ")");
+          return false;
+        }
       }
     }
+
+    if (is_decommissioned()) {
+      if (proposed_state == new_state::decommission) {
+        MDEBUG("MN decommission invalid: already decommissioned");
+        return false;
+      } else if (proposed_state == new_state::ip_change_penalty) {
+        MDEBUG("MN ip change penalty invalid: currently decommissioned");
+        return false;
+      }
+      return true; // recomm or dereg
+    } else if (proposed_state == new_state::recommission) {
+      MDEBUG("MN recommission invalid: not recommissioned");
+      return false;
+    }
+    MTRACE("SN state change is valid");
+    return true;
   }
 
   payout master_node_info_to_payout(crypto::public_key const &key, master_node_info const &info)

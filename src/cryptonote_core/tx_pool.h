@@ -44,7 +44,6 @@
 #include "blockchain_db/blockchain_db.h"
 #include "crypto/hash.h"
 #include "rpc/core_rpc_server_commands_defs.h"
-#include "rpc/message_data_structs.h"
 #include "tx_blink.h"
 #include "beldex_economy.h"
 
@@ -90,7 +89,7 @@ namespace cryptonote
       o.do_not_relay = !approved;
       o.approved_blink = approved;
       o.fee_percent = BLINK_MINER_TX_FEE_PERCENT;
-      o.burn_percent = hf_version <= network_version_14_blink ? BLINK_BURN_TX_FEE_PERCENT_OLD : BLINK_BURN_TX_FEE_PERCENT;
+      o.burn_percent = hf_version <= network_version_15_blink ? BLINK_BURN_TX_FEE_PERCENT_OLD : BLINK_BURN_TX_FEE_PERCENT;
       o.burn_fixed = BLINK_BURN_FIXED;
       return o;
     }
@@ -441,18 +440,6 @@ namespace cryptonote
      * @return true
      */
     bool get_transactions_and_spent_keys_info(std::vector<rpc::tx_info>& tx_infos, std::vector<rpc::spent_key_image_info>& key_image_infos, std::function<void(const transaction& tx, rpc::tx_info&)> post_process = nullptr, bool include_sensitive_data = true) const;
-
-    /**
-     * @brief get information about all transactions and key images in the pool
-     *
-     * see documentation on tx_in_pool and key_images_with_tx_hashes for more details
-     *
-     * @param tx_infos [out] the transactions' information
-     * @param key_image_infos [out] the spent key images' information
-     *
-     * @return true
-     */
-    bool get_pool_for_rpc(std::vector<cryptonote::rpc::tx_in_pool>& tx_infos, cryptonote::rpc::key_images_with_tx_hashes& key_image_infos) const;
 
     /**
      * @brief check for presence of key images in the pool

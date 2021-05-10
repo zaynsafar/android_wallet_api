@@ -13,9 +13,9 @@
 #include "cryptonote_core/blockchain.h"
 #include "beldex_economy.h"
 
-#include <lokimq/hex.h>
-#include <lokimq/base32z.h>
-#include <lokimq/base64.h>
+#include <oxenmq/hex.h>
+#include <oxenmq/base32z.h>
+#include <oxenmq/base64.h>
 
 #include <sqlite3.h>
 
@@ -105,7 +105,7 @@ std::string bns::mapping_value::to_readable_value(cryptonote::network_type netty
   std::string result;
   if (is_beldexnet_type(type))
   {
-    result = lokimq::to_base32z(to_view()) + ".beldex";
+    result = oxenmq::to_base32z(to_view()) + ".beldex";
   }
   else if (type == bns::mapping_type::wallet)
   {
@@ -120,7 +120,7 @@ std::string bns::mapping_value::to_readable_value(cryptonote::network_type netty
   }
   else
   {
-    result = lokimq::to_hex(to_view());
+    result = oxenmq::to_hex(to_view());
   }
 
   return result;
@@ -608,9 +608,9 @@ sqlite3 *init_beldex_name_system(const fs::path& file_path, bool read_only)
 std::vector<mapping_type> all_mapping_types(uint8_t hf_version) {
   std::vector<mapping_type> result;
   result.reserve(2);
-  if (hf_version >= cryptonote::network_version_15_bns)
+  if (hf_version >= cryptonote::network_version_16_bns)
     result.push_back(mapping_type::session);
-  if (hf_version >= cryptonote::network_version_16_pulse)
+  if (hf_version >= cryptonote::network_version_17_pulse)
     result.push_back(mapping_type::beldexnet);
   return result;
 }
@@ -639,64 +639,32 @@ std::optional<uint64_t> expiry_blocks(cryptonote::network_type nettype, mapping_
   return result;
 }
 
-static uint8_t *memcpy_helper(uint8_t *dest, void const *src, size_t size)
+static void append_owner(std::string& buffer, const bns::generic_owner* owner)
 {
-  std::memcpy(dest, src, size);
-  return dest + size;
-}
-
-static uint8_t *memcpy_generic_owner_helper(uint8_t *dest, bns::generic_owner const *owner)
-{
-  if (!owner) return dest;
-
-  uint8_t *result = memcpy_helper(dest, reinterpret_cast<uint8_t const *>(&owner->type), sizeof(owner->type));
-  void const *src = &owner->wallet.address;
-  size_t src_len  = sizeof(owner->wallet.address);
-  if (owner->type == bns::generic_owner_sig_type::ed25519)
-  {
-    src     = &owner->ed25519;
-    src_len = sizeof(owner->ed25519);
+  if (owner) {
+    buffer += static_cast<char>(owner->type);
+    buffer += owner->type == bns::generic_owner_sig_type::ed25519
+        ? tools::view_guts(owner->ed25519)
+        : tools::view_guts(owner->wallet.address);
   }
-
-  result = memcpy_helper(result, src, src_len);
-  return result;
 }
 
-crypto::hash tx_extra_signature_hash(std::string_view value, bns::generic_owner const *owner, bns::generic_owner const *backup_owner, crypto::hash const &prev_txid)
+std::string tx_extra_signature(std::string_view value, bns::generic_owner const *owner, bns::generic_owner const *backup_owner, crypto::hash const &prev_txid)
 {
   static_assert(sizeof(crypto::hash) == crypto_generichash_BYTES, "Using libsodium generichash for signature hash, require we fit into crypto::hash");
-  crypto::hash result = {};
   if (value.size() > mapping_value::BUFFER_SIZE)
   {
     MERROR("Unexpected value len=" << value.size() << " greater than the expected capacity=" << mapping_value::BUFFER_SIZE);
-    return result;
+    return ""s;
   }
 
-  uint8_t buffer[mapping_value::BUFFER_SIZE + sizeof(*owner) + sizeof(*backup_owner) + sizeof(prev_txid)] = {};
-  uint8_t *ptr = memcpy_helper(buffer, value.data(), value.size());
-  ptr          = memcpy_generic_owner_helper(ptr, owner);
-  ptr          = memcpy_generic_owner_helper(ptr, backup_owner);
-  ptr          = memcpy_helper(ptr, prev_txid.data, sizeof(prev_txid));
+  std::string result;
+  result.reserve(mapping_value::BUFFER_SIZE + sizeof(*owner) + sizeof(*backup_owner) + sizeof(prev_txid));
+  result += value;
+  append_owner(result, owner);
+  append_owner(result, backup_owner);
+  result += tools::view_guts(prev_txid);
 
-  if (ptr > (buffer + sizeof(buffer)))
-  {
-    assert(ptr < buffer + sizeof(buffer));
-    MERROR("Unexpected buffer overflow");
-    return {};
-  }
-
-  size_t buffer_len  = ptr - buffer;
-  static_assert(sizeof(owner->type) == sizeof(char), "Require byte alignment to avoid unaligned access exceptions");
-
-  crypto_generichash(reinterpret_cast<unsigned char *>(result.data), sizeof(result), buffer, buffer_len, NULL /*key*/, 0 /*key_len*/);
-  return result;
-}
-
-bns::generic_signature make_monero_signature(crypto::hash const &hash, crypto::public_key const &pkey, crypto::secret_key const &skey)
-{
-  bns::generic_signature result = {};
-  result.type                   = bns::generic_owner_sig_type::monero;
-  generate_signature(hash, pkey, skey, result.monero);
   return result;
 }
 
@@ -733,9 +701,9 @@ bool parse_owner_to_generic_owner(cryptonote::network_type nettype, std::string_
   {
     result = bns::make_monero_owner(parsed_addr.address, parsed_addr.is_subaddress);
   }
-  else if (owner.size() == 2*sizeof(ed_owner.data) && lokimq::is_hex(owner))
+  else if (owner.size() == 2*sizeof(ed_owner.data) && oxenmq::is_hex(owner))
   {
-    lokimq::from_hex(owner.begin(), owner.end(), ed_owner.data);
+    oxenmq::from_hex(owner.begin(), owner.end(), ed_owner.data);
     result = bns::make_ed25519_owner(ed_owner);
   }
   else
@@ -896,7 +864,7 @@ static bool check_lengths(mapping_type type, std::string_view value, size_t max,
     {
       std::stringstream err_stream;
       err_stream << "BNS type=" << type << ", specifies mapping from name_hash->encrypted_value where the value's length=" << value.size() << ", does not equal the required length=" << max << ", given value=";
-      if (binary_val) err_stream << lokimq::to_hex(value);
+      if (binary_val) err_stream << oxenmq::to_hex(value);
       else            err_stream << value;
       *reason = err_stream.str();
     }
@@ -944,14 +912,14 @@ bool mapping_value::validate(cryptonote::network_type nettype, mapping_type type
     // We need a 52 char base32z string that decodes to a 32-byte value, which really means we need
     // 51 base32z chars (=255 bits) followed by a 1-bit value ('y'=0, or 'o'=0b10000); anything else
     // in the last spot isn't a valid beldexnet address.
-    if (check_condition(value.size() != 57 || !tools::ends_with(value, ".beldex") || !lokimq::is_base32z(value.substr(0, 52)) || !(value[51] == 'y' || value[51] == 'o'),
+    if (check_condition(value.size() != 57 || !tools::ends_with(value, ".beldex") || !oxenmq::is_base32z(value.substr(0, 52)) || !(value[51] == 'y' || value[51] == 'o'),
                 reason, "'", value, "' is not a valid beldexnet address"))
       return false;
 
     if (blob)
     {
       blob->len = sizeof(crypto::ed25519_public_key);
-      lokimq::from_base32z(value.begin(), value.begin() + 52, blob->buffer.begin());
+      oxenmq::from_base32z(value.begin(), value.begin() + 52, blob->buffer.begin());
     }
   }
   else
@@ -961,7 +929,7 @@ bool mapping_value::validate(cryptonote::network_type nettype, mapping_type type
     if (check_condition(value.size() != 2*SESSION_PUBLIC_KEY_BINARY_LENGTH, reason, "The value=", value, " is not the required ", 2*SESSION_PUBLIC_KEY_BINARY_LENGTH, "-character hex string session public key, length=", value.size()))
       return false;
 
-    if (check_condition(!lokimq::is_hex(value), reason, ", specifies name -> value mapping where the value is not a hex string given value="))
+    if (check_condition(!oxenmq::is_hex(value), reason, ", specifies name -> value mapping where the value is not a hex string given value="))
       return false;
 
     // NOTE: Session public keys are 33 bytes, with the first byte being 0x05 and the remaining 32 being the public key.
@@ -972,7 +940,7 @@ bool mapping_value::validate(cryptonote::network_type nettype, mapping_type type
     {
       blob->len = value.size() / 2;
       assert(blob->len <= blob->buffer.size());
-      lokimq::from_hex(value.begin(), value.end(), blob->buffer.begin());
+      oxenmq::from_hex(value.begin(), value.end(), blob->buffer.begin());
 
     }
   }
@@ -1024,17 +992,17 @@ std::string name_hash_bytes_to_base64(std::string_view bytes)
 {
   if (bytes.size() != NAME_HASH_SIZE)
     throw std::runtime_error{"Invalid name hash: expected exactly 32 bytes"};
-  return lokimq::to_base64(bytes);
+  return oxenmq::to_base64(bytes);
 }
 
 std::optional<std::string> name_hash_input_to_base64(std::string_view input)
 {
   if (input.size() == NAME_HASH_SIZE)
     return name_hash_bytes_to_base64(input);
-  if (input.size() == 2*NAME_HASH_SIZE && lokimq::is_hex(input))
-    return name_hash_bytes_to_base64(lokimq::from_hex(input));
-  if (input.size() >= NAME_HASH_SIZE_B64_MIN && input.size() <= NAME_HASH_SIZE_B64_MAX && lokimq::is_base64(input)) {
-    std::string tmp = lokimq::from_base64(input);
+  if (input.size() == 2*NAME_HASH_SIZE && oxenmq::is_hex(input))
+    return name_hash_bytes_to_base64(oxenmq::from_hex(input));
+  if (input.size() >= NAME_HASH_SIZE_B64_MIN && input.size() <= NAME_HASH_SIZE_B64_MAX && oxenmq::is_base64(input)) {
+    std::string tmp = oxenmq::from_base64(input);
     if (tmp.size() == NAME_HASH_SIZE) // Could still be off from too much/too little padding
       return name_hash_bytes_to_base64(tmp);
   }
@@ -1091,21 +1059,21 @@ static bool validate_against_previous_mapping(bns::name_system_db &bns_db, uint6
       return false;
 
     // Validate signature
-    {
-      crypto::hash hash = tx_extra_signature_hash(bns_extra.encrypted_value,
-                                                  bns_extra.field_is_set(bns::extra_field::owner) ? &bns_extra.owner : nullptr,
-                                                  bns_extra.field_is_set(bns::extra_field::backup_owner) ? &bns_extra.backup_owner : nullptr,
-                                                  expected_prev_txid);
-      if (check_condition(!hash, reason, tx, ", ", bns_extra_string(bns_db.network_type(), bns_extra), " unexpectedly failed to generate signature hash, please inform the Beldex developers"))
-        return false;
+    auto data = tx_extra_signature(
+        bns_extra.encrypted_value,
+        bns_extra.field_is_set(bns::extra_field::owner) ? &bns_extra.owner : nullptr,
+        bns_extra.field_is_set(bns::extra_field::backup_owner) ? &bns_extra.backup_owner : nullptr,
+        expected_prev_txid);
+    if (check_condition(data.empty(), reason, tx, ", ", bns_extra_string(bns_db.network_type(), bns_extra), " unexpectedly failed to generate signature, please inform the Beldex developers"))
+      return false;
 
-      if (check_condition(!verify_bns_signature(hash, bns_extra.signature, mapping.owner) &&
-                          !verify_bns_signature(hash, bns_extra.signature, mapping.backup_owner), reason,
-                          tx, ", ", bns_extra_string(bns_db.network_type(), bns_extra), " failed to verify signature for BNS update, current owner=", mapping.owner.to_string(bns_db.network_type()), ", backup owner=", mapping.backup_owner.to_string(bns_db.network_type())))
-      {
-        return false;
-      }
-    }
+    crypto::hash hash;
+    crypto_generichash(reinterpret_cast<unsigned char*>(hash.data), sizeof(hash), reinterpret_cast<const unsigned char*>(data.data()), data.size(), nullptr /*key*/, 0 /*key_len*/);
+
+    if (check_condition(!verify_bns_signature(hash, bns_extra.signature, mapping.owner) &&
+                        !verify_bns_signature(hash, bns_extra.signature, mapping.backup_owner), reason,
+                        tx, ", ", bns_extra_string(bns_db.network_type(), bns_extra), " failed to verify signature for BNS update, current owner=", mapping.owner.to_string(bns_db.network_type()), ", backup owner=", mapping.backup_owner.to_string(bns_db.network_type())))
+      return false;
   }
   else if (bns_extra.is_buying())
   {
@@ -1236,7 +1204,7 @@ bool validate_mapping_type(std::string_view mapping_type_str, uint8_t hf_version
   std::optional<bns::mapping_type> mapping_type_;
   if (txtype != bns_tx_type::renew && tools::string_iequal(mapping, "session"))
     mapping_type_ = bns::mapping_type::session;
-  else if (hf_version >= cryptonote::network_version_16_pulse)
+  else if (hf_version >= cryptonote::network_version_17_pulse)
   {
     if (tools::string_iequal(mapping, "beldexnet"))
       mapping_type_ = bns::mapping_type::beldexnet;
@@ -1614,7 +1582,7 @@ scoped_db_transaction::~scoped_db_transaction()
   if (!initialised) return;
   if (!bns_db.transaction_begun)
   {
-    MERROR("Trying to apply non-existent transaction (no prior history of a db transaction beginning) to the bns DB");
+    MERROR("Trying to apply non-existent transaction (no prior history of a db transaction beginning) to the BNS DB");
     return;
   }
 
@@ -2011,7 +1979,7 @@ bool name_system_db::add_block(const cryptonote::block &block, const std::vector
    return false;
 
   bool bns_parsed_from_block = false;
-  if (block.major_version >= cryptonote::network_version_15_bns)
+  if (block.major_version >= cryptonote::network_version_16_bns)
   {
     for (cryptonote::transaction const &tx : txs)
     {
@@ -2152,7 +2120,7 @@ owner_record name_system_db::get_owner_by_id(int64_t owner_id)
 
 mapping_record name_system_db::get_mapping(mapping_type type, std::string_view name_base64_hash, std::optional<uint64_t> blockchain_height)
 {
-  assert(name_base64_hash.size() == 44 && name_base64_hash.back() == '=' && lokimq::is_base64(name_base64_hash));
+  assert(name_base64_hash.size() == 44 && name_base64_hash.back() == '=' && oxenmq::is_base64(name_base64_hash));
   mapping_record result = {};
   result.loaded         = bind_and_run(bns_sql_type::get_mapping, get_mapping_sql, &result,
       db_mapping_type(type), name_base64_hash);
@@ -2163,7 +2131,7 @@ mapping_record name_system_db::get_mapping(mapping_type type, std::string_view n
 
 std::optional<mapping_value> name_system_db::resolve(mapping_type type, std::string_view name_hash_b64, uint64_t blockchain_height)
 {
-  assert(name_hash_b64.size() == 44 && name_hash_b64.back() == '=' && lokimq::is_base64(name_hash_b64));
+  assert(name_hash_b64.size() == 44 && name_hash_b64.back() == '=' && oxenmq::is_base64(name_hash_b64));
   std::optional<mapping_value> result;
   bind_all(resolve_sql, db_mapping_type(type), name_hash_b64, blockchain_height);
   if (step(resolve_sql) == SQLITE_ROW)
@@ -2184,7 +2152,7 @@ std::optional<mapping_value> name_system_db::resolve(mapping_type type, std::str
 
 std::vector<mapping_record> name_system_db::get_mappings(std::vector<mapping_type> const &types, std::string_view name_base64_hash, std::optional<uint64_t> blockchain_height)
 {
-  assert(name_base64_hash.size() == 44 && name_base64_hash.back() == '=' && lokimq::is_base64(name_base64_hash));
+  assert(name_base64_hash.size() == 44 && name_base64_hash.back() == '=' && oxenmq::is_base64(name_base64_hash));
   std::vector<mapping_record> result;
   if (types.empty())
     return result;

@@ -32,7 +32,7 @@
 #include <atomic>
 #include <boost/algorithm/string.hpp>
 #include <limits>
-#include <lokimq/hex.h>
+#include <oxenmq/hex.h>
 #include <variant>
 #include "common/hex.h"
 #include "epee/wipeable_string.h"
@@ -134,7 +134,7 @@ namespace cryptonote
     if (tx.version >= txversion::v2_ringct && !is_coinbase(tx))
     {
       rct::rctSig &rv = tx.rct_signatures;
-      if (rv.type == rct::RCTTypeNull)
+      if (rv.type == rct::RCTType::Null)
         return true;
       if (rv.outPk.size() != tx.vout.size())
       {
@@ -452,7 +452,7 @@ namespace cryptonote
   {
     CHECK_AND_ASSERT_MES(tx.pruned, std::numeric_limits<uint64_t>::max(), "get_pruned_transaction_weight does not support non pruned txes");
     CHECK_AND_ASSERT_MES(tx.version >= txversion::v2_ringct, std::numeric_limits<uint64_t>::max(), "get_pruned_transaction_weight does not support v1 txes");
-    CHECK_AND_ASSERT_MES(tx.rct_signatures.type >= rct::RCTTypeBulletproof2,
+    CHECK_AND_ASSERT_MES(tx.rct_signatures.type >= rct::RCTType::Bulletproof2,
         std::numeric_limits<uint64_t>::max(), "get_pruned_transaction_weight does not support older range proof types");
     CHECK_AND_ASSERT_MES(!tx.vin.empty(), std::numeric_limits<uint64_t>::max(), "empty vin");
     CHECK_AND_ASSERT_MES(std::holds_alternative<cryptonote::txin_to_key>(tx.vin[0]), std::numeric_limits<uint64_t>::max(), "empty vin");
@@ -473,7 +473,7 @@ namespace cryptonote
 
     // calculate deterministic CLSAG/MLSAG data size
     const size_t ring_size = var::get<cryptonote::txin_to_key>(tx.vin[0]).key_offsets.size();
-    if (tx.rct_signatures.type == rct::RCTTypeCLSAG)
+    if (tx.rct_signatures.type == rct::RCTType::CLSAG)
       extra = tx.vin.size() * (ring_size + 2) * 32;
     else
       extra = tx.vin.size() * (ring_size * (1 + 1) * 32 + 32 /* cc */);
@@ -546,7 +546,7 @@ namespace cryptonote
     try {
       serialization::deserialize_all(ar, tx_extra_fields);
     } catch (const std::exception& e) {
-      MWARNING(__func__ << ": failed to deserialize extra field: " << e.what() << "; extra = " << lokimq::to_hex(tx_extra.begin(), tx_extra.end()));
+      MWARNING(__func__ << ": failed to deserialize extra field: " << e.what() << "; extra = " << oxenmq::to_hex(tx_extra.begin(), tx_extra.end()));
       return false;
     }
 
@@ -645,7 +645,7 @@ namespace cryptonote
   bool add_master_node_state_change_to_tx_extra(std::vector<uint8_t>& tx_extra, const tx_extra_master_node_state_change& state_change, const uint8_t hf_version)
   {
     tx_extra_field field;
-    if (hf_version < network_version_12_checkpointing)
+    if (hf_version < network_version_13_checkpointing)
     {
       CHECK_AND_ASSERT_MES(state_change.state == master_nodes::new_state::deregister, false, "internal error: cannot construct an old deregistration for a non-deregistration state change (before hardfork v12)");
       field = tx_extra_master_node_deregister_old{state_change};
@@ -763,7 +763,7 @@ namespace cryptonote
   //---------------------------------------------------------------
   bool get_master_node_state_change_from_tx_extra(const std::vector<uint8_t>& tx_extra, tx_extra_master_node_state_change &state_change, const uint8_t hf_version)
   {
-    if (hf_version >= cryptonote::network_version_12_checkpointing) {
+    if (hf_version >= cryptonote::network_version_13_checkpointing) {
       // Look for a new-style state change field:
       return get_field_from_tx_extra(tx_extra, state_change);
     }
@@ -811,7 +811,7 @@ namespace cryptonote
           value(newar, field);
       } while (ar.remaining_bytes() > 0);
     } catch (const std::exception& e) {
-      LOG_PRINT_L1(__func__ << ": failed to deserialize extra field: " << e.what() << "; extra = " << lokimq::to_hex(tx_extra.begin(), tx_extra.end()));
+      LOG_PRINT_L1(__func__ << ": failed to deserialize extra field: " << e.what() << "; extra = " << oxenmq::to_hex(tx_extra.begin(), tx_extra.end()));
       return false;
     }
 
@@ -973,7 +973,7 @@ namespace cryptonote
   //---------------------------------------------------------------
   std::string short_hash_str(const crypto::hash& h)
   {
-    return lokimq::to_hex(tools::view_guts(h).substr(0, 4)) + "....";
+    return oxenmq::to_hex(tools::view_guts(h).substr(0, 4)) + "....";
   }
   //---------------------------------------------------------------
   bool is_out_to_acc(const account_keys& acc, const txout_to_key& out_key, const crypto::public_key& tx_pub_key, const std::vector<crypto::public_key>& additional_tx_pub_keys, size_t output_index)
@@ -1105,7 +1105,7 @@ namespace cryptonote
     if (tvc.m_fee_too_low)               os << "Fee too low, ";
     if (tvc.m_invalid_version)           os << "TX has invalid version, ";
     if (tvc.m_invalid_type)              os << "TX has invalid type, ";
-    if (tvc.m_key_image_locked_by_mnode) os << "Key image is locked by master node, ";
+    if (tvc.m_key_image_locked_by_snode) os << "Key image is locked by master node, ";
     if (tvc.m_key_image_blacklisted)     os << "Key image is blacklisted on the master node network, ";
 
     if (tx)
@@ -1185,15 +1185,13 @@ namespace cryptonote
     }
     else
     {
-      transaction &tt = const_cast<transaction&>(t);
       serialization::binary_string_archiver ba;
-      const size_t inputs = t.vin.size();
-      const size_t outputs = t.vout.size();
       size_t mixin = 0;
       if (t.vin.size() > 0 && std::holds_alternative<txin_to_key>(t.vin[0]))
         mixin = var::get<txin_to_key>(t.vin[0]).key_offsets.size() - 1;
       try {
-        tt.rct_signatures.p.serialize_rctsig_prunable(ba, t.rct_signatures.type, inputs, outputs, mixin);
+        const_cast<transaction&>(t).rct_signatures.p.serialize_rctsig_prunable(
+                ba, t.rct_signatures.type, t.vin.size(), t.vout.size(), mixin);
       } catch (const std::exception& e) {
         LOG_ERROR("Failed to serialize rct signatures (prunable): " << e.what());
         return false;
@@ -1234,7 +1232,7 @@ namespace cryptonote
     }
 
     // prunable rct
-    if (t.rct_signatures.type == rct::RCTTypeNull)
+    if (t.rct_signatures.type == rct::RCTType::Null)
       hashes[2] = crypto::null_hash;
     else
       hashes[2] = pruned_data_hash;
@@ -1289,7 +1287,7 @@ namespace cryptonote
     }
 
     // prunable rct
-    if (t.rct_signatures.type == rct::RCTTypeNull)
+    if (t.rct_signatures.type == rct::RCTType::Null)
     {
       hashes[2] = crypto::null_hash;
     }

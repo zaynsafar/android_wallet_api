@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2019, The Monero Project
+// Copyright (c) 2014-2018, The Monero Project
 // Copyright (c)      2018, The Beldex Project
 //
 // All rights reserved.
@@ -127,7 +127,7 @@ namespace cryptonote {
     timestamps.push_back(timestamp);
     difficulties.push_back(cumulative_difficulty);
 
-    static const uint64_t hf16_height = HardFork::get_hardcoded_hard_fork_height(nettype, cryptonote::network_version_16_pulse);
+    static const uint64_t hf16_height = HardFork::get_hardcoded_hard_fork_height(nettype, cryptonote::network_version_17_pulse);
     bool const before_hf16            = chain_height < hf16_height;
 
     // Trim down arrays
@@ -158,15 +158,15 @@ namespace cryptonote {
   // Do not use "if solvetime < 1 then solvetime = 1" which allows a catastrophic exploit.
   // Do not sort timestamps.  "Solvetimes" and "LWMA" variables must allow negatives.
   // Do not use MTP as most recent block.  Do not use (POW)Limits, filtering, or tempering.
-  // Do not forget to set N (aka DIFFICULTY_WINDOW in Cryptonote) to recommendation below.
+  // Do not forget to set N (aka DIFFICULTY_WINDOW_V2 in Cryptonote) to recommendation below.
   // The nodes' future time limit (FTL) aka CRYPTONOTE_BLOCK_FUTURE_TIME_LIMIT needs to
   // be reduced from 60*60*2 to 500 seconds to prevent timestamp manipulation from miner's with 
   //  > 50% hash power.  If this is too small, it can be increased to 1000 at a cost in protection.
 
   difficulty_calc_mode difficulty_mode(cryptonote::network_type nettype, uint8_t hf_version, uint64_t height)
   {
-    static const uint64_t hf12_height = cryptonote::HardFork::get_hardcoded_hard_fork_height(nettype, cryptonote::network_version_12_checkpointing);
-    static const uint64_t hf16_height = cryptonote::HardFork::get_hardcoded_hard_fork_height(nettype, cryptonote::network_version_16_pulse);
+    static const uint64_t hf12_height = cryptonote::HardFork::get_hardcoded_hard_fork_height(nettype, cryptonote::network_version_13_checkpointing);
+    static const uint64_t hf16_height = cryptonote::HardFork::get_hardcoded_hard_fork_height(nettype, cryptonote::network_version_17_pulse);
     auto result = difficulty_calc_mode::normal;
 
     if (hf_version <= cryptonote::network_version_9_master_nodes)

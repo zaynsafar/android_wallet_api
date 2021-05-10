@@ -68,7 +68,7 @@ namespace cryptonote {
     bool bitset        = blk_header.pulse.validator_bitset > 0;
     bool random_value  = !(blk_header.pulse.random_value == empty_random_value);
     uint8_t hf_version = blk_header.major_version;
-    bool result        = hf_version >= cryptonote::network_version_16_pulse && (bitset || random_value);
+    bool result        = hf_version >= cryptonote::network_version_17_pulse && (bitset || random_value);
     return result;
   }
   //-----------------------------------------------------------------------------------------------
@@ -77,7 +77,7 @@ namespace cryptonote {
     bool signatures    = blk.signatures.size();
     uint8_t hf_version = blk.major_version;
     bool result =
-        (hf_version >= cryptonote::network_version_16_pulse && signatures) || block_header_has_pulse_components(blk);
+        (hf_version >= cryptonote::network_version_17_pulse && signatures) || block_header_has_pulse_components(blk);
     return result;
   }
   //-----------------------------------------------------------------------------------------------
@@ -92,14 +92,17 @@ namespace cryptonote {
   }
   //-----------------------------------------------------------------------------------------------
   // TODO(beldex): Move into beldex_economy, this will require access to beldex::exp2
-  uint64_t block_reward_unpenalized_formula_v7(uint64_t already_generated_coins, uint64_t height)
+  uint64_t block_reward_unpenalized_formula_v7(uint8_t version, uint64_t already_generated_coins, uint64_t height)
   {
-    uint64_t emission_supply_component = (already_generated_coins * EMISSION_SUPPLY_MULTIPLIER) / EMISSION_SUPPLY_DIVISOR;
-    uint64_t result = (EMISSION_LINEAR_BASE - emission_supply_component) / EMISSION_DIVISOR;
+    const int target = version < 2 ? DIFFICULTY_TARGET_V1 : DIFFICULTY_TARGET_V2;
+    const int target_minutes = target / 60;
+      const int emission_speed_factor = EMISSION_SPEED_FACTOR_PER_MINUTE - (target_minutes-1);
 
-    // Check if we just overflowed
-    if (emission_supply_component > EMISSION_LINEAR_BASE)
-      result = 0;
+      uint64_t result = (MONEY_SUPPLY - already_generated_coins) >> emission_speed_factor;
+      if (result < FINAL_SUBSIDY_PER_MINUTE*target_minutes)
+      {
+        result = FINAL_SUBSIDY_PER_MINUTE*target_minutes;
+      }
     return result;
   }
 
@@ -119,18 +122,18 @@ namespace cryptonote {
       return true;
     }
 
-	  if(height>=56500)
-	  {
-		  reward = COIN * 2;
-		  return true;
-	  }
-	  static_assert((TARGET_BLOCK_TIME % 1min) == 0s, "difficulty targets must be a multiple of a minute");
+	if(height>=56500)
+	{
+		reward = COIN * 2;
+		return true;
+	}
+	static_assert(TARGET_BLOCK_TIME % 1 == 0s, "difficulty targets must be a multiple of 60");
 
     uint64_t base_reward =
-      version >= network_version_17 ? BLOCK_REWARD_HF17 :
-      version >= network_version_15_bns ? BLOCK_REWARD_HF15 :
-      version >= network_version_8  ? block_reward_unpenalized_formula_v8(height) :
-        block_reward_unpenalized_formula_v7(already_generated_coins, height);
+      version >= network_version_18 ? BLOCK_REWARD_HF18 :
+      version >= network_version_16_bns ? BLOCK_REWARD_HF16 :
+        version >= network_version_8  ? block_reward_unpenalized_formula_v8(height) :
+        block_reward_unpenalized_formula_v7(version, already_generated_coins, height);
 
     uint64_t full_reward_zone = get_min_block_weight(version);
 

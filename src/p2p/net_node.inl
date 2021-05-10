@@ -610,9 +610,8 @@ namespace nodetool
     std::set<std::string> full_addrs;
     if (nettype == cryptonote::TESTNET)
     {
-		full_addrs.insert("35.237.127.119:29090");
-        full_addrs.insert("35.211.199.127:29090");
-        full_addrs.insert("35.237.54.104:29090");
+		full_addrs.insert("35.196.91.135:29090");
+        full_addrs.insert("35.244.62.222:29090");
     }
     else if (nettype == cryptonote::DEVNET)
     {
@@ -906,7 +905,8 @@ namespace nodetool
   {
     TRY_ENTRY();
 
-    if (!tools::create_directories_if_necessary(m_config_folder))
+    std::error_code ec;
+    if (fs::create_directories(m_config_folder); ec)
     {
       MWARNING("Failed to create data directory " << m_config_folder);
       return false;
@@ -1005,15 +1005,15 @@ namespace nodetool
         // move
         if(rsp.node_data.peer_id == zone.m_config.m_peer_id)
         {
-          LOG_WARNING_CC(context, "Connection to self detected, dropping connection");
+          LOG_DEBUG_CC(context, "Connection to self detected, dropping connection");
           hsh_result = false;
           return;
         }
         LOG_INFO_CC(context, "New connection handshaked, pruning seed " << epee::string_tools::to_string_hex(context.m_pruning_seed));
-        LOG_WARNING_CC(context, " COMMAND_HANDSHAKE INVOKED OK");
+        LOG_DEBUG_CC(context, " COMMAND_HANDSHAKE INVOKED OK");
       }else
       {
-        LOG_WARNING_CC(context, " COMMAND_HANDSHAKE(AND CLOSE) INVOKED OK");
+        LOG_DEBUG_CC(context, " COMMAND_HANDSHAKE(AND CLOSE) INVOKED OK");
       }
       context_ = context;
     }, P2P_DEFAULT_HANDSHAKE_INVOKE_TIMEOUT);

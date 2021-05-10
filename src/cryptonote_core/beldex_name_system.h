@@ -6,7 +6,7 @@
 #include "epee/span.h"
 #include "cryptonote_basic/tx_extra.h"
 #include "common/fs.h"
-#include <lokimq/hex.h>
+#include <oxenmq/hex.h>
 
 #include <cassert>
 #include <string>
@@ -28,8 +28,8 @@ namespace bns
 
 constexpr size_t WALLET_NAME_MAX                  = 97; // mainnet addresses are 95 but testnet/devnet are 97
 constexpr size_t WALLET_ACCOUNT_BINARY_LENGTH     = 2 * sizeof(crypto::public_key);
-constexpr size_t BELDEXNET_DOMAIN_NAME_MAX          = 63 + 5; // DNS components name must be at most 63 (+ 5 for .beldex); this limit applies if there is at least one hyphen (and thus includes punycode)
-constexpr size_t BELDEXNET_DOMAIN_NAME_MAX_NOHYPHEN = 32 + 5; // If the name does not contain a - then we restrict it to 32 characters so that it cannot be (and is obviously not) an encoded .beldex address (52 characters)
+constexpr size_t BELDEXNET_DOMAIN_NAME_MAX          = 63 + 5; // DNS components name must be at most 63 (+ 5 for .loki); this limit applies if there is at least one hyphen (and thus includes punycode)
+constexpr size_t BELDEXNET_DOMAIN_NAME_MAX_NOHYPHEN = 32 + 5; // If the name does not contain a - then we restrict it to 32 characters so that it cannot be (and is obviously not) an encoded .loki address (52 characters)
 constexpr size_t BELDEXNET_ADDRESS_BINARY_LENGTH    = sizeof(crypto::ed25519_public_key);
 constexpr size_t SESSION_DISPLAY_NAME_MAX         = 64;
 constexpr size_t SESSION_PUBLIC_KEY_BINARY_LENGTH = 1 + sizeof(crypto::ed25519_public_key); // Session keys at prefixed with 0x05 + ed25519 key
@@ -104,7 +104,7 @@ struct mapping_value
   // mapping_value, ready for decryption via decrypt().
   static bool validate_encrypted(mapping_type type, std::string_view value, mapping_value *blob = nullptr, std::string *reason = nullptr);
 };
-inline std::ostream &operator<<(std::ostream &os, mapping_value const &v) { return os << lokimq::to_hex(v.to_view()); }
+inline std::ostream &operator<<(std::ostream &os, mapping_value const &v) { return os << oxenmq::to_hex(v.to_view()); }
 
 inline std::string_view mapping_type_str(mapping_type type)
 {
@@ -122,8 +122,8 @@ inline std::string_view mapping_type_str(mapping_type type)
 inline std::ostream &operator<<(std::ostream &os, mapping_type type) { return os << mapping_type_str(type); }
 
 constexpr bool mapping_type_allowed(uint8_t hf_version, mapping_type type) {
-  return (type == mapping_type::session && hf_version >= cryptonote::network_version_15_bns)
-      || (is_beldexnet_type(type) && hf_version >= cryptonote::network_version_16_pulse);
+  return (type == mapping_type::session && hf_version >= cryptonote::network_version_16_bns)
+      || (is_beldexnet_type(type) && hf_version >= cryptonote::network_version_17_pulse);
 }
 
 // Returns all mapping types supported for lookup as of the given hardfork.  (Note that this does
@@ -162,12 +162,11 @@ std::optional<std::string> name_hash_input_to_base64(std::string_view input);
 
 bool validate_bns_name(mapping_type type, std::string name, std::string *reason = nullptr);
 
-generic_signature  make_monero_signature(crypto::hash const &hash, crypto::public_key const &pkey, crypto::secret_key const &skey);
 generic_signature  make_ed25519_signature(crypto::hash const &hash, crypto::ed25519_secret_key const &skey);
 generic_owner      make_monero_owner(cryptonote::account_public_address const &owner, bool is_subaddress);
 generic_owner      make_ed25519_owner(crypto::ed25519_public_key const &pkey);
 bool               parse_owner_to_generic_owner(cryptonote::network_type nettype, std::string_view owner, generic_owner &key, std::string *reason);
-crypto::hash       tx_extra_signature_hash(std::string_view value, generic_owner const *owner, generic_owner const *backup_owner, crypto::hash const &prev_txid);
+std::string        tx_extra_signature(std::string_view value, generic_owner const *owner, generic_owner const *backup_owner, crypto::hash const &prev_txid);
 
 enum struct bns_tx_type { lookup, buy, update, renew };
 // Converts a human readable case-insensitive string denoting the mapping type into a value suitable for storing into the BNS DB.

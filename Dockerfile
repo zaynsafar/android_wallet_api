@@ -134,7 +134,7 @@ VOLUME /wallet
 EXPOSE 19090
 EXPOSE 19091
 
-# switch to user monero
+# switch to user beldex
 USER beldex
 
 ENTRYPOINT ["beldexd", "--p2p-bind-ip=0.0.0.0", "--p2p-bind-port=19090", "--rpc-bind-ip=0.0.0.0", "--rpc-bind-port=19092", "--non-interactive", "--confirm-external-bind"]

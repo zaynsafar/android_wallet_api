@@ -42,9 +42,9 @@
 #include "cryptonote_basic/hardfork.h"
 #include "checkpoints/checkpoints.h"
 #include <boost/format.hpp>
-
+#include "rpc_command_executor.h"
 #include "common/beldex_integration_test_hooks.h"
-
+#include <iostream>
 #include <fstream>
 #include <ctime>
 #include <string>
@@ -66,10 +66,8 @@ namespace {
     std::cout << prompt << std::flush;
     std::string result;
 #if defined (BELDEX_ENABLE_INTEGRATION_TEST_HOOKS)
-    beldex::write_redirected_stdout_to_shared_mem();
-    beldex::fixed_buffer buffer = beldex::read_from_stdin_shared_mem();
-    result.reserve(buffer.len);
-    result = buffer.data;
+    integration_test::write_buffered_stdout();
+    result = integration_test::read_from_pipe();
 #else
     rdln::suspend_readline pause_readline;
     std::cin >> result;
@@ -299,7 +297,7 @@ bool rpc_command_executor::print_mn_state_changes(uint64_t start_height, uint64_
 
   std::stringstream output;
 
-  output << " Master Node State Changes (blocks " << res.start_height << "-" << res.end_height << ")" << std::endl;
+  output << "Master Node State Changes (blocks " << res.start_height << "-" << res.end_height << ")" << std::endl;
   output << " Recommissions:\t\t" << res.total_recommission << std::endl;
   output << " Unlocks:\t\t" << res.total_unlock << std::endl;
   output << " Decommissions:\t\t" << res.total_decommission << std::endl;
@@ -857,11 +855,11 @@ bool rpc_command_executor::print_transaction(const crypto::hash& transaction_has
     std::optional<cryptonote::transaction> t;
     if (include_metadata || include_json)
     {
-      if (lokimq::is_hex(pruned_as_hex) && (!tx.prunable_as_hex || lokimq::is_hex(*tx.prunable_as_hex)))
+      if (oxenmq::is_hex(pruned_as_hex) && (!tx.prunable_as_hex || oxenmq::is_hex(*tx.prunable_as_hex)))
       {
-        std::string blob = lokimq::from_hex(pruned_as_hex);
+        std::string blob = oxenmq::from_hex(pruned_as_hex);
         if (tx.prunable_as_hex)
-          blob += lokimq::from_hex(*tx.prunable_as_hex);
+          blob += oxenmq::from_hex(*tx.prunable_as_hex);
 
         bool parsed = pruned
           ? cryptonote::parse_and_validate_tx_base_from_blob(blob, t.emplace())
@@ -930,7 +928,7 @@ static void print_pool(const std::vector<cryptonote::rpc::tx_info> &transactions
     w << "blob_size: " << tx_info.blob_size << "\n"
       << "weight: " << tx_info.weight << "\n"
       << "fee: " << cryptonote::print_money(tx_info.fee) << "\n"
-      /// NB(Beldex): in v13 we have min_fee = per_out*outs + per_byte*bytes, only the total fee/byte matters for
+      /// NB(beldex): in v13 we have min_fee = per_out*outs + per_byte*bytes, only the total fee/byte matters for
       /// the purpose of building a block template from the pool, so we still print the overall fee / byte here.
       /// (we can't back out the individual per_out and per_byte that got used anyway).
       << "fee/byte: " << cryptonote::print_money(tx_info.fee / (double)tx_info.weight) << "\n"
@@ -1155,24 +1153,29 @@ bool rpc_command_executor::out_peers(bool set, uint32_t limit)
 {
     OUT_PEERS::request req{set, limit};
 	OUT_PEERS::response res{};
+  req.out_peers = limit;
+  
     if (!invoke<OUT_PEERS>(std::move(req), res, "Failed to set max out peers"))
       return false;
 
 	const std::string s = res.out_peers == (uint32_t)-1 ? "unlimited" : std::to_string(res.out_peers);
-	tools::msg_writer() << "Max number of out peers set to " << s << std::endl;
+	tools::msg_writer() << "Max number of out peers set to " << limit;
 
 	return true;
 }
 
 bool rpc_command_executor::in_peers(bool set, uint32_t limit)
 {
-    IN_PEERS::request req{set, limit};
+	IN_PEERS::request req{set, limit};
 	IN_PEERS::response res{};
-    if (!invoke<IN_PEERS>(std::move(req), res, "Failed to set max in peers"))
-      return false;
 
-	const std::string s = res.in_peers == (uint32_t)-1 ? "unlimited" : std::to_string(res.in_peers);
-	tools::msg_writer() << "Max number of in peers set to " << s << std::endl;
+	req.in_peers = limit;
+
+	if (!invoke<IN_PEERS>(std::move(req), res, "Failed to set max out peers"))
+	
+			return false;
+      const std::string s = res.in_peers == (uint32_t)-1 ? "unlimited" : std::to_string(res.in_peers);
+	tools::msg_writer() << "Max number of in peers set to " << limit;
 
 	return true;
 }
@@ -2486,3 +2489,4 @@ bool rpc_command_executor::test_trigger_uptime_proof()
 }
 
 }// namespace daemonize
+

@@ -40,15 +40,17 @@
 #include <ratio>
 
 using namespace std::literals;
+#define EMISSION_SPEED_FACTOR_PER_MINUTE                (28)
 
 #define CRYPTONOTE_MAX_BLOCK_NUMBER                     500000000
 #define CRYPTONOTE_MAX_TX_SIZE                          1000000
 #define CRYPTONOTE_MAX_TX_PER_BLOCK                     0x10000000
 #define CRYPTONOTE_PUBLIC_ADDRESS_TEXTBLOB_VER          0
-#define CRYPTONOTE_MINED_MONEY_UNLOCK_WINDOW            30
+#define CRYPTONOTE_MINED_MONEY_UNLOCK_WINDOW            60
 #define CRYPTONOTE_BLOCK_FUTURE_TIME_LIMIT_V2           60*10
 #define CRYPTONOTE_DEFAULT_TX_SPENDABLE_AGE             10
 #define CRYPTONOTE_DEFAULT_TX_MIXIN                     9
+#define FINAL_SUBSIDY_PER_MINUTE                        ((uint64_t)500000000) // 3 * pow(10, 7)
 
 #define STAKING_REQUIREMENT_LOCK_BLOCKS_EXCESS          20
 #define STAKING_PORTIONS                                UINT64_C(0xfffffffffffffffc)
@@ -92,6 +94,8 @@ static_assert(STAKING_PORTIONS % 12 == 0, "Use a multiple of twelve, so that it 
 #define DYNAMIC_FEE_REFERENCE_TRANSACTION_WEIGHT        ((uint64_t)3000)
 #define DYNAMIC_FEE_REFERENCE_TRANSACTION_WEIGHT_V12    ((uint64_t)240000) // Only v12 (v13 switches back)
 
+#define DIFFICULTY_TARGET_V2                            120  // seconds
+#define DIFFICULTY_TARGET_V1                            60  // seconds - before first fork
 constexpr auto TARGET_BLOCK_TIME           = 2min;
 constexpr uint64_t DIFFICULTY_WINDOW       = 59;
 constexpr uint64_t DIFFICULTY_BLOCKS_COUNT(bool before_hf16)
@@ -183,17 +187,17 @@ constexpr uint64_t BLOCKS_EXPECTED_IN_YEARS(int years) { return BLOCKS_EXPECTED_
 #define HF_VERSION_PER_BYTE_FEE                 cryptonote::network_version_10_bulletproofs
 #define HF_VERSION_SMALLER_BP                   cryptonote::network_version_11_infinite_staking
 #define HF_VERSION_LONG_TERM_BLOCK_WEIGHT       cryptonote::network_version_11_infinite_staking
-#define HF_VERSION_INCREASE_FEE                 cryptonote::network_version_12_checkpointing
-#define HF_VERSION_PER_OUTPUT_FEE               cryptonote::network_version_13_enforce_checkpoints
-#define HF_VERSION_ED25519_KEY                  cryptonote::network_version_13_enforce_checkpoints
-#define HF_VERSION_FEE_BURNING                  cryptonote::network_version_14_blink
-#define HF_VERSION_BLINK                        cryptonote::network_version_14_blink
-#define HF_VERSION_MIN_2_OUTPUTS                cryptonote::network_version_16_pulse
-#define HF_VERSION_REJECT_SIGS_IN_COINBASE      cryptonote::network_version_16_pulse
-#define HF_VERSION_ENFORCE_MIN_AGE              cryptonote::network_version_16_pulse
-#define HF_VERSION_EFFECTIVE_SHORT_TERM_MEDIAN_IN_PENALTY cryptonote::network_version_16_pulse
-#define HF_VERSION_PULSE cryptonote::network_version_16_pulse
-#define HF_VERSION_CLSAG                        cryptonote::network_version_16_pulse
+#define HF_VERSION_INCREASE_FEE                 cryptonote::network_version_13_checkpointing
+#define HF_VERSION_PER_OUTPUT_FEE               cryptonote::network_version_14_enforce_checkpoints
+#define HF_VERSION_ED25519_KEY                  cryptonote::network_version_14_enforce_checkpoints
+#define HF_VERSION_FEE_BURNING                  cryptonote::network_version_15_blink
+#define HF_VERSION_BLINK                        cryptonote::network_version_15_blink
+#define HF_VERSION_MIN_2_OUTPUTS                cryptonote::network_version_17_pulse
+#define HF_VERSION_REJECT_SIGS_IN_COINBASE      cryptonote::network_version_17_pulse
+#define HF_VERSION_ENFORCE_MIN_AGE              cryptonote::network_version_17_pulse
+#define HF_VERSION_EFFECTIVE_SHORT_TERM_MEDIAN_IN_PENALTY cryptonote::network_version_17_pulse
+#define HF_VERSION_PULSE cryptonote::network_version_17_pulse
+#define HF_VERSION_CLSAG                        cryptonote::network_version_17_pulse
 
 #define PER_KB_FEE_QUANTIZATION_DECIMALS        8
 
@@ -324,12 +328,13 @@ namespace cryptonote
     network_version_9_master_nodes, // Proof Of Stake w/ Service Nodes
     network_version_10_bulletproofs, // Bulletproofs, Service Node Grace Registration Period, Batched Governance
     network_version_11_infinite_staking, // Infinite Staking, CN-Turtle
-    network_version_12_checkpointing, // Checkpointing, Relaxed Deregistration, RandomXL, Loki Storage Server
-    network_version_13_enforce_checkpoints,
-    network_version_14_blink,
-    network_version_15_bns,
-    network_version_16_pulse,
-    network_version_17, // future HF
+    network_version_12_security_signature,
+    network_version_13_checkpointing, // Checkpointing, Relaxed Deregistration, RandomXL, Loki Storage Server
+    network_version_14_enforce_checkpoints,
+    network_version_15_blink,
+    network_version_16_bns,
+    network_version_17_pulse,
+    network_version_18,
 
     network_version_count,
   };

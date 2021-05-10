@@ -17,7 +17,7 @@ chmod 600 ssh_key
 filenames=(dist/electron/Packaged/beldex-electron-wallet-*)
 if [ "${#filenames[@]}" -lt 1 ] || ! [ -f "${filenames[0]}" ]; then
     echo "Did not find expected electron wallet packages"
-    find beldex-electron-gui-wallet/dist/electron/Packaged
+    find dist/electron
     exit 1
 fi
 
@@ -25,7 +25,7 @@ fi
 # -mkdir a/, -mkdir a/b/, -mkdir a/b/c/, ... commands.  The leading `-` allows the command to fail
 # without error.
 branch_or_tag=${DRONE_BRANCH:-${DRONE_TAG:-unknown}}
-upload_to="builds.beldexnet.dev/${DRONE_REPO// /_}/${branch_or_tag// /_}"
+upload_to="beldex.rocks/${DRONE_REPO// /_}/${branch_or_tag// /_}"
 upload_dirs=(${upload_to//\// })
 sftpcmds=
 dir_tmp=""
@@ -39,7 +39,7 @@ for filename in "${filenames[@]}"; do
 put $filename $upload_to"
 done
 
-sftp -i ssh_key -b - -o StrictHostKeyChecking=off drone@builds.beldexnet.dev <<SFTP
+sftp -i ssh_key -b - -o StrictHostKeyChecking=off drone@beldex.rocks <<SFTP
 $sftpcmds
 SFTP
 

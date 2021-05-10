@@ -691,7 +691,7 @@ void pulse::handle_message(void *quorumnet_state, pulse::message const &msg)
     case pulse::message_type::signed_block:
     {
       // NOTE: The block template with the final random value inserted but no
-      // master Node signatures. (Master Node signatures are added in one shot
+      // Master Node signatures. (Master Node signatures are added in one shot
       // after this stage has timed out and all signatures are collected).
       cryptonote::block const &final_block_no_signatures = context.transient.signed_block.final_block;
       crypto::hash const final_block_hash                = cryptonote::get_block_hash(final_block_no_signatures);
@@ -734,7 +734,7 @@ bool pulse::convert_time_to_round(pulse::time_point const &time, pulse::time_poi
 bool pulse::get_round_timings(cryptonote::Blockchain const &blockchain, uint64_t block_height, uint64_t prev_timestamp, pulse::timings &times)
 {
   times = {};
-  static uint64_t const hf16_height = blockchain.get_earliest_ideal_height_for_version(cryptonote::network_version_16_pulse);
+  static uint64_t const hf16_height = blockchain.get_earliest_ideal_height_for_version(cryptonote::network_version_17_pulse);
   if (hf16_height == std::numeric_limits<uint64_t>::max())
     return false;
 
@@ -911,7 +911,7 @@ Yes +-----[Block can not be added to blockchain]
 
     - The state machine *always* reverts to 'Prepare For Round' when any
       subsequent stage fails, except in the cases where Pulse can not proceed
-      because of an insufficient master Node network.
+      because of an insufficient Master Node network.
 
     - If the next round to prepare for is >255, we disable Pulse and re-allow
       PoW blocks to be added to the chain, the Pulse state machine resets and
@@ -1568,7 +1568,7 @@ round_state send_and_wait_for_random_value(round_context &context, master_nodes:
       {
         if (auto &random_value = quorum[index]; random_value)
         {
-          epee::wipeable_string string = lokimq::to_hex(tools::view_guts(random_value->data));
+          epee::wipeable_string string = oxenmq::to_hex(tools::view_guts(random_value->data));
 
 #if defined(NDEBUG)
           // Mask the random value generated incase someone is snooping logs
@@ -1599,7 +1599,7 @@ round_state send_and_wait_for_random_value(round_context &context, master_nodes:
     crypto::hash const &final_block_hash = cryptonote::get_block_hash(final_block);
     crypto::generate_signature(final_block_hash, key.pub, key.key, context.transient.signed_block.send.data);
 
-    MINFO(log_prefix(context) << "Block final random value " << lokimq::to_hex(tools::view_guts(final_block.pulse.random_value.data)) << " generated from validators " << bitset_view16(stage.bitset));
+    MINFO(log_prefix(context) << "Block final random value " << oxenmq::to_hex(tools::view_guts(final_block.pulse.random_value.data)) << " generated from validators " << bitset_view16(stage.bitset));
     return round_state::send_and_wait_for_signed_blocks;
   }
 
@@ -1685,7 +1685,7 @@ void pulse::main(void *quorumnet_state, cryptonote::core &core)
   //
   // NOTE: Early exit if too early
   //
-  static uint64_t const hf16_height = cryptonote::HardFork::get_hardcoded_hard_fork_height(blockchain.nettype(), cryptonote::network_version_16_pulse);
+  static uint64_t const hf16_height = cryptonote::HardFork::get_hardcoded_hard_fork_height(blockchain.nettype(), cryptonote::network_version_17_pulse);
   if (hf16_height == cryptonote::HardFork::INVALID_HF_VERSION_HEIGHT)
   {
     for (static bool once = true; once; once = !once)

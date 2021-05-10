@@ -2,9 +2,9 @@
 #include "http_server.h"
 #include <chrono>
 #include <exception>
-#include <lokimq/base64.h>
+#include <oxenmq/base64.h>
 #include <boost/endian/conversion.hpp>
-#include <lokimq/variant.h>
+#include <oxenmq/variant.h>
 #include "common/command_line.h"
 #include "common/string_util.h"
 #include "cryptonote_config.h"
@@ -573,7 +573,7 @@ namespace cryptonote::rpc {
     });
   }
 
-  static std::unordered_set<lokimq::LokiMQ*> timer_started;
+  static std::unordered_set<oxenmq::OxenMQ*> timer_started;
 
   void http_server::start()
   {
@@ -581,7 +581,7 @@ namespace cryptonote::rpc {
       throw std::logic_error{"Cannot call http_server::start() more than once"};
 
     auto net = m_server.nettype();
-    m_server_header = "beldexd/"s + (m_restricted ? std::to_string(BELDEX_VERSION[0]) : BELDEX_VERSION_FULL)
+    m_server_header = "beldexd/"s + (m_restricted ? std::to_string(BELDEX_VERSION[0]) : std::string{BELDEX_VERSION_FULL})
       + (net == MAINNET ? " mainnet" : net == TESTNET ? " testnet" : net == DEVNET ? " devnet" : net == FAKECHAIN ? " fakenet" : " unknown net");
 
     m_startup_promise.set_value(true);
