@@ -3067,11 +3067,11 @@ bool Blockchain::check_tx_outputs(const transaction& tx, tx_verification_context
 
   // from v10, allow bulletproofs
   const uint8_t hf_version = m_hardfork->get_current_version();
-  if (hf_version < network_version_10_bulletproofs) {
+  if (hf_version < network_version_8) {
     const bool bulletproof = rct::is_rct_bulletproof(tx.rct_signatures.type);
     if (bulletproof || !tx.rct_signatures.p.bulletproofs.empty())
     {
-      MERROR_VER("Bulletproofs are not allowed before v10");
+      MERROR_VER("Bulletproofs are not allowed before v8");
       tvc.m_invalid_output = true;
       return false;
     }
@@ -3528,7 +3528,7 @@ if (tx.version >= cryptonote::txversion::v2_ringct)
     }
 
     // for bulletproofs, check they're only multi-output after v8
-    if (rct::is_rct_bulletproof(rv.type) && hf_version < network_version_10_bulletproofs)
+    if (rct::is_rct_bulletproof(rv.type) && hf_version < network_version_8)
     {
       for (const rct::Bulletproof &proof: rv.p.bulletproofs)
       {
