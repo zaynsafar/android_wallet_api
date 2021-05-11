@@ -505,7 +505,7 @@ namespace cryptonote
   constexpr txversion transaction_prefix::get_min_version_for_hf(uint8_t hf_version)
   {
     if (hf_version >= cryptonote::network_version_7 && hf_version <= cryptonote::network_version_10_bulletproofs)
-      return txversion::v2_ringct;
+      return txversion::v1;
     return txversion::v4_tx_types;
   }
 
