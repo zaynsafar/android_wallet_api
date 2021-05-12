@@ -3048,7 +3048,7 @@ bool Blockchain::check_tx_outputs(const transaction& tx, tx_verification_context
   std::unique_lock lock{*this};
 
   for (const auto &o: tx.vout) {
-    if ( o.amount != 0) { // in a v2 tx, all outputs must have 0 amount NOTE(beldex): All beldex tx's are atleast v2 from the beginning
+    if ( tx.version >= cryptonote::txversion::v2_ringct && o.amount != 0) { // in a v2 tx, all outputs must have 0 amount NOTE(beldex): All beldex tx's are atleast v2 from the beginning
       tvc.m_invalid_output = true;
       return false;
     }
@@ -3067,11 +3067,11 @@ bool Blockchain::check_tx_outputs(const transaction& tx, tx_verification_context
 
   // from v10, allow bulletproofs
   const uint8_t hf_version = m_hardfork->get_current_version();
-  if (hf_version < network_version_10_bulletproofs) {
+  if (hf_version < network_version_8) {
     const bool bulletproof = rct::is_rct_bulletproof(tx.rct_signatures.type);
     if (bulletproof || !tx.rct_signatures.p.bulletproofs.empty())
     {
-      MERROR_VER("Bulletproofs are not allowed before v10");
+      MERROR_VER("Bulletproofs are not allowed before v8");
       tvc.m_invalid_output = true;
       return false;
     }
@@ -3378,7 +3378,8 @@ bool Blockchain::check_tx_inputs(transaction& tx, tx_verification_context &tvc, 
       CHECK_AND_ASSERT_MES(*pmax_used_block_height + CRYPTONOTE_DEFAULT_TX_SPENDABLE_AGE <= m_db->height(),
           false, "Transaction spends at least one output which is too young");
     }
-
+if (tx.version >= cryptonote::txversion::v2_ringct)
+	{
     if (!expand_transaction_2(tx, tx_prefix_hash, pubkeys))
     {
       MERROR_VER("Failed to expand rct signatures!");
@@ -3527,7 +3528,7 @@ bool Blockchain::check_tx_inputs(transaction& tx, tx_verification_context &tvc, 
     }
 
     // for bulletproofs, check they're only multi-output after v8
-    if (rct::is_rct_bulletproof(rv.type) && hf_version < network_version_10_bulletproofs)
+    if (rct::is_rct_bulletproof(rv.type) && hf_version < network_version_8)
     {
       for (const rct::Bulletproof &proof: rv.p.bulletproofs)
       {
@@ -3538,7 +3539,6 @@ bool Blockchain::check_tx_inputs(transaction& tx, tx_verification_context &tvc, 
         }
       }
     }
-
     if (tx.type == txtype::beldex_name_system)
     {
       cryptonote::tx_extra_beldex_name_system data;
@@ -3550,6 +3550,7 @@ bool Blockchain::check_tx_inputs(transaction& tx, tx_verification_context &tvc, 
         return false;
       }
     }
+  }
   }
   else
   {
@@ -4081,6 +4082,8 @@ Blockchain::block_pow_verified Blockchain::verify_block_pow(cryptonote::block co
     }
   }
 
+  crypto::hash proof_of_work = null_hash;
+
   if (result.per_block_checkpointed)
   {
     result.valid = true;
@@ -4088,7 +4091,7 @@ Blockchain::block_pow_verified Blockchain::verify_block_pow(cryptonote::block co
   else
   {
     // validate proof_of_work versus difficulty target
-    result.valid = check_hash(result.proof_of_work, difficulty);
+    result.valid = check_hash(proof_of_work, difficulty);
     if (!result.valid)
       MGINFO_RED((alt_block ? "Alternative block" : "Block") << " with id: " << blk_hash << "\n does not have enough proof of work: " << result.proof_of_work << " at height " << blk_height << ", required difficulty: " << difficulty);
   }
