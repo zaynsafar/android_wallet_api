@@ -131,7 +131,7 @@ namespace cryptonote
   }
 
   
-  const uint64_t MASTER_NODE_BASE_REWARD_PERCENTAGE = 100;
+  const uint64_t MASTER_NODE_BASE_REWARD_PERCENTAGE = 95;
 
   uint64_t governance_reward_formula(uint64_t base_reward, uint8_t hf_version)
   {
@@ -490,7 +490,6 @@ namespace cryptonote
     if (hard_fork_version < cryptonote::network_version_17_pulse)
     {
       result.master_node_total = calculate_sum_of_portions(beldex_context.block_leader_payouts, master_node_reward);
-
       // The base_miner amount is everything left in the base reward after subtracting off the master
       // node and governance fee amounts (the due amount in the latter case). (Any penalty for
       // exceeding the block limit is already removed from base_reward).
