@@ -12784,7 +12784,7 @@ bool wallet2::check_reserve_proof(const cryptonote::account_public_address &addr
   THROW_WALLET_EXCEPTION_IF(!check_connection(&rpc_version), error::wallet_internal_error, "Failed to connect to daemon: " + get_daemon_address());
   THROW_WALLET_EXCEPTION_IF((rpc_version < rpc::version_t{1, 0}), error::wallet_internal_error, "Daemon RPC version is too old");
 
-  THROW_WALLET_EXCEPTION_IF(tools::starts_with(sig_str, RESERVE_PROOF_MAGIC), error::wallet_internal_error,
+  THROW_WALLET_EXCEPTION_IF(!tools::starts_with(sig_str, RESERVE_PROOF_MAGIC), error::wallet_internal_error,
     "Signature header check error");
   sig_str.remove_prefix(RESERVE_PROOF_MAGIC.size());
 

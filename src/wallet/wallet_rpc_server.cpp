@@ -581,6 +581,24 @@ namespace tools
       throw wallet_rpc_error{error_code::NOT_OPEN, "No wallet file"};
   }
   //------------------------------------------------------------------------------------------------------------------------------
+  void wallet_rpc_server::close_wallet(bool save_current)
+  {
+    if (m_wallet)
+    {
+      MDEBUG(tools::wallet_rpc_server::tr("Closing wallet..."));
+      stop_long_poll_thread();
+      if (save_current)
+      {
+        MDEBUG(tools::wallet_rpc_server::tr("Saving wallet..."));
+        m_wallet->store();
+        MINFO(tools::wallet_rpc_server::tr("Wallet saved"));
+      }
+      m_wallet->deinit();
+      m_wallet.reset();
+      MINFO(tools::wallet_rpc_server::tr("Wallet closed"));
+    }
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
   GET_BALANCE::response wallet_rpc_server::invoke(GET_BALANCE::request&& req)
   {
     require_open();
@@ -2403,8 +2421,7 @@ namespace {
     else
       wal->generate(wallet_file, req.password);
 
-    if (m_wallet)
-      m_wallet->store();
+    close_wallet(true);
     m_wallet = std::move(wal);
     return {};
   }
@@ -2424,16 +2441,7 @@ namespace {
     if (ptr)
       throw wallet_rpc_error{error_code::UNKNOWN_ERROR, "Invalid filename"};
 
-    if (m_wallet)
-    {
-      // stopping the thread resets this but we want to turn it on again for the next wallet:
-      bool was_long_polling = !m_long_poll_disabled;
-      stop_long_poll_thread();
-      m_long_poll_disabled = !was_long_polling;
-      if (req.autosave_current)
-        m_wallet->store();
-      m_wallet.reset();
-    }
+    close_wallet(req.autosave_current);
 
     fs::path wallet_file = m_wallet_dir / fs::u8path(req.filename);
     auto vm2 = password_arg_hack(req.password, m_vm);
@@ -2450,11 +2458,7 @@ namespace {
   CLOSE_WALLET::response wallet_rpc_server::invoke(CLOSE_WALLET::request&& req)
   {
     require_open();
-
-    if (req.autosave_current)
-      m_wallet->store();
-    m_wallet.reset();
-
+    close_wallet(req.autosave_current);
     return {};
   }
   //------------------------------------------------------------------------------------------------------------------------------
@@ -2515,11 +2519,7 @@ namespace {
     if (!viewkey_string.hex_to_pod(unwrap(unwrap(viewkey))))
       throw wallet_rpc_error{error_code::UNKNOWN_ERROR, "Failed to parse view key secret key"};
 
-    if (m_wallet && req.autosave_current)
-    {
-      if (!wallet_file.empty())
-        m_wallet->store();
-    }
+    close_wallet(req.autosave_current);
 
     {
       if (!req.spendkey.empty())
@@ -2572,8 +2572,7 @@ namespace {
       if (!crypto::ElectrumWords::words_to_bytes(req.seed, recovery_key, old_language))
         throw wallet_rpc_error{error_code::UNKNOWN_ERROR, "Electrum-style word list failed verification"};
     }
-    if (m_wallet && req.autosave_current)
-      m_wallet->store();
+    close_wallet(req.autosave_current);
 
     // process seed_offset if given
     {
@@ -3509,14 +3508,7 @@ namespace {
     LOG_PRINT_L0(tools::wallet_rpc_server::tr("Stopped wallet RPC server"));
     try
     {
-      if (m_wallet)
-      {
-        LOG_PRINT_L0(tools::wallet_rpc_server::tr("Saving wallet..."));
-        m_wallet->store();
-        m_wallet->deinit();
-        m_wallet.reset();
-        LOG_PRINT_L0(tools::wallet_rpc_server::tr("Successfully saved"));
-      }
+      close_wallet(true);
     }
     catch (const std::exception& e)
     {
