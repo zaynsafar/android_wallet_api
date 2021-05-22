@@ -273,7 +273,7 @@ namespace config
     inline constexpr time_t HEIGHT_ESTIMATE_TIMESTAMP = 1595360006;
     inline constexpr uint64_t CRYPTONOTE_PUBLIC_ADDRESS_BASE58_PREFIX = 53;
     inline constexpr uint64_t CRYPTONOTE_PUBLIC_INTEGRATED_ADDRESS_BASE58_PREFIX = 54;
-    inline constexpr uint64_t CRYPTONOTE_PUBLIC_SUBADDRESS_BASE58_PREFIX = 53;
+    inline constexpr uint64_t CRYPTONOTE_PUBLIC_SUBADDRESS_BASE58_PREFIX = 63;
     inline constexpr uint16_t P2P_DEFAULT_PORT = 29090;
     inline constexpr uint16_t RPC_DEFAULT_PORT = 29091;
     inline constexpr uint16_t ZMQ_RPC_DEFAULT_PORT = 29092;
