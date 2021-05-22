@@ -78,11 +78,11 @@ static constexpr HardFork::Params testnet_hard_forks[] =
   { network_version_8, 11, 0, 1548474449 },
   { network_version_11_infinite_staking, 12, 0, 1559474450 },
   { network_version_12_security_signature, 13, 0, 1559474451 },
-  { network_version_13_checkpointing,       75471,  0, 1561608000 }, // 2019-06-28 14:00AEDT
-  { network_version_14_enforce_checkpoints, 127028, 0, 1568440800 }, // 2019-09-13 16:00AEDT
-  { network_version_15_blink,               174630, 0, 1575075600 }, // 2019-11-30 07:00UTC
-  { network_version_16_bns,                 244777, 0, 1583940000 }, // 2020-03-11 15:20UTC
-  { network_version_17_pulse,               382222, 0, 1600468200 }, // 2020-09-18 22:30UTC
+  { network_version_13_checkpointing,       14,  0, 1561608000 }, // 2019-06-28 14:00AEDT
+  { network_version_14_enforce_checkpoints, 15, 0, 1568440800 }, // 2019-09-13 16:00AEDT
+  { network_version_15_blink,               16, 0, 1575075600 }, // 2019-11-30 07:00UTC
+  { network_version_16_bns,                 17, 0, 1583940000 }, // 2020-03-11 15:20UTC
+  { network_version_17_pulse,               18, 0, 1600468200 }, // 2020-09-18 22:30UTC
 };
 
 static constexpr HardFork::Params devnet_hard_forks[] =

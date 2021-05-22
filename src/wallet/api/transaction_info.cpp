@@ -71,6 +71,7 @@ int TransactionInfoImpl::direction() const
     return m_direction;
 }
 
+EXPORT
 bool TransactionInfoImpl::isMasterNodeReward() const
 {
     return m_reward_type == reward_type::master_node;

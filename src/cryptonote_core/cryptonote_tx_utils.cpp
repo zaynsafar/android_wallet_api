@@ -158,10 +158,10 @@ namespace cryptonote
   
   uint64_t master_node_reward_formula(uint64_t base_reward, uint8_t hard_fork_version)
   {
-    uint64_t reward = 0;
-    if(hard_fork_version >= 11)
-        reward = (base_reward / 10) * (MASTER_NODE_BASE_REWARD_PERCENTAGE/10) ;
-	      return reward;
+    return
+      hard_fork_version >= network_version_17_pulse          ? BLOCK_REWARD_HF17 :
+      hard_fork_version >= network_version_11_infinite_staking ? (base_reward / 10) * (MASTER_NODE_BASE_REWARD_PERCENTAGE/10) : // 90% of base reward up until HF15's fixed payout
+      0;
   }
 
   uint64_t get_portion_of_reward(uint64_t portions, uint64_t total_master_node_reward)
