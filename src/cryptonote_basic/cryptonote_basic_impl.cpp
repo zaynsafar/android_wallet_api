@@ -99,11 +99,18 @@ namespace cryptonote {
       const int emission_speed_factor = EMISSION_SPEED_FACTOR_PER_MINUTE - (target_minutes-1);
 
       uint64_t result = (MONEY_SUPPLY - already_generated_coins) >> emission_speed_factor;
-      if (result < FINAL_SUBSIDY_PER_MINUTE*target_minutes)
+
+      if (version < network_version_7 )
       {
-        result = FINAL_SUBSIDY_PER_MINUTE*target_minutes;
+        if (result < FINAL_SUBSIDY_PER_MINUTE*target_minutes)
+        {
+          result = FINAL_SUBSIDY_PER_MINUTE*target_minutes;
+        }
       }
-      result = 1000000000;
+      else
+      {
+        result = 1000000000;
+      }
     return result;
   }
 
