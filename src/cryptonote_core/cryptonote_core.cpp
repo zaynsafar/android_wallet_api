@@ -2241,7 +2241,7 @@ namespace cryptonote
                 "is running! It is required to run alongside the Beldex daemon");
             return;
           }
-          if (!check_external_ping(m_last_beldexnet_ping, BELDEXNET_PING_LIFETIME, "Lokinet"))
+          if (!check_external_ping(m_last_beldexnet_ping, BELDEXNET_PING_LIFETIME, "Beldexnet"))
           {
             MGINFO_RED(
                 "Failed to submit uptime proof: have not heard from beldexnet recently. Make sure that it "
