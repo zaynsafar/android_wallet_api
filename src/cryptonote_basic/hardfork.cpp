@@ -81,8 +81,7 @@ static constexpr HardFork::Params testnet_hard_forks[] =
   { network_version_13_checkpointing,       117503,  0, 1635901648 },
   { network_version_14_enforce_checkpoints, 144288, 0, 1639130597 },
   { network_version_15_blink,               218664, 0, 1653196092 },
-  { network_version_16_bns,                 266760, 0, 1663755007 },
-  { network_version_17_pulse,               349272, 0, 1671779413 }, 
+};
 
 static constexpr HardFork::Params devnet_hard_forks[] =
 {

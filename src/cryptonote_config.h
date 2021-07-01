@@ -192,12 +192,12 @@ constexpr uint64_t BLOCKS_EXPECTED_IN_YEARS(int years) { return BLOCKS_EXPECTED_
 #define HF_VERSION_ED25519_KEY                  cryptonote::network_version_14_enforce_checkpoints
 #define HF_VERSION_FEE_BURNING                  cryptonote::network_version_15_blink
 #define HF_VERSION_BLINK                        cryptonote::network_version_15_blink
-#define HF_VERSION_MIN_2_OUTPUTS                cryptonote::network_version_17_pulse
-#define HF_VERSION_REJECT_SIGS_IN_COINBASE      cryptonote::network_version_17_pulse
-#define HF_VERSION_ENFORCE_MIN_AGE              cryptonote::network_version_17_pulse
-#define HF_VERSION_EFFECTIVE_SHORT_TERM_MEDIAN_IN_PENALTY cryptonote::network_version_17_pulse
-#define HF_VERSION_PULSE cryptonote::network_version_17_pulse
-#define HF_VERSION_CLSAG                        cryptonote::network_version_17_pulse
+#define HF_VERSION_MIN_2_OUTPUTS                cryptonote::network_version_15_blink
+#define HF_VERSION_REJECT_SIGS_IN_COINBASE      cryptonote::network_version_15_blink
+#define HF_VERSION_ENFORCE_MIN_AGE              cryptonote::network_version_15_blink
+#define HF_VERSION_EFFECTIVE_SHORT_TERM_MEDIAN_IN_PENALTY cryptonote::network_version_15_blink
+#define HF_VERSION_PULSE cryptonote::network_version_15_blink
+#define HF_VERSION_CLSAG                        cryptonote::network_version_15_blink
 
 #define PER_KB_FEE_QUANTIZATION_DECIMALS        8
 
