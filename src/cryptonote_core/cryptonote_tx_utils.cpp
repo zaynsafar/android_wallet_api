@@ -481,7 +481,8 @@ namespace cryptonote
     // We base governance fees and MN rewards based on the block reward formula.  (Prior to HF13,
     // however, they were accidentally based on the block reward formula *after* subtracting a
     // potential penalty if the block producer includes txes beyond the median size limit).
-    result.original_base_reward = hard_fork_version >= network_version_14_enforce_checkpoints ? base_reward_unpenalized : base_reward;
+    //result.original_base_reward = hard_fork_version >= network_version_14_enforce_checkpoints ? base_reward_unpenalized : base_reward;
+    result.original_base_reward = base_reward;
 
     // There is a goverance fee due every block.  Beginning in hardfork 10 this is still subtracted
     // from the block reward as if it was paid, but the actual payments get batched into rare, large
