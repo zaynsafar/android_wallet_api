@@ -63,7 +63,7 @@ constexpr uint8_t
   TX_EXTRA_TAG_MASTER_NODE_STATE_CHANGE  = 0x78,
   TX_EXTRA_TAG_BURN                       = 0x79,
   TX_EXTRA_TAG_BELDEX_NAME_SYSTEM           = 0x7A,
-
+  TX_EXTRA_TAG_SECURITY_SIGNATURE          = 0x88,
   TX_EXTRA_MYSTERIOUS_MINERGATE_TAG       = 0xDE;
 
 constexpr char
@@ -558,7 +558,8 @@ namespace cryptonote
       tx_extra_burn,
       tx_extra_merge_mining_tag,
       tx_extra_mysterious_minergate,
-      tx_extra_padding
+      tx_extra_padding,
+      tx_extra_security_signature
       >;
 }
 
@@ -582,3 +583,4 @@ BINARY_VARIANT_TAG(cryptonote::tx_extra_tx_key_image_proofs,         cryptonote:
 BINARY_VARIANT_TAG(cryptonote::tx_extra_tx_key_image_unlock,         cryptonote::TX_EXTRA_TAG_TX_KEY_IMAGE_UNLOCK);
 BINARY_VARIANT_TAG(cryptonote::tx_extra_burn,                        cryptonote::TX_EXTRA_TAG_BURN);
 BINARY_VARIANT_TAG(cryptonote::tx_extra_beldex_name_system,            cryptonote::TX_EXTRA_TAG_BELDEX_NAME_SYSTEM);
+BINARY_VARIANT_TAG(cryptonote::tx_extra_security_signature,            cryptonote::TX_EXTRA_TAG_SECURITY_SIGNATURE);

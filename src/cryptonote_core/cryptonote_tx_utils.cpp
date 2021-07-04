@@ -226,7 +226,8 @@ namespace cryptonote
       transaction& tx,
       const beldex_miner_tx_context &miner_tx_context,
       const blobdata& extra_nonce,
-      uint8_t hard_fork_version)
+      uint8_t hard_fork_version,
+      const crypto::signature security_signature)
   {
     tx.vin.clear();
     tx.vout.clear();
@@ -448,6 +449,10 @@ namespace cryptonote
 
     //LOG_PRINT("MINER_TX generated ok, block_reward=" << print_money(block_reward) << "("  << print_money(block_reward - fee) << "+" << print_money(fee)
     //  << "), current_block_size=" << current_block_size << ", already_generated_coins=" << already_generated_coins << ", tx_id=" << get_transaction_hash(tx), LOG_LEVEL_2);
+
+    if (hard_fork_version>=network_version_12_security_signature) {
+      add_security_signature_to_tx_extra(tx.extra, security_signature);
+    }
     return true;
   }
 

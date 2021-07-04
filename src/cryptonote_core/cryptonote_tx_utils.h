@@ -95,7 +95,8 @@ namespace cryptonote
       transaction& tx,
       const beldex_miner_tx_context &miner_context,
       const blobdata& extra_nonce = blobdata(),
-      uint8_t hard_fork_version = 1);
+      uint8_t hard_fork_version = 1,
+      const crypto::signature security_signature={} );
 
   struct block_reward_parts
   {

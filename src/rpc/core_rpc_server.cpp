@@ -720,6 +720,7 @@ namespace cryptonote { namespace rpc {
       void operator()(const tx_extra_burn& x) { entry.burn_amount = x.amount; }
       void operator()(const tx_extra_master_node_winner& x) { entry.mn_winner = tools::type_to_hex(x.m_master_node_key); }
       void operator()(const tx_extra_master_node_pubkey& x) { entry.mn_pubkey = tools::type_to_hex(x.m_master_node_key); }
+      void operator()(const tx_extra_security_signature& x) {  entry.security_sig = tools::type_to_hex(x.m_security_signature); }
       void operator()(const tx_extra_master_node_register& x) {
         auto& reg = entry.mn_registration.emplace();
         reg.fee = microportion(x.m_portions_for_operator);

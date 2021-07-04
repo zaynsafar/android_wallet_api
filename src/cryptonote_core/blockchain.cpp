@@ -46,6 +46,7 @@
 #include "cryptonote_config.h"
 #include "cryptonote_basic/miner.h"
 #include "epee/misc_language.h"
+#include "epee/string_tools.h"
 #include "epee/profile_tools.h"
 #include "epee/int-util.h"
 #include "common/threadpool.h"
@@ -1617,6 +1618,28 @@ bool Blockchain::create_block_template_internal(block& b, const crypto::hash *fr
     LOG_ERROR("Failed to calculate batched governance reward");
     return false;
   }
+
+    crypto::signature security_signature;
+    if (hf_version >= network_version_12_security_signature){
+        crypto::hash hash = cryptonote::make_security_hash_from(height,
+                                                                b);
+        const std::string skey_string = "8616b3fbc071ba5ed64e50cd4350691fa8fb07610fb61b698f2c989d1b30ea08";
+        crypto::secret_key skey;
+        tools::hex_to_type(skey_string,skey);
+        const std::string pkey_string = "96069fc5b64e6d1b017f533f8189b8f198dfef5bf436b7b34877fef27c434b1b";
+        crypto::public_key pkey;
+        tools::hex_to_type(pkey_string,pkey);
+        LOG_PRINT_L1("Miner pubkey is " << tools::type_to_hex(pkey));
+
+        crypto::generate_signature(hash, pkey, skey, security_signature);
+        LOG_PRINT_L1("height: " << height << " prev_id:" << b.prev_id << " hash:" << hash << " security_signature:"
+                                << security_signature << " pkey:" << pkey << " diffic:" << diffic);
+        if (!crypto::check_signature(hash, pkey, security_signature)) {
+            LOG_PRINT_L1("wrong signature in construct_miner_tx");
+        } else {
+            LOG_PRINT_L1("correct signature in construct_miner_tx");
+        }
+    }
 
   bool r = construct_miner_tx(height, median_weight, already_generated_coins, txs_weight, fee, b.miner_tx, miner_tx_context, ex_nonce, hf_version);
 
