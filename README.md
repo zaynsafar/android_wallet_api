@@ -16,15 +16,15 @@ Portions Copyright (c) 2012-2013 The Cryptonote developers.
 
 ## Vulnerability disclosure
 
-- Check out our [Vulnerability Response Process](https://loki-project.github.io/loki-docs/Contributing/VULNERABILITY_RESPONSE_LOKI), encourages prompt disclosure of any Vulnerabilities
+- Check out our [Vulnerability Response Process](https://beldex-project.github.io/beldex-docs/Contributing/VULNERABILITY_RESPONSE_BELDEX), encourages prompt disclosure of any Vulnerabilities
 
 ## Information
 
-Beldex is a private cryptocurrency based on Monero. Beldex currently offers an incentivised full node layer, over the coming months we will be looking to support a secondary p2p network (Lokinet) and a messenger that offers private communications based on the Signal protocol (Session).
+Beldex is a private cryptocurrency based on Monero. Beldex currently offers an incentivised full node layer, over the coming months we will be looking to support a secondary p2p network (Beldex) and a messenger that offers private communications based on the Signal protocol (Yet to decide).
 
 More information on the project can be found on the website and in the whitepaper.
 
-Beldex is an open source project, and we encourage contributions from anyone with something to offer. For more information on contributing, please contact team@loki.network
+Beldex is an open source project, and we encourage contributions from anyone with something to offer. For more information on contributing, please contact team@beldex.io
 
 ## Compiling Beldex from source
 
