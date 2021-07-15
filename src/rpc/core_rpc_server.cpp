@@ -3470,9 +3470,9 @@ namespace cryptonote { namespace rpc {
     return res;
   }
   //------------------------------------------------------------------------------------------------------------------------------
-  REPORT_PEER_SS_STATUS::response core_rpc_server::invoke(REPORT_PEER_SS_STATUS::request&& req, rpc_context context)
+  REPORT_PEER_STATUS::response core_rpc_server::invoke(REPORT_PEER_STATUS::request&& req, rpc_context context)
   {
-    REPORT_PEER_SS_STATUS::response res{};
+    REPORT_PEER_STATUS::response res{};
 
     crypto::public_key pubkey;
     if (!tools::hex_to_type(req.pubkey, pubkey)) {

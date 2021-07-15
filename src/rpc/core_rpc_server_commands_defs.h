@@ -2390,9 +2390,9 @@ namespace rpc {
 
 
   BELDEX_RPC_DOC_INTROSPECT
-  struct REPORT_PEER_SS_STATUS : RPC_COMMAND
+  struct REPORT_PEER_STATUS : RPC_COMMAND
   {
-    static constexpr auto names() { return NAMES("report_peer_storage_server_status"); }
+    static constexpr auto names() { return NAMES("report_peer_status","report_peer_storage_server_status"); }
 
     struct request
     {
@@ -2648,7 +2648,7 @@ namespace rpc {
     GET_OUTPUT_BLACKLIST,
     GET_CHECKPOINTS,
     GET_MN_STATE_CHANGES,
-    REPORT_PEER_SS_STATUS,
+    REPORT_PEER_STATUS,
     TEST_TRIGGER_P2P_RESYNC,
     TEST_TRIGGER_UPTIME_PROOF,
     BNS_NAMES_TO_OWNERS,
