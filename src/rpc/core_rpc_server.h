@@ -265,7 +265,7 @@ namespace cryptonote::rpc {
     BELDEXNET_PING::response                              invoke(BELDEXNET_PING::request&& req, rpc_context context);
     GET_CHECKPOINTS::response                           invoke(GET_CHECKPOINTS::request&& req, rpc_context context);
     GET_MN_STATE_CHANGES::response                      invoke(GET_MN_STATE_CHANGES::request&& req, rpc_context context);
-    REPORT_PEER_SS_STATUS::response                     invoke(REPORT_PEER_SS_STATUS::request&& req, rpc_context context);
+    REPORT_PEER_STATUS::response                     invoke(REPORT_PEER_STATUS::request&& req, rpc_context context);
     TEST_TRIGGER_P2P_RESYNC::response                   invoke(TEST_TRIGGER_P2P_RESYNC::request&& req, rpc_context context);
     TEST_TRIGGER_UPTIME_PROOF::response                 invoke(TEST_TRIGGER_UPTIME_PROOF::request&& req, rpc_context context);
     BNS_NAMES_TO_OWNERS::response                       invoke(BNS_NAMES_TO_OWNERS::request&& req, rpc_context context);
