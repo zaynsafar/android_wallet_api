@@ -3500,9 +3500,11 @@ namespace cryptonote { namespace rpc {
     bool success = false;
     if (req.type == "beldexnet")
       success = m_core.get_master_node_list().set_beldexnet_peer_reachable(pubkey, req.passed);
-    else if (req.type != "reachability")
-      throw rpc_error{ERROR_WRONG_PARAM, "Unknown status type"};
-    if (!m_core.set_storage_server_peer_reachable(pubkey, req.passed))
+    else if (req.type == "storage" || req.type == "reachability" /* TODO: old name, can be removed once SS no longer uses it */)
+      success = m_core.get_master_node_list().set_storage_server_peer_reachable(pubkey, req.passed);
+    else
+      throw rpc_error{ERROR_WRONG_PARAM, "Unknown status type"};   
+    if (!success)
       throw rpc_error{ERROR_WRONG_PARAM, "Pubkey not found"};
 
     res.status = STATUS_OK;

@@ -999,10 +999,6 @@ namespace cryptonote
       */
      void flush_invalid_blocks();
 
-     /**
-      * @brief Record the reachability status of node's storage server
-      */
-     bool set_storage_server_peer_reachable(crypto::public_key const &pubkey, bool value);
 
      /// Time point at which the storage server and beldexnet last pinged us
      std::atomic<time_t> m_last_storage_server_ping, m_last_beldexnet_ping;

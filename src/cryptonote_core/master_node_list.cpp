@@ -3103,22 +3103,7 @@ namespace master_nodes
   }
   bool master_node_list::set_storage_server_peer_reachable(crypto::public_key const &pubkey, bool value)
   {
-    std::lock_guard lock(m_mn_mutex);
-
-    if (!m_state.master_nodes_infos.count(pubkey)) {
-      LOG_PRINT_L2("No Master Node is known by this pubkey: " << pubkey);
-      return false;
-    }
-
-    proof_info &info = proofs[pubkey];
-    if (info.storage_server_reachable != value)
-    {
-      info.storage_server_reachable = value;
-      LOG_PRINT_L2("Setting reachability status for node " << pubkey << " as: " << (value ? "true" : "false"));
-    }
-
-    info.storage_server_reachable_timestamp = time(nullptr);
-    return true;
+     return set_peer_reachable(true, pubkey, reachable);
   }
 
   bool master_node_list::set_beldexnet_peer_reachable(crypto::public_key const &pubkey, bool reachable)
