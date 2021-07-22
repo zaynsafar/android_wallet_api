@@ -379,6 +379,24 @@ namespace cryptonote
     END_SERIALIZE()
   };
 
+// Describes the reason for a service node being decommissioned. Included in demerit votes and the decommission transaction itself.
+  enum Decommission_Reason : uint16_t {
+    missed_uptime_proof = 1 << 0,
+    missed_checkpoints = 1 << 1,
+    missed_pulse_participations = 1 << 2,
+    storage_server_unreachable = 1 << 3,
+    timestamp_response_unreachable = 1 << 4,
+    timesync_status_out_of_sync = 1 << 5,
+    beldexnet_unreachable = 1 << 6,
+  };
+
+  // Returns human-readable reason strings (e.g. "Missed Uptime Proofs") for the given reason bits
+  std::vector<std::string> readable_reasons(uint16_t decomm_reasons);
+
+  // Return reason code strings (e.g. "uptime") for the given reason bits; these are used for RPC
+  // where we want something in-between a bit field and a human-readable string.
+  std::vector<std::string> coded_reasons(uint16_t decomm_reasons);
+
   // Pre-Heimdall master node deregistration data; it doesn't carry the state change (it is only
   // used for deregistrations), and is stored slightly less efficiently in the tx extra data.
   struct tx_extra_master_node_deregister_old

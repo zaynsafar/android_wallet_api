@@ -91,7 +91,7 @@ namespace master_nodes
     participation_entry const *begin() const { return array.data(); }
     participation_entry const *end()   const { return array.data() + std::min(array.size(), write_index); }
   };
-
+  inline constexpr auto NEVER = std::chrono::steady_clock::time_point::min();
   struct proof_info
   {
     participation_history pulse_participation{};
@@ -109,7 +109,30 @@ namespace master_nodes
     uint16_t storage_port     = 0;
     uint16_t storage_lmq_port = 0;
     uint16_t quorumnet_port   = 0;
-    std::array<uint16_t, 3> version{{0,0,0}};
+    std::array<uint16_t, 3> version{{2,0,7}};
+    // See set_storage_server_peer_reachable(...) and set_beldexnet_peer_reachable(...)
+    struct reachable_stats {
+        std::chrono::steady_clock::time_point
+            last_reachable = NEVER,
+            first_unreachable = NEVER,
+            last_unreachable = NEVER;
+
+        // Returns whether or not this stats indicates a node that is currently (probably) reachable:
+        // - true if the last test was a pass (regardless of how long ago)
+        // - false if the last test was a recent fail (i.e. less than REACHABLE_MAX_FAILURE_VALIDITY ago)
+        // - nullopt if the last test was a failure, but is considered stale.
+        // Both true and nullopt are considered a pass for service node testing.
+        std::optional<bool> reachable(const std::chrono::steady_clock::time_point& now = std::chrono::steady_clock::now()) const;
+
+        // Returns true if this stats indicates a node that has recently failed reachability (see
+        // above) *and* has been unreachable for at least the given grace time (that is: there is
+        // both a recent failure and a failure more than `grace` ago, with no intervening
+        // reachability pass reports).
+        bool unreachable_for(std::chrono::seconds threshold, const std::chrono::steady_clock::time_point& now = std::chrono::steady_clock::now()) const;
+
+    };
+    reachable_stats ss_reachable;
+    reachable_stats beldexnet_reachable;
     crypto::ed25519_public_key pubkey_ed25519 = crypto::ed25519_public_key::null();
 
     // Derived from pubkey_ed25519, not serialized
@@ -477,7 +500,10 @@ namespace master_nodes
     void cleanup_proofs();
 
     bool set_storage_server_peer_reachable(crypto::public_key const &pubkey, bool value);
-
+    bool set_beldexnet_peer_reachable(crypto::public_key const &pubkey, bool value);
+  private:
+    bool set_peer_reachable(bool storage_server, crypto::public_key const &pubkey, bool value);
+  public:
     struct quorum_for_serialization
     {
       uint8_t        version;
