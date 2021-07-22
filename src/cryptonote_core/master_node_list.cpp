@@ -3101,7 +3101,7 @@ namespace master_nodes
     return true;
 
   }
-  bool master_node_list::set_storage_server_peer_reachable(crypto::public_key const &pubkey, bool value)
+  bool master_node_list::set_storage_server_peer_reachable(crypto::public_key const &pubkey, bool reachable)
   {
      return set_peer_reachable(true, pubkey, reachable);
   }
