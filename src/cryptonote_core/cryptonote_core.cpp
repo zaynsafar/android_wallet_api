@@ -2439,11 +2439,7 @@ namespace cryptonote
 
     return true;
   }
-  //-----------------------------------------------------------------------------------------------
-  bool core::set_storage_server_peer_reachable(crypto::public_key const &pubkey, bool value)
-  {
-    return m_master_node_list.set_storage_server_peer_reachable(pubkey, value);
-  }
+  
   //-----------------------------------------------------------------------------------------------
   void core::flush_bad_txs_cache()
   {
