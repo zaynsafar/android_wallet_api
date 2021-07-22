@@ -3052,7 +3052,55 @@ namespace master_nodes
     auto &info = proofs[pubkey];
     info.pulse_participation.add(entry);
   }
+  
+  std::optional<bool> proof_info::reachable_stats::reachable(const std::chrono::steady_clock::time_point& now) const {
+    if (last_reachable >= last_unreachable)
+      return true;
+    if (last_unreachable > now - config::REACHABLE_MAX_FAILURE_VALIDITY)
+      return false;
+    // Last result was a failure, but it was a while ago, so we don't know for sure that it isn't
+    // reachable now:
+    return std::nullopt;
+  }
 
+  bool proof_info::reachable_stats::unreachable_for(std::chrono::seconds threshold, const std::chrono::steady_clock::time_point& now) const {
+    if (auto maybe_reachable = reachable(now); !maybe_reachable /*stale*/ || *maybe_reachable /*good*/)
+      return false;
+    if (first_unreachable > now - threshold)
+      return false; // Unreachable, but for less than the grace time
+    return true;
+  }
+
+  bool master_node_list::set_peer_reachable(bool storage_server, const crypto::public_key& pubkey, bool reachable) {
+
+    // (See .h for overview description)
+
+    std::lock_guard lock(m_mn_mutex);
+
+    const auto type = storage_server ? "storage server"sv : "beldexnet"sv;
+
+    if (!m_state.master_nodes_infos.count(pubkey)) {
+      MDEBUG("Dropping " << type << " reachable report: " << pubkey << " is not a registered MN pubkey");
+      return false;
+    }
+
+    MDEBUG("Received " << type << (reachable ? " reachable" : " UNREACHABLE") << " report for MN " << pubkey);
+
+    const auto now = std::chrono::steady_clock::now();
+
+    auto& reach = storage_server ? proofs[pubkey].ss_reachable : proofs[pubkey].beldexnet_reachable;
+    if (reachable) {
+      reach.last_reachable = now;
+      reach.first_unreachable = NEVER;
+    } else {
+      reach.last_unreachable = now;
+      if (reach.first_unreachable == NEVER)
+        reach.first_unreachable = now;
+    }
+
+    return true;
+
+  }
   bool master_node_list::set_storage_server_peer_reachable(crypto::public_key const &pubkey, bool value)
   {
     std::lock_guard lock(m_mn_mutex);
@@ -3071,6 +3119,11 @@ namespace master_nodes
 
     info.storage_server_reachable_timestamp = time(nullptr);
     return true;
+  }
+
+  bool master_node_list::set_beldexnet_peer_reachable(crypto::public_key const &pubkey, bool reachable)
+  {
+      return set_peer_reachable(false, pubkey, reachable);
   }
 
   static quorum_manager quorum_for_serialization_to_quorum_manager(master_node_list::quorum_for_serialization const &source)

@@ -197,7 +197,7 @@ constexpr uint64_t BLOCKS_EXPECTED_IN_YEARS(int years) { return BLOCKS_EXPECTED_
 #define HF_VERSION_ENFORCE_MIN_AGE              cryptonote::network_version_17_pulse
 #define HF_VERSION_EFFECTIVE_SHORT_TERM_MEDIAN_IN_PENALTY cryptonote::network_version_17_pulse
 #define HF_VERSION_PULSE                        cryptonote::network_version_17_pulse
-#define HF_VERSION_CLSAG                        cryptonote::network_version_17_pulse
+#define HF_VERSION_CLSAG                        cryptonote::network_version_15_blink
 
 #define PER_KB_FEE_QUANTIZATION_DECIMALS        8
 
@@ -253,6 +253,9 @@ namespace config
     "bxcguQiBhYaDW5wAdPLSwRHA6saX1nCEYUF89SPKZfBY1BENdLQWjti59aEtAEgrVZjnCJEVFoCDrG1DCoz2HeeN2pxhxL9xa"sv,
   };
 
+  inline constexpr auto UPTIME_PROOF_FREQUENCY = 1h; // How often to send proofs out to the network since the last proof we successfully sent.  (Approximately; this can be up to CHECK_INTERFACE/2 off in either direction).  The minimum accepted time between proofs is half of this.
+  inline constexpr auto UPTIME_PROOF_VALIDITY = 2h + 5min; // The maximum time that we consider an uptime proof to be valid (i.e. after this time since the last proof we consider the SN to be down)
+  inline constexpr auto REACHABLE_MAX_FAILURE_VALIDITY = 5min; // If we don't hear any SS ping/lokinet session test failures for more than this long then we start considering the SN as passing for the purpose of obligation testing until we get another test result.  This should be somewhat larger than SS/lokinet's max re-test backoff (2min).
   // Hash domain separators
   inline constexpr std::string_view HASH_KEY_BULLETPROOF_EXPONENT = "bulletproof"sv;
   inline constexpr std::string_view HASH_KEY_RINGDB = "ringdsb\0"sv;
@@ -291,6 +294,8 @@ namespace config
       "9zGqWVYfaWRTroZwwtATfFHKcSby5JYCW8Yvu7gyTeg3ZC5deykauXNNms2J7DiiXxg3RknqkV4EV4UaPGFwc1Y8TkTSWzm"sv, // hardfork v7-9
     };
 
+    inline constexpr auto UPTIME_PROOF_FREQUENCY = 10min;
+    inline constexpr auto UPTIME_PROOF_VALIDITY = 21min;
   }
 
   namespace devnet
@@ -316,6 +321,15 @@ namespace config
       "59XZKiAFwAKVyWN1CuuyFqMTTFLu9PEjpb3WhXfVuStgdoCZM1MtyJ2C41qijqfbdnY844F3boaW29geb8pT3mfrV9QQSRB"sv, // hardfork v7-9
       "59XZKiAFwAKVyWN1CuuyFqMTTFLu9PEjpb3WhXfVuStgdoCZM1MtyJ2C41qijqfbdnY844F3boaW29geb8pT3mfrV9QQSRB"sv, // hardfork v10
     };
+        inline constexpr auto UPTIME_PROOF_STARTUP_DELAY = 5s;
+  }
+    namespace fakechain {
+    // Fakechain uptime proofs are 60x faster than mainnet, because this really only runs on a
+    // hand-crafted, typically local temporary network.
+    inline constexpr auto UPTIME_PROOF_STARTUP_DELAY = 5s;
+    inline constexpr auto UPTIME_PROOF_CHECK_INTERVAL = 5s;
+    inline constexpr auto UPTIME_PROOF_FREQUENCY = 1min;
+    inline constexpr auto UPTIME_PROOF_VALIDITY = 2min + 5s;
   }
 }
 
@@ -379,6 +393,9 @@ namespace cryptonote
     uint64_t GOVERNANCE_REWARD_INTERVAL_IN_BLOCKS;
     std::array<std::string_view, 2> GOVERNANCE_WALLET_ADDRESS;
 
+    std::chrono::seconds UPTIME_PROOF_FREQUENCY;
+    std::chrono::seconds UPTIME_PROOF_VALIDITY;
+
     inline constexpr std::string_view governance_wallet_address(int hard_fork_version) const {
       const auto wallet_switch =
         (NETWORK_TYPE == MAINNET || NETWORK_TYPE == FAKECHAIN)
@@ -403,6 +420,8 @@ namespace cryptonote
     ::config::GENESIS_NONCE,
     ::config::GOVERNANCE_REWARD_INTERVAL_IN_BLOCKS,
     ::config::GOVERNANCE_WALLET_ADDRESS,
+    config::UPTIME_PROOF_FREQUENCY,
+    config::UPTIME_PROOF_VALIDITY,
   };
   inline constexpr network_config testnet_config = {
     TESTNET,
@@ -420,6 +439,8 @@ namespace cryptonote
     ::config::testnet::GENESIS_NONCE,
     ::config::testnet::GOVERNANCE_REWARD_INTERVAL_IN_BLOCKS,
     ::config::testnet::GOVERNANCE_WALLET_ADDRESS,
+    config::testnet::UPTIME_PROOF_FREQUENCY,
+    config::testnet::UPTIME_PROOF_VALIDITY,
   };
   inline constexpr network_config devnet_config = {
     DEVNET,
@@ -437,6 +458,8 @@ namespace cryptonote
     ::config::devnet::GENESIS_NONCE,
     ::config::devnet::GOVERNANCE_REWARD_INTERVAL_IN_BLOCKS,
     ::config::devnet::GOVERNANCE_WALLET_ADDRESS,
+    config::testnet::UPTIME_PROOF_FREQUENCY,
+    config::testnet::UPTIME_PROOF_VALIDITY,
   };
   inline constexpr network_config fakenet_config = {
     FAKECHAIN,
@@ -454,6 +477,8 @@ namespace cryptonote
     ::config::GENESIS_NONCE,
     100, //::config::GOVERNANCE_REWARD_INTERVAL_IN_BLOCKS,
     ::config::GOVERNANCE_WALLET_ADDRESS,
+    config::fakechain::UPTIME_PROOF_FREQUENCY,
+    config::fakechain::UPTIME_PROOF_VALIDITY,
   };
 
   inline constexpr const network_config& get_config(network_type nettype)

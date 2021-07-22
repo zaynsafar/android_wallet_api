@@ -61,6 +61,7 @@ namespace master_nodes
       if (!uptime_proved)            buf_ptr += snprintf(buf_ptr, buf_end - buf_ptr, "Uptime proof missing.\n");
       if (!checkpoint_participation) buf_ptr += snprintf(buf_ptr, buf_end - buf_ptr, "Skipped voting in at least %d checkpoints.\n", (int)(QUORUM_VOTE_CHECK_COUNT - CHECKPOINT_MAX_MISSABLE_VOTES));
       if (!pulse_participation)      buf_ptr += snprintf(buf_ptr, buf_end - buf_ptr, "Skipped voting in at least %d pulse quorums.\n", (int)(QUORUM_VOTE_CHECK_COUNT - PULSE_MAX_MISSABLE_VOTES));
+      if (!beldexnet_reachable)      buf_ptr += snprintf(buf_ptr, buf_end - buf_ptr,"Beldexnet router is not reachable.");
       buf_ptr += snprintf(buf_ptr, buf_end - buf_ptr, "Note: Storage server may not be reachable. This is only testable by an external Master Node.");
     }
     return buf;
@@ -81,15 +82,22 @@ namespace master_nodes
   // has submitted uptime proofs, participated in required quorums, etc.
   master_node_test_results quorum_cop::check_master_node(uint8_t hf_version, const crypto::public_key &pubkey, const master_node_info &info) const
   {
+    const auto& netconf = m_core.get_net_config();
+
     master_node_test_results result; // Defaults to true for individual tests
     bool ss_reachable = true;
+    bool beldexnet_reachable = true;
     uint64_t timestamp = 0;
     decltype(std::declval<proof_info>().public_ips) ips{};
 
     master_nodes::participation_history checkpoint_participation{};
     master_nodes::participation_history pulse_participation{};
+
+    const auto unreachable_threshold = netconf.UPTIME_PROOF_VALIDITY - netconf.UPTIME_PROOF_FREQUENCY;
+
     m_core.get_master_node_list().access_proof(pubkey, [&](const proof_info &proof) {
       ss_reachable             = proof.storage_server_reachable;
+      beldexnet_reachable        = !proof.beldexnet_reachable.unreachable_for(unreachable_threshold);
       timestamp                = std::max(proof.timestamp, proof.effective_timestamp);
       ips                      = proof.public_ips;
       checkpoint_participation = proof.checkpoint_participation;
@@ -120,7 +128,11 @@ namespace master_nodes
       if (hf_version >= cryptonote::network_version_14_enforce_checkpoints)
           result.storage_server_reachable = false;
     }
-
+    if (!beldexnet_reachable && hf_version >= cryptonote::network_version_18)
+    {
+      LOG_PRINT_L1("master Node beldexnet is not reachable for node: " << pubkey);
+      result.beldexnet_reachable = false;
+    }
     // IP change checks
     if (ips[0].first && ips[1].first) {
       // Figure out when we last had a blockchain-level IP change penalty (or when we registered);
@@ -362,6 +374,7 @@ namespace master_nodes
                 bool passed       = test_results.passed();
 
                 new_state vote_for_state;
+                uint reason = 0; 
                 if (passed) {
                   if (info.is_decommissioned()) {
                     vote_for_state = new_state::recommission;
@@ -378,6 +391,8 @@ namespace master_nodes
 
                 }
                 else {
+
+                  if (!test_results.beldexnet_reachable) reason |= cryptonote::Decommission_Reason::beldexnet_unreachable;
                   int64_t credit = calculate_decommission_credit(info, latest_height);
 
                   if (info.is_decommissioned()) {

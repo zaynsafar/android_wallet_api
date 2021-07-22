@@ -1668,7 +1668,31 @@ static void append_printable_master_node_list_entry(cryptonote::network_type net
     else
       stream << "Last checked: " << get_human_time_ago(entry.storage_server_reachable_timestamp, now);
     stream << ")\n";
-
+    
+    auto print_reachable = [&stream, &now] (bool reachable, auto first_unreachable, auto last_unreachable, auto last_reachable) {
+      if (first_unreachable == 0) {
+        if (last_reachable == 0)
+          stream << "Not yet tested";
+        else {
+          stream << "Yes (last tested " << get_human_time_ago(last_reachable, now);
+          if (last_unreachable)
+            stream << "; last failure " << get_human_time_ago(last_unreachable, now);
+          stream << ")";
+        }
+      } else {
+        stream << "NO";
+        if (!reachable)
+          stream << " - FAILING!";
+        stream << " (last tested " << get_human_time_ago(last_unreachable, now)
+          << "; failing since " << get_human_time_ago(first_unreachable, now);
+        if (last_reachable)
+          stream << "; last good " << get_human_time_ago(last_reachable, now);
+        stream << ")";
+      }
+      stream << '\n';
+    };
+    stream << indent2 << "Beldexnet Reachable: ";
+    print_reachable(entry.beldexnet_reachable, entry.beldexnet_first_unreachable, entry.beldexnet_last_unreachable, entry.beldexnet_last_reachable);
     //
     // NOTE: Node Credits
     //

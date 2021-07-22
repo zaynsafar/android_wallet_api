@@ -91,9 +91,10 @@ namespace master_nodes
     bool checkpoint_participation = true;
     bool pulse_participation      = true;
     bool storage_server_reachable = true;
+    bool beldexnet_reachable      = true;
 
     char const *why() const;
-    bool passed() const { return uptime_proved && checkpoint_participation && pulse_participation && storage_server_reachable; }
+    bool passed() const { return uptime_proved && checkpoint_participation && pulse_participation && storage_server_reachable && beldexnet_reachable; }
   };
 
   class quorum_cop

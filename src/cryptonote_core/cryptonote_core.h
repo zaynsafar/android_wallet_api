@@ -836,6 +836,8 @@ namespace cryptonote
       */
      network_type get_nettype() const { return m_nettype; };
 
+     constexpr const network_config& get_net_config() const { return get_config(m_nettype); }
+
      /**
       * @brief get whether transaction relay should be padded
       *

@@ -3021,6 +3021,17 @@ namespace cryptonote { namespace rpc {
     res.status = STATUS_OK;
     return res;
   }
+
+  static time_t reachable_to_time_t(
+      std::chrono::steady_clock::time_point t,
+      std::chrono::system_clock::time_point system_now,
+      std::chrono::steady_clock::time_point steady_now) {
+    if (t == master_nodes::NEVER)
+      return 0;
+    return std::chrono::system_clock::to_time_t(
+            std::chrono::time_point_cast<std::chrono::system_clock::duration>(
+                system_now + (t - steady_now)));
+  }
   //------------------------------------------------------------------------------------------------------------------------------
   void core_rpc_server::fill_mn_response_entry(GET_MASTER_NODES::response::entry& entry, const master_nodes::master_node_pubkey_info &mn_info, uint64_t current_height) {
 
@@ -3037,7 +3048,8 @@ namespace cryptonote { namespace rpc {
     entry.earned_downtime_blocks        = master_nodes::quorum_cop::calculate_decommission_credit(info, current_height);
     entry.decommission_count            = info.decommission_count;
 
-    m_core.get_master_node_list().access_proof(mn_info.pubkey, [&entry](const auto &proof) {
+    auto& netconf = m_core.get_net_config();
+    m_core.get_master_node_list().access_proof(mn_info.pubkey, [&entry, &netconf](const auto &proof) {
         entry.master_node_version     = proof.version;
         entry.public_ip                = epee::string_tools::get_ip_string_from_int32(proof.public_ip);
         entry.storage_port             = proof.storage_port;
@@ -3049,9 +3061,14 @@ namespace cryptonote { namespace rpc {
 
         // NOTE: Master Node Testing
         entry.last_uptime_proof                  = proof.timestamp;
+        auto system_now = std::chrono::system_clock::now();
+        auto steady_now = std::chrono::steady_clock::now();
         entry.storage_server_reachable           = proof.storage_server_reachable;
         entry.storage_server_reachable_timestamp = proof.storage_server_reachable_timestamp;
-
+        entry.beldexnet_reachable = !proof.beldexnet_reachable.unreachable_for(netconf.UPTIME_PROOF_VALIDITY - netconf.UPTIME_PROOF_FREQUENCY, steady_now);
+        entry.beldexnet_first_unreachable = reachable_to_time_t(proof.beldexnet_reachable.first_unreachable, system_now, steady_now);
+        entry.beldexnet_last_unreachable = reachable_to_time_t(proof.beldexnet_reachable.last_unreachable, system_now, steady_now);
+        entry.beldexnet_last_reachable = reachable_to_time_t(proof.beldexnet_reachable.last_reachable, system_now, steady_now);
         master_nodes::participation_history const &checkpoint_participation = proof.checkpoint_participation;
         master_nodes::participation_history const &pulse_participation      = proof.pulse_participation;
         entry.checkpoint_participation = std::vector<master_nodes::participation_entry>(checkpoint_participation.begin(), checkpoint_participation.end());
@@ -3298,7 +3315,7 @@ namespace cryptonote { namespace rpc {
   STORAGE_SERVER_PING::response core_rpc_server::invoke(STORAGE_SERVER_PING::request&& req, rpc_context context)
   {
     return handle_ping<STORAGE_SERVER_PING>(
-      {req.version_major, req.version_minor, req.version_patch}, master_nodes::MIN_STORAGE_SERVER_VERSION,
+      {2,0,7}, master_nodes::MIN_STORAGE_SERVER_VERSION,
       "Storage Server", m_core.m_last_storage_server_ping, STORAGE_SERVER_PING_LIFETIME,
       [this, &req](bool significant) {
         m_core.m_storage_lmq_port = req.storage_lmq_port;
@@ -3480,7 +3497,10 @@ namespace cryptonote { namespace rpc {
       throw rpc_error{ERROR_WRONG_PARAM, "Could not parse public key"};
     }
 
-    if (req.type != "reachability")
+    bool success = false;
+    if (req.type == "beldexnet")
+      success = m_core.get_master_node_list().set_beldexnet_peer_reachable(pubkey, req.passed);
+    else if (req.type != "reachability")
       throw rpc_error{ERROR_WRONG_PARAM, "Unknown status type"};
     if (!m_core.set_storage_server_peer_reachable(pubkey, req.passed))
       throw rpc_error{ERROR_WRONG_PARAM, "Pubkey not found"};
