@@ -3314,11 +3314,13 @@ namespace cryptonote { namespace rpc {
   //------------------------------------------------------------------------------------------------------------------------------
   STORAGE_SERVER_PING::response core_rpc_server::invoke(STORAGE_SERVER_PING::request&& req, rpc_context context)
   {
+    m_core.ss_version = req.version;
     return handle_ping<STORAGE_SERVER_PING>(
       {2,0,7}, master_nodes::MIN_STORAGE_SERVER_VERSION,
-      "Storage Server", m_core.m_last_storage_server_ping, STORAGE_SERVER_PING_LIFETIME,
+      "Storage Server", m_core.m_last_storage_server_ping, m_core.get_net_config().UPTIME_PROOF_FREQUENCY,
       [this, &req](bool significant) {
-        m_core.m_storage_lmq_port = req.storage_lmq_port;
+        m_core.m_storage_https_port = req.https_port;
+        m_core.m_storage_omq_port = req.omq_port;
         if (significant)
           m_core.reset_proof_interval();
       });

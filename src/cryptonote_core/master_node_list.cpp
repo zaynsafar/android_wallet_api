@@ -2775,6 +2775,11 @@ namespace master_nodes
     crypto_sign_detached(result.sig_ed25519.data, NULL, reinterpret_cast<unsigned char *>(hash.data), sizeof(hash.data), keys.key_ed25519.data);
     return result;
   }
+  uptime_proof::Proof master_node_list::generate_uptime_proof(uint32_t public_ip, uint16_t storage_https_port, uint16_t storage_omq_port, std::array<uint16_t, 3> ss_version, uint16_t quorumnet_port, std::array<uint16_t, 3> beldexnet_version) const
+  {
+    const auto& keys = *m_master_node_keys;
+    return uptime_proof::Proof(public_ip, storage_https_port, storage_omq_port, ss_version, quorumnet_port, beldexnet_version, keys);
+  }
 
 #ifdef __cpp_lib_erase_if // # (C++20)
   using std::erase_if;
