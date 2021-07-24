@@ -2,21 +2,21 @@
 // Copyright (c)      2018, The Beldex Project
 // 
 // All rights reserved.
-// 
+//
 // Redistribution and use in source and binary forms, with or without modification, are
 // permitted provided that the following conditions are met:
-// 
+//
 // 1. Redistributions of source code must retain the above copyright notice, this list of
 //    conditions and the following disclaimer.
-// 
+//
 // 2. Redistributions in binary form must reproduce the above copyright notice, this list
 //    of conditions and the following disclaimer in the documentation and/or other
 //    materials provided with the distribution.
-// 
+//
 // 3. Neither the name of the copyright holder nor the names of its contributors may be
 //    used to endorse or promote products derived from this software without specific
 //    prior written permission.
-// 
+//
 // THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY
 // EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
 // MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL
@@ -26,7 +26,7 @@
 // INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
 // STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
 // THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-// 
+//
 // Parts of this file are originally copyright (c) 2012-2013 The Cryptonote developers
 #include <boost/format.hpp>
 #include <boost/asio/ip/address.hpp>
@@ -467,8 +467,11 @@ namespace tools
     }
     MINFO("Stopping long poll thread");
     m_wallet->cancel_long_poll();
+    // Store this to revert it afterwards to its original state
+    bool disabled_state = m_long_poll_disabled;
     m_long_poll_disabled = true;
     m_long_poll_thread.join();
+    m_long_poll_disabled = disabled_state;
   }
   //------------------------------------------------------------------------------------------------------------------------------
   bool wallet_rpc_server::init()
@@ -863,12 +866,18 @@ namespace tools
     return res;
   }
 
-  static cryptonote::address_parse_info extract_account_addr(
+  //------------------------------------------------------------------------------------------------------------------------------
+  cryptonote::address_parse_info wallet_rpc_server::extract_account_addr(
       cryptonote::network_type nettype,
       std::string_view addr_or_url)
   {
-    cryptonote::address_parse_info info;
-    if (!get_account_address_from_str_or_url(info, nettype, addr_or_url,
+    if (m_wallet->is_trusted_daemon())
+    {
+      std::optional<std::string> address = m_wallet->resolve_address(std::string{addr_or_url});
+      if (address)
+      {
+        cryptonote::address_parse_info info;
+        if (!get_account_address_from_str_or_url(info, nettype, *address,
           [](const std::string_view url, const std::vector<std::string> &addresses, bool dnssec_valid) {
             if (!dnssec_valid)
               throw wallet_rpc_error{error_code::WRONG_ADDRESS, "Invalid DNSSEC for "s + std::string{url}};
@@ -876,8 +885,25 @@ namespace tools
               throw wallet_rpc_error{error_code::WRONG_ADDRESS, "No Beldex address found at "s + std::string{url}};
             return addresses[0];
           }))
-      throw wallet_rpc_error{error_code::WRONG_ADDRESS, "Invalid address: "s + std::string{addr_or_url}};
-    return info;
+          throw wallet_rpc_error{error_code::WRONG_ADDRESS, "Invalid address: "s + std::string{addr_or_url}};
+        return info;
+      } else {
+        throw wallet_rpc_error{error_code::WRONG_ADDRESS, "Invalid address: "s + std::string{addr_or_url}};
+      }
+    } else {
+      cryptonote::address_parse_info info;
+      if (!get_account_address_from_str_or_url(info, nettype, addr_or_url,
+        [](const std::string_view url, const std::vector<std::string> &addresses, bool dnssec_valid) {
+          if (!dnssec_valid)
+            throw wallet_rpc_error{error_code::WRONG_ADDRESS, "Invalid DNSSEC for "s + std::string{url}};
+          if (addresses.empty())
+            throw wallet_rpc_error{error_code::WRONG_ADDRESS, "No Beldex address found at "s + std::string{url}};
+          return addresses[0];
+        }))
+        throw wallet_rpc_error{error_code::WRONG_ADDRESS, "Invalid address: "s + std::string{addr_or_url}};
+      return info;
+    }
+    return {};
   }
 
   //------------------------------------------------------------------------------------------------------------------------------
@@ -1992,7 +2018,7 @@ namespace tools
       {
         res.in.push_back(std::move(entry));
       }
-      else if (entry.pay_type == wallet::pay_type::out || entry.pay_type == wallet::pay_type::stake)
+      else if (entry.pay_type == wallet::pay_type::out || entry.pay_type == wallet::pay_type::stake || entry.pay_type == wallet::pay_type::ons)
       {
         res.out.push_back(std::move(entry));
       }
@@ -2115,6 +2141,35 @@ namespace tools
       throw wallet_rpc_error{error_code::UNKNOWN_ERROR, "command not supported by HW wallet"};
 
     res.outputs_data_hex = oxenmq::to_hex(m_wallet->export_outputs_to_str(req.all));
+
+    return res;
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
+  EXPORT_TRANSFERS::response wallet_rpc_server::invoke(EXPORT_TRANSFERS::request&& req)
+  {
+    require_open();
+    EXPORT_TRANSFERS::response res{};
+    std::vector<wallet::transfer_view> all_transfers;
+
+    tools::wallet2::get_transfers_args_t args;
+    args.in = req.in;
+    args.out = req.out;
+    args.stake = req.stake;
+    args.pending = req.pending;
+    args.failed = req.failed;
+    args.pool = req.pool;
+    args.coinbase = req.coinbase;
+    args.filter_by_height = req.filter_by_height;
+    args.min_height = req.min_height;
+    args.max_height = req.max_height;
+    args.subaddr_indices = req.subaddr_indices;
+    args.account_index = req.account_index;
+    args.all_accounts = req.all_accounts;
+
+    m_wallet->get_transfers(args, all_transfers);
+
+    const bool formatting = true;
+    res.data = m_wallet->transfers_to_csv(all_transfers, formatting);
 
     return res;
   }
@@ -2322,7 +2377,7 @@ namespace tools
     if (req.threads_count < 1 || max_mining_threads_count < req.threads_count)
       throw wallet_rpc_error{error_code::UNKNOWN_ERROR, "The specified number of threads is inappropriate."};
 
-    rpc::START_MINING::request daemon_req{}; 
+    rpc::START_MINING::request daemon_req{};
     daemon_req.miner_address = m_wallet->get_account().get_public_address_str(m_wallet->nettype());
     daemon_req.threads_count = req.threads_count;
 

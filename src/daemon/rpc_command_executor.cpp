@@ -37,14 +37,14 @@
 #include "daemon/rpc_command_executor.h"
 #include "epee/int-util.h"
 #include "rpc/core_rpc_server_commands_defs.h"
-#include "cryptonote_core/cryptonote_core.h"
 #include "cryptonote_core/master_node_rules.h"
 #include "cryptonote_basic/hardfork.h"
 #include "checkpoints/checkpoints.h"
 #include <boost/format.hpp>
-#include "rpc_command_executor.h"
+#include <oxenmq/base32z.h>
+
 #include "common/beldex_integration_test_hooks.h"
-#include <iostream>
+
 #include <fstream>
 #include <ctime>
 #include <string>
@@ -169,7 +169,7 @@ namespace {
   {
     if (t == now)
       return "now";
-    time_t dt = t > now ? t - now : now - t;
+    auto dt = ago > 0s ? ago : -ago;
     std::string s;
     if (dt < 90)
       s = std::to_string(dt) + (abbreviate ? "sec" : dt == 1 ? " second" : " seconds");
@@ -470,6 +470,7 @@ bool rpc_command_executor::show_status() {
   int64_t my_decomm_remaining = 0;
   uint64_t my_mn_last_uptime = 0;
   bool my_mn_registered = false, my_mn_staked = false, my_mn_active = false;
+  uint16_t my_reason_all = 0, my_reason_any = 0;
   if (ires.master_node && *ires.master_node) {
     GET_MASTER_KEYS::response res{};
 
@@ -489,6 +490,8 @@ bool rpc_command_executor::show_status() {
       my_mn_active = entry.active;
       my_decomm_remaining = entry.earned_downtime_blocks;
       my_mn_last_uptime = entry.last_uptime_proof;
+      my_reason_all = entry.last_decommission_reason_consensus_all;
+      my_reason_any = entry.last_decommission_reason_consensus_any;
     }
   }
 
@@ -525,17 +528,15 @@ bool rpc_command_executor::show_status() {
 
   str << ", v" << (ires.version.empty() ? "?.?.?" : ires.version);
   str << "(net v" << +hfres.version << ')';
-  print_fork_extra_info(str, hfres.earliest_height, net_height, ires.target);
+  if (hfres.earliest_height)
+    print_fork_extra_info(str, *hfres.earliest_height, net_height, ires.target);
 
-  str << ", " << (
-    hfres.state == cryptonote::HardFork::Ready ? "up to date" :
-    hfres.state == cryptonote::HardFork::UpdateNeeded ? "update needed" :
-    "out of date, likely forked");
+  std::time_t now = std::time(nullptr);
 
   // restricted RPC does not disclose these:
   if (ires.outgoing_connections_count && ires.incoming_connections_count && ires.start_time)
   {
-    std::time_t uptime = std::time(nullptr) - *ires.start_time;
+    std::time_t uptime = now - *ires.start_time;
     str << ", " << *ires.outgoing_connections_count << "(out)+" << *ires.incoming_connections_count << "(in) connections"
       << ", uptime "
       << (uptime / (24*60*60)) << 'd'
@@ -562,12 +563,24 @@ bool rpc_command_executor::show_status() {
     str << " (storage), ";
 
     if (*ires.last_beldexnet_ping > 0)
-        str << get_human_time_ago(*ires.last_beldexnet_ping, time(nullptr), true /*abbreviate*/);
+        str << get_human_time_ago(*ires.last_beldexnet_ping, now, true /*abbreviate*/);
     else
         str << "NOT RECEIVED";
     str << " (beldexnet)";
 
     tools::success_msg_writer() << str.str();
+
+    if (my_mn_registered && my_mn_staked && !my_mn_active && (my_reason_all | my_reason_any)) {
+      str.str("Decomm reasons: ");
+      if (auto reasons = cryptonote::readable_reasons(my_reason_all); !reasons.empty())
+        str << tools::join(", ", reasons);
+      if (auto reasons = cryptonote::readable_reasons(my_reason_any & ~my_reason_all); !reasons.empty()) {
+        for (auto& r : reasons)
+          r += "(some)";
+        str << (my_reason_all ? ", " : "") << tools::join(", ", reasons);
+      }
+      tools::fail_msg_writer() << str.str();
+    }
   }
 
   return true;
@@ -1153,45 +1166,26 @@ bool rpc_command_executor::out_peers(bool set, uint32_t limit)
 {
     OUT_PEERS::request req{set, limit};
 	OUT_PEERS::response res{};
-  req.out_peers = limit;
-  
     if (!invoke<OUT_PEERS>(std::move(req), res, "Failed to set max out peers"))
       return false;
 
 	const std::string s = res.out_peers == (uint32_t)-1 ? "unlimited" : std::to_string(res.out_peers);
-	tools::msg_writer() << "Max number of out peers set to " << limit;
+	tools::msg_writer() << "Max number of out peers set to " << s << std::endl;
 
 	return true;
 }
 
 bool rpc_command_executor::in_peers(bool set, uint32_t limit)
 {
-	IN_PEERS::request req{set, limit};
+    IN_PEERS::request req{set, limit};
 	IN_PEERS::response res{};
-
-	req.in_peers = limit;
-
-	if (!invoke<IN_PEERS>(std::move(req), res, "Failed to set max out peers"))
-	
-			return false;
-      const std::string s = res.in_peers == (uint32_t)-1 ? "unlimited" : std::to_string(res.in_peers);
-	tools::msg_writer() << "Max number of in peers set to " << limit;
-
-	return true;
-}
-
-bool rpc_command_executor::hard_fork_info(uint8_t version)
-{
-    HARD_FORK_INFO::response res{};
-    if (!invoke<HARD_FORK_INFO>({version}, res, "Failed to retrieve hard fork info"))
+    if (!invoke<IN_PEERS>(std::move(req), res, "Failed to set max in peers"))
       return false;
 
-    version = version > 0 ? version : res.voting;
-    tools::msg_writer() << "version " << (uint32_t)version << " " << (res.enabled ? "enabled" : "not enabled") <<
-        ", " << res.votes << "/" << res.window << " votes, threshold " << res.threshold;
-    tools::msg_writer() << "current version " << (uint32_t)res.version << ", voting for version " << (uint32_t)res.voting;
+	const std::string s = res.in_peers == (uint32_t)-1 ? "unlimited" : std::to_string(res.in_peers);
+	tools::msg_writer() << "Max number of in peers set to " << s << std::endl;
 
-    return true;
+	return true;
 }
 
 bool rpc_command_executor::print_bans()
@@ -1548,27 +1542,35 @@ static void print_vote_history(std::ostringstream &stream, std::vector<master_no
 
   for (size_t i = 0; i < votes.size(); i++)
   {
-    master_nodes::participation_entry const &entry = votes[(offset + i) % votes.size()];
-    if (entry.is_pulse)
-    {
-      stream << "[" << entry.height << ", ";
-      stream << +entry.pulse.round << ", ";
-      stream << (entry.voted ? "Yes" : "No") << "]";
-    }
-    else
-    {
-      stream << "[" << entry.height << ", " << (entry.voted ? "Yes" : "No") << "]";
-    }
-    if (i < (votes.size() - 1)) stream << ",";
-    stream << " ";
+    if (i > 0) stream << ", ";
+    const auto& entry = votes[(offset + i) % votes.size()];
+    stream << "[" << entry.height;
+    if (entry.is_pulse and entry.pulse.round > 0)
+      // For a typical pulse round just [1234,yes].  For a backup round: [1234+3,yes]
+      stream << "+" << +entry.pulse.round;
+
+    stream << "," << (entry.voted ? "yes" : "NO") << "]";
+  }
+}
+
+template <class participationEntry>
+static void print_participation_history(std::ostringstream &stream, std::vector<participationEntry> const &votes)
+{
+  if (votes.empty())
+    stream << "(Awaiting timesync data from master node)";
+
+  for (size_t i = 0; i < votes.size(); i++)
+  {
+    if (i > 0) stream << ", ";
+    stream << "["<< (votes[i].pass() ? "yes" : "NO") << "]";
   }
 }
 
 static void append_printable_master_node_list_entry(cryptonote::network_type nettype, bool detailed_view, uint64_t blockchain_height, uint64_t entry_index, GET_MASTER_NODES::response::entry const &entry, std::string &buffer)
 {
-  const char indent1[] = "    ";
-  const char indent2[] = "        ";
-  const char indent3[] = "            ";
+  const char indent1[] = "  ";
+  const char indent2[] = "    ";
+  const char indent3[] = "      ";
   bool is_registered = entry.total_contributed >= entry.staking_requirement;
 
   std::ostringstream stream;
@@ -1650,25 +1652,19 @@ static void append_printable_master_node_list_entry(cryptonote::network_type net
     if (entry.public_ip == "0.0.0.0")
       stream << "(Awaiting confirmation from network)";
     else
-      stream << entry.public_ip << " :" << entry.storage_port << " (storage), :" << entry.storage_lmq_port
-             << " (storage lmq), :" << entry.quorumnet_port << " (quorumnet)";
+      stream << entry.public_ip << " :" << entry.storage_port << " (storage https), :" << entry.storage_lmq_port
+             << " (storage omq), :" << entry.quorumnet_port << " (quorumnet)";
 
     stream << "\n";
     if (detailed_view)
       stream << indent2 << "Auxiliary Public Keys:\n"
              << indent3 << (entry.pubkey_ed25519.empty() ? "(not yet received)" : entry.pubkey_ed25519) << " (Ed25519)\n"
+             << indent3 << (entry.pubkey_ed25519.empty() ? "(not yet received)" : oxenmq::to_base32z(oxenmq::from_hex(entry.pubkey_ed25519)) + ".mnode") << " (Beldexnet)\n"
              << indent3 << (entry.pubkey_x25519.empty()  ? "(not yet received)" : entry.pubkey_x25519)  << " (X25519)\n";
 
     //
     // NOTE: Storage Server Test
     //
-    stream << indent2 << "Storage Server Reachable: " << (entry.storage_server_reachable ? "Yes" : "No") << " (";
-    if (entry.storage_server_reachable_timestamp == 0)
-      stream << "Awaiting first test";
-    else
-      stream << "Last checked: " << get_human_time_ago(entry.storage_server_reachable_timestamp, now);
-    stream << ")\n";
-    
     auto print_reachable = [&stream, &now] (bool reachable, auto first_unreachable, auto last_unreachable, auto last_reachable) {
       if (first_unreachable == 0) {
         if (last_reachable == 0)
@@ -1691,31 +1687,34 @@ static void append_printable_master_node_list_entry(cryptonote::network_type net
       }
       stream << '\n';
     };
+    stream << indent2 << "Storage Server Reachable: ";
+    print_reachable(entry.storage_server_reachable, entry.storage_server_first_unreachable, entry.storage_server_last_unreachable, entry.storage_server_last_reachable);
     stream << indent2 << "Beldexnet Reachable: ";
     print_reachable(entry.beldexnet_reachable, entry.beldexnet_first_unreachable, entry.beldexnet_last_unreachable, entry.beldexnet_last_reachable);
+
     //
-    // NOTE: Node Credits
+    // NOTE: Component Versions
     //
-    stream << indent2;
-    if (entry.active) {
-      stream << "Downtime Credits: " << entry.earned_downtime_blocks << " blocks";
-      stream << " (about " << to_string_rounded(entry.earned_downtime_blocks / (double) BLOCKS_EXPECTED_IN_HOURS(1), 2)  << " hours)";
-      if (entry.earned_downtime_blocks < master_nodes::DECOMMISSION_MINIMUM)
-        stream << " (Note: " << master_nodes::DECOMMISSION_MINIMUM << " blocks required to enable deregistration delay)";
-    } else {
-      stream << "Current Status: DECOMMISSIONED\n";
-      stream << indent2 << "Remaining Decommission Time Until DEREGISTRATION: " << entry.earned_downtime_blocks << " blocks";
-    }
-    stream << "\n";
+    stream << indent2 << "Storage Server / Beldexnet Router versions: "
+        << ((entry.storage_server_version[0] == 0 && entry.storage_server_version[1] == 0 && entry.storage_server_version[2] == 0) ? "(Storage server ping not yet received) " : tools::join(".", entry.storage_server_version)) << " / " << ((entry.beldexnet_version[0] == 0 && entry.beldexnet_version[1] == 0 && entry.beldexnet_version[2] == 0) ? "(Beldexnet ping not yet received)" : tools::join(".", entry.beldexnet_version)) << "\n";
+
+
+
 
     //
     // NOTE: Print Voting History
     //
-    stream << indent2 <<  "Checkpoint Participation [Height, Voted]\n" << indent3;
+    stream << indent2 <<  "Checkpoints [Height,Voted]: ";
     print_vote_history(stream, entry.checkpoint_participation);
 
-    stream << "\n\n" << indent2 << "Pulse Participation [Height, Round, Voted]\n" << indent3;
+    stream << "\n" << indent2 << "Pulse [Height,Voted]: ";
     print_vote_history(stream, entry.pulse_participation);
+
+    stream << "\n" << indent2 << "Timestamps [in_sync]: ";
+    print_participation_history(stream, entry.timestamp_participation);
+
+    stream << "\n" << indent2 << "Timesync [responded]: ";
+    print_participation_history(stream, entry.timesync_status);
   }
 
   stream << "\n";
@@ -1728,6 +1727,34 @@ static void append_printable_master_node_list_entry(cryptonote::network_type net
       stream << indent3 << "Amount / Reserved: " << cryptonote::print_money(contributor.amount) << "/" << cryptonote::print_money(contributor.reserved) << "\n";
     }
   }
+
+  //
+  // NOTE: Overall status
+  //
+  if (entry.active) {
+    stream << indent2 << "Current Status: ACTIVE\n";
+    stream << indent2 << "Downtime Credits: " << entry.earned_downtime_blocks << " blocks"
+      << " (about " << to_string_rounded(entry.earned_downtime_blocks / (double) BLOCKS_EXPECTED_IN_HOURS(1), 2)  << " hours)";
+    if (entry.earned_downtime_blocks < master_nodes::DECOMMISSION_MINIMUM)
+      stream << " (Note: " << master_nodes::DECOMMISSION_MINIMUM << " blocks required to enable deregistration delay)";
+  } else if (is_registered) {
+    stream << indent2 << "Current Status: DECOMMISSIONED" ;
+    if (entry.last_decommission_reason_consensus_all || entry.last_decommission_reason_consensus_any)
+      stream << " - ";
+    if (auto reasons = cryptonote::readable_reasons(entry.last_decommission_reason_consensus_all); !reasons.empty())
+      stream << tools::join(", ", reasons);
+    // Add any "any" reasons that aren't in all with a (some) qualifier
+    if (auto reasons = cryptonote::readable_reasons(entry.last_decommission_reason_consensus_any & ~entry.last_decommission_reason_consensus_all); !reasons.empty()) {
+      for (auto& r : reasons)
+        r += "(some)";
+      stream << (entry.last_decommission_reason_consensus_all ? ", " : "") << tools::join(", ", reasons);
+    }
+    stream << "\n";
+    stream << indent2 << "Remaining Decommission Time Until DEREGISTRATION: " << entry.earned_downtime_blocks << " blocks";
+  } else {
+      stream << indent2 << "Current Status: awaiting contributions\n";
+  }
+  stream << "\n";
 
   buffer.append(stream.str());
 }
@@ -1924,7 +1951,7 @@ static uint64_t get_actual_amount(uint64_t amount, uint64_t portions)
   return resultlo;
 }
 
-bool rpc_command_executor::prepare_registration()
+bool rpc_command_executor::prepare_registration(bool force_registration)
 {
   // RAII-style class to temporarily clear categories and restore upon destruction (i.e. upon returning).
   struct clear_log_categories {
@@ -1934,7 +1961,7 @@ bool rpc_command_executor::prepare_registration()
   };
   auto scoped_log_cats = std::unique_ptr<clear_log_categories>(new clear_log_categories());
 
-  // Check if the daemon was started in Master Node or not
+  // Check if the daemon was started in master Node or not
   GET_INFO::response res{};
   GET_MASTER_KEYS::response kres{};
   HARD_FORK_INFO::response hf_res{};
@@ -1946,6 +1973,20 @@ bool rpc_command_executor::prepare_registration()
   if (!res.master_node)
   {
     tools::fail_msg_writer() << "Unable to prepare registration: this daemon is not running in --master-node mode";
+    return false;
+  }
+  else if (auto last_beldexnet_ping = static_cast<std::time_t>(res.last_beldexnet_ping.value_or(0));
+      last_beldexnet_ping < (time(nullptr) - 60) && !force_registration)
+  {
+    tools::fail_msg_writer() << "Unable to prepare registration: this daemon has not received a ping from beldexnet "
+                             << (res.last_beldexnet_ping == 0 ? "yet" : "since " + get_human_time_ago(last_beldexnet_ping, std::time(nullptr)));
+    return false;
+  }
+  else if (auto last_storage_server_ping = static_cast<std::time_t>(res.last_storage_server_ping.value_or(0));
+      last_storage_server_ping < (time(nullptr) - 60) && !force_registration)
+  {
+    tools::fail_msg_writer() << "Unable to prepare registration: this daemon has not received a ping from the storage server "
+                             << (res.last_storage_server_ping == 0 ? "yet" : "since " + get_human_time_ago(last_storage_server_ping, std::time(nullptr)));
     return false;
   }
 
@@ -1995,8 +2036,8 @@ bool rpc_command_executor::prepare_registration()
   }
 
   const uint64_t staking_requirement =
-    std::max(master_nodes::get_staking_requirement(nettype, block_height, hf_version),
-             master_nodes::get_staking_requirement(nettype, block_height + 30 * 24, hf_version)); // allow 1 day
+    std::max(master_nodes::get_staking_requirement(nettype, block_height),
+             master_nodes::get_staking_requirement(nettype, block_height + 30 * 24)); // allow 1 day
 
   // anything less than DUST will be added to operator stake
   const uint64_t DUST = MAX_NUMBER_OF_CONTRIBUTORS;

@@ -72,7 +72,7 @@ static_assert(STAKING_PORTIONS % 12 == 0, "Use a multiple of twelve, so that it 
 #define UPTIME_PROOF_INITIAL_DELAY_SECONDS              (2*UPTIME_PROOF_BASE_MINUTE) // Delay after startup before sending a proof (to allow connections to be established)
 #define UPTIME_PROOF_TIMER_SECONDS                      (5*UPTIME_PROOF_BASE_MINUTE) // How often we check whether we need to send an uptime proof
 #define UPTIME_PROOF_FREQUENCY_IN_SECONDS               (60*UPTIME_PROOF_BASE_MINUTE) // How often we resend uptime proofs normally (i.e. after we've seen an uptime proof reply from the network)
-#define UPTIME_PROOF_MAX_TIME_IN_SECONDS                (UPTIME_PROOF_FREQUENCY_IN_SECONDS * 2 + UPTIME_PROOF_BUFFER_IN_SECONDS) // How long until proofs of other network service nodes are considered expired
+#define UPTIME_PROOF_MAX_TIME_IN_SECONDS                (UPTIME_PROOF_FREQUENCY_IN_SECONDS * 2 + UPTIME_PROOF_BUFFER_IN_SECONDS) // How long until proofs of other network master nodes are considered expired
 
 #define STORAGE_SERVER_PING_LIFETIME                    UPTIME_PROOF_FREQUENCY_IN_SECONDS
 #define BELDEXNET_PING_LIFETIME                           UPTIME_PROOF_FREQUENCY_IN_SECONDS
@@ -224,7 +224,7 @@ namespace config
   // Maximum allowed stake contribution, as a fraction of the available contribution room.  This
   // should generally be slightly larger than 1.  This is used to disallow large overcontributions
   // which can happen when there are competing stakes submitted at the same time for the same
-  // service node.
+  // master node.
   using MAXIMUM_ACCEPTABLE_STAKE = std::ratio<101, 100>;
 
   // Used to estimate the blockchain height from a timestamp, with some grace time.  This can drift
@@ -253,9 +253,12 @@ namespace config
     "bxcguQiBhYaDW5wAdPLSwRHA6saX1nCEYUF89SPKZfBY1BENdLQWjti59aEtAEgrVZjnCJEVFoCDrG1DCoz2HeeN2pxhxL9xa"sv,
   };
 
+  inline constexpr auto UPTIME_PROOF_TOLERANCE = 5min; // How much an uptime proof timestamp can deviate from our timestamp before we refuse it
+  inline constexpr auto UPTIME_PROOF_STARTUP_DELAY = 30s; // How long to wait after startup before broadcasting a proof
+  inline constexpr auto UPTIME_PROOF_CHECK_INTERVAL = 30s; // How frequently to check whether we need to broadcast a proof
   inline constexpr auto UPTIME_PROOF_FREQUENCY = 1h; // How often to send proofs out to the network since the last proof we successfully sent.  (Approximately; this can be up to CHECK_INTERFACE/2 off in either direction).  The minimum accepted time between proofs is half of this.
   inline constexpr auto UPTIME_PROOF_VALIDITY = 2h + 5min; // The maximum time that we consider an uptime proof to be valid (i.e. after this time since the last proof we consider the SN to be down)
-  inline constexpr auto REACHABLE_MAX_FAILURE_VALIDITY = 5min; // If we don't hear any SS ping/lokinet session test failures for more than this long then we start considering the SN as passing for the purpose of obligation testing until we get another test result.  This should be somewhat larger than SS/lokinet's max re-test backoff (2min).
+  inline constexpr auto REACHABLE_MAX_FAILURE_VALIDITY = 5min; // If we don't hear any SS ping/beldexnet session test failures for more than this long then we start considering the SN as passing for the purpose of obligation testing until we get another test result.  This should be somewhat larger than SS/beldexnet's max re-test backoff (2min).
   // Hash domain separators
   inline constexpr std::string_view HASH_KEY_BULLETPROOF_EXPONENT = "bulletproof"sv;
   inline constexpr std::string_view HASH_KEY_RINGDB = "ringdsb\0"sv;
@@ -343,7 +346,7 @@ namespace cryptonote
     network_version_10_bulletproofs, // Bulletproofs, Service Node Grace Registration Period, Batched Governance
     network_version_11_infinite_staking, // Infinite Staking, CN-Turtle
     network_version_12_security_signature,
-    network_version_13_checkpointing, // Checkpointing, Relaxed Deregistration, RandomXL, Loki Storage Server
+    network_version_13_checkpointing, // Checkpointing, Relaxed Deregistration, RandomXL, Beldex Storage Server
     network_version_14_enforce_checkpoints,
     network_version_15_blink,
     network_version_16_bns,
@@ -393,6 +396,9 @@ namespace cryptonote
     uint64_t GOVERNANCE_REWARD_INTERVAL_IN_BLOCKS;
     std::array<std::string_view, 2> GOVERNANCE_WALLET_ADDRESS;
 
+    std::chrono::seconds UPTIME_PROOF_TOLERANCE;
+    std::chrono::seconds UPTIME_PROOF_STARTUP_DELAY;
+    std::chrono::seconds UPTIME_PROOF_CHECK_INTERVAL;
     std::chrono::seconds UPTIME_PROOF_FREQUENCY;
     std::chrono::seconds UPTIME_PROOF_VALIDITY;
 
@@ -404,7 +410,7 @@ namespace cryptonote
       return GOVERNANCE_WALLET_ADDRESS[hard_fork_version >= wallet_switch ? 1 : 0];
     }
   };
-  inline constexpr network_config mainnet_config = {
+  inline constexpr network_config mainnet_config{
     MAINNET,
     ::config::HEIGHT_ESTIMATE_HEIGHT,
     ::config::HEIGHT_ESTIMATE_TIMESTAMP,
@@ -420,10 +426,13 @@ namespace cryptonote
     ::config::GENESIS_NONCE,
     ::config::GOVERNANCE_REWARD_INTERVAL_IN_BLOCKS,
     ::config::GOVERNANCE_WALLET_ADDRESS,
+    config::UPTIME_PROOF_TOLERANCE,
+    config::UPTIME_PROOF_STARTUP_DELAY,
+    config::UPTIME_PROOF_CHECK_INTERVAL,
     config::UPTIME_PROOF_FREQUENCY,
     config::UPTIME_PROOF_VALIDITY,
   };
-  inline constexpr network_config testnet_config = {
+  inline constexpr network_config testnet_config{
     TESTNET,
     ::config::testnet::HEIGHT_ESTIMATE_HEIGHT,
     ::config::testnet::HEIGHT_ESTIMATE_TIMESTAMP,
@@ -439,10 +448,13 @@ namespace cryptonote
     ::config::testnet::GENESIS_NONCE,
     ::config::testnet::GOVERNANCE_REWARD_INTERVAL_IN_BLOCKS,
     ::config::testnet::GOVERNANCE_WALLET_ADDRESS,
+    config::UPTIME_PROOF_TOLERANCE,
+    config::UPTIME_PROOF_STARTUP_DELAY,
+    config::UPTIME_PROOF_CHECK_INTERVAL,
     config::testnet::UPTIME_PROOF_FREQUENCY,
     config::testnet::UPTIME_PROOF_VALIDITY,
   };
-  inline constexpr network_config devnet_config = {
+  inline constexpr network_config devnet_config{
     DEVNET,
     ::config::devnet::HEIGHT_ESTIMATE_HEIGHT,
     ::config::devnet::HEIGHT_ESTIMATE_TIMESTAMP,
@@ -458,10 +470,13 @@ namespace cryptonote
     ::config::devnet::GENESIS_NONCE,
     ::config::devnet::GOVERNANCE_REWARD_INTERVAL_IN_BLOCKS,
     ::config::devnet::GOVERNANCE_WALLET_ADDRESS,
+    config::UPTIME_PROOF_TOLERANCE,
+    config::UPTIME_PROOF_STARTUP_DELAY,
+    config::UPTIME_PROOF_CHECK_INTERVAL,
     config::testnet::UPTIME_PROOF_FREQUENCY,
     config::testnet::UPTIME_PROOF_VALIDITY,
   };
-  inline constexpr network_config fakenet_config = {
+  inline constexpr network_config fakenet_config{
     FAKECHAIN,
     ::config::HEIGHT_ESTIMATE_HEIGHT,
     ::config::HEIGHT_ESTIMATE_TIMESTAMP,
@@ -477,6 +492,9 @@ namespace cryptonote
     ::config::GENESIS_NONCE,
     100, //::config::GOVERNANCE_REWARD_INTERVAL_IN_BLOCKS,
     ::config::GOVERNANCE_WALLET_ADDRESS,
+    config::UPTIME_PROOF_TOLERANCE,
+    config::fakechain::UPTIME_PROOF_STARTUP_DELAY,
+    config::fakechain::UPTIME_PROOF_CHECK_INTERVAL,
     config::fakechain::UPTIME_PROOF_FREQUENCY,
     config::fakechain::UPTIME_PROOF_VALIDITY,
   };

@@ -63,10 +63,10 @@ namespace cryptonote::rpc {
         std::vector<std::tuple<std::string, uint16_t, bool>> bind // {IP,port,required}
         );
 
-    ~http_server();
+    ~http_server() override;
 
     /// Starts the event loop in the thread handling http requests.  Core must have been initialized
-    /// and LokiMQ started.  Will propagate an exception from the thread if startup fails.
+    /// and OxenMQ started.  Will propagate an exception from the thread if startup fails.
     void start();
 
     /// Closes the http server connection.  Can safely be called multiple times, or to abort a

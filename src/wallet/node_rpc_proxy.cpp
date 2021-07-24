@@ -1,21 +1,21 @@
 // Copyright (c) 2017-2019, The Monero Project
 // 
 // All rights reserved.
-// 
+//
 // Redistribution and use in source and binary forms, with or without modification, are
 // permitted provided that the following conditions are met:
-// 
+//
 // 1. Redistributions of source code must retain the above copyright notice, this list of
 //    conditions and the following disclaimer.
-// 
+//
 // 2. Redistributions in binary form must reproduce the above copyright notice, this list
 //    of conditions and the following disclaimer in the documentation and/or other
 //    materials provided with the distribution.
-// 
+//
 // 3. Neither the name of the copyright holder nor the names of its contributors may be
 //    used to endorse or promote products derived from this software without specific
 //    prior written permission.
-// 
+//
 // THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY
 // EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
 // MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL
@@ -161,7 +161,9 @@ bool NodeRPCProxy::get_earliest_height(uint8_t version, uint64_t &earliest_heigh
     req_t.version = version;
     try {
       auto resp_t = invoke_json_rpc<rpc::HARD_FORK_INFO>(req_t);
-      m_earliest_height[version] = resp_t.earliest_height;
+      if (!resp_t.earliest_height)
+        return false;
+      m_earliest_height[version] = *resp_t.earliest_height;
     } catch (...) { return false; }
   }
 
@@ -329,6 +331,39 @@ std::pair<bool, std::vector<cryptonote::rpc::GET_MASTER_NODE_BLACKLISTED_KEY_IMA
     }
 
     mns = m_master_node_blacklisted_key_images;
+  }
+
+  success = true;
+  return result;
+}
+
+std::pair<bool, std::vector<cryptonote::rpc::ONS_OWNERS_TO_NAMES::response_entry>> NodeRPCProxy::bns_owners_to_names(cryptonote::rpc::ONS_OWNERS_TO_NAMES::request const &request) const
+{
+  return get_result_pair<rpc::ONS_OWNERS_TO_NAMES>(request, [](auto&& res) { return std::move(res.entries); });
+}
+
+std::pair<bool, std::vector<cryptonote::rpc::ONS_NAMES_TO_OWNERS::response_entry>> NodeRPCProxy::bns_names_to_owners(cryptonote::rpc::ONS_NAMES_TO_OWNERS::request const &request) const
+{
+  return get_result_pair<rpc::ONS_NAMES_TO_OWNERS>(request, [](auto&& res) { return std::move(res.entries); });
+}
+std::pair<bool,cryptonote::rpc::ONS_RESOLVE::response> NodeRPCProxy::bns_resolve(cryptonote::rpc::ONS_RESOLVE::request const &request) const
+{
+  std::pair<bool, cryptonote::rpc::ONS_RESOLVE::response> result;
+  auto& [success, resolved] = result;
+  success = false;
+
+  uint64_t height;
+  if (m_offline || !get_height(height))
+    return result;
+
+  {
+    try {
+      auto res = m_http_client.json_rpc<rpc::ONS_RESOLVE>(rpc::ONS_RESOLVE::names().front(), request);
+      resolved = res;
+    } catch (...) {
+      return result;
+    }
+
   }
 
   success = true;

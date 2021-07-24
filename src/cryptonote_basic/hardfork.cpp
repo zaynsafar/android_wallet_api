@@ -27,454 +27,124 @@
 // STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
 // THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include <algorithm>
-#include <cstdio>
+#include <array>
 
-#include "common/beldex.h"
-#include "cryptonote_basic/cryptonote_basic.h"
-#include "blockchain_db/blockchain_db.h"
 #include "hardfork.h"
 
-#undef BELDEX_DEFAULT_LOG_CATEGORY
-#define BELDEX_DEFAULT_LOG_CATEGORY "hardfork"
-
-using namespace cryptonote;
-
-static uint8_t get_block_vote(const cryptonote::block &b)
-{
-  // Pre-hardfork blocks have a minor version hardcoded to 0.
-  // For the purposes of voting, we consider 0 to refer to
-  // version number 1, which is what all blocks from the genesis
-  // block are. It makes things simpler.
-  if (b.minor_version == 0)
-    return 1;
-  return b.minor_version;
-}
-
-static uint8_t get_block_version(const cryptonote::block &b)
-{
-  return b.major_version;
-}
-
-// TODO(beldex): Re-evaluate Hardfork as a class. Originally designed to
-// handle voting, hardforks are now locked in, maybe we just need helper
-// functions on the hardcoded table instead of hiding everything behind
-// a class.
+namespace cryptonote {
 
 // version 7 from the start of the blockchain, inhereted from Monero mainnet
-static constexpr HardFork::Params mainnet_hard_forks[] =
-{ 
-	{ 1, 1, 0, 1548750273 },
-	{ network_version_7, 10, 0, 1548750283 },
-	{ network_version_8, 40000, 0, 1559474448 },
-	{ network_version_11_infinite_staking, 56240, 0, 1577836800 } ,
-  { network_version_12_security_signature, 126874, 0, 1578704502 }
-};
-
-static constexpr HardFork::Params testnet_hard_forks[] =
-{ 
-	{ 1, 1, 0, 1548474440},
-  { network_version_7, 10, 0, 1548474448 },
-  { network_version_8, 40000, 0, 1559474448 },
-	{ network_version_11_infinite_staking, 54288, 0, 1628224369 } ,
-  { network_version_12_security_signature, 104832, 0, 1633933364 },
-  { network_version_13_checkpointing,       117503,  0, 1635901648 },
-  { network_version_14_enforce_checkpoints, 144288, 0, 1639130597 },
-  { network_version_15_blink,               218664, 0, 1653196092 },
-};
-
-static constexpr HardFork::Params devnet_hard_forks[] =
+static constexpr std::array mainnet_hard_forks =
 {
-  { network_version_7,                      1,      0, 1599848400 },
-  { network_version_17_pulse,               2,      0, 1599848400 }, // 2020-09-11 18:20 UTC
+  hard_fork{1,  0,       1,  1548750273 }, // Beldex 0.1: Beldex is born
+  hard_fork{7,  0,      10,  1548750283 },
+  hard_fork{8,  0,    40000, 1559474448 },
+  hard_fork{11, 0,    56240, 1577836800 },
+  hard_fork{12, 0,   126874, 1578704502 },
 };
 
-uint64_t HardFork::get_hardcoded_hard_fork_height(network_type nettype, cryptonote::network_version version)
+static constexpr std::array testnet_hard_forks =
 {
-  uint64_t result = INVALID_HF_VERSION_HEIGHT;
-  for (const auto &record : cryptonote::HardFork::get_hardcoded_hard_forks(nettype))
-  {
-    if (record.version >= version)
-    {
-      result = record.height;
-      break;
-    }
+  hard_fork{1,  0,        1, 1548474440 },
+  hard_fork{7,  0,       10, 1559474448 },
+  hard_fork{8,  0,    40000, 1559474448 },
+  hard_fork{11, 0,    54288, 1628224369 },
+  hard_fork{12, 0,   104832, 1633933364 },
+  hard_fork{13, 0,   117503, 1635901648 },
+  hard_fork{14, 0,   144288, 1639130597 },
+  hard_fork{15, 0,   218664, 1653196092 },
+};
+
+static constexpr std::array devnet_hard_forks =
+{
+  hard_fork{ 7, 0,      0,  1599848400 },
+  hard_fork{ 17, 0,     2,  1599848400 },
+};
+
+template <size_t N>
+static constexpr bool is_ordered(const std::array<hard_fork, N>& forks) {
+  if (N == 0 || forks[0].version < 1)
+    return false;
+  for (size_t i = 1; i < N; i++) {
+    auto& hf = forks[i];
+    auto& prev = forks[i-1];
+    if ( // [major,mnoderevision] pair must be strictly increasing (lexicographically)
+        std::make_pair(hf.version, hf.mnode_revision) <= std::make_pair(prev.version, prev.mnode_revision)
+        // height must be strictly increasing; time must be weakly increasing
+        || hf.height <= prev.height || hf.time < prev.time)
+      return false;
   }
-
-  return result;
+  return true;
 }
 
-HardFork::ParamsIterator HardFork::get_hardcoded_hard_forks(network_type nettype)
+static_assert(is_ordered(mainnet_hard_forks),
+    "Invalid mainnet hard forks: version must start at 1, major versions and heights must be strictly increasing, and timestamps must be non-decreasing");
+static_assert(is_ordered(testnet_hard_forks),
+    "Invalid testnet hard forks: version must start at 1, versions and heights must be strictly increasing, and timestamps must be non-decreasing");
+static_assert(is_ordered(devnet_hard_forks),
+    "Invalid devnet hard forks: version must start at 1, versions and heights must be strictly increasing, and timestamps must be non-decreasing");
+
+std::vector<hard_fork> fakechain_hardforks;
+
+std::pair<const hard_fork*, const hard_fork*> get_hard_forks(network_type type)
 {
-  if (nettype == MAINNET)       return {mainnet_hard_forks, std::end(mainnet_hard_forks)};
-  else if (nettype == TESTNET)  return {testnet_hard_forks, std::end(testnet_hard_forks)};
-  else if (nettype == DEVNET) return {devnet_hard_forks, std::end(devnet_hard_forks)};
+  if (type == network_type::MAINNET) return {&mainnet_hard_forks[0], &mainnet_hard_forks[mainnet_hard_forks.size()]};
+  if (type == network_type::TESTNET) return {&testnet_hard_forks[0], &testnet_hard_forks[testnet_hard_forks.size()]};
+  if (type == network_type::DEVNET) return {&devnet_hard_forks[0], &devnet_hard_forks[devnet_hard_forks.size()]};
+  if (type == network_type::FAKECHAIN) return {fakechain_hardforks.data(), fakechain_hardforks.data() + fakechain_hardforks.size()};
   return {nullptr, nullptr};
 }
 
-HardFork::HardFork(cryptonote::BlockchainDB &db, uint8_t original_version, time_t forked_time, time_t update_time, uint64_t window_size, uint8_t default_threshold_percent):
-  db(db),
-  original_version(original_version),
-  forked_time(forked_time),
-  update_time(update_time),
-  window_size(window_size),
-  default_threshold_percent(default_threshold_percent),
-  current_fork_index(0)
-{
-  if (window_size == 0)
-    throw std::logic_error{"window_size needs to be strictly positive"};
-  if (default_threshold_percent > 100)
-    throw std::logic_error{"default_threshold_percent needs to be between 0 and 100"};
-}
 
-void HardFork::add_fork(uint8_t version, uint64_t height, uint8_t threshold, time_t time)
-{
-  std::unique_lock l{lock};
-
-  // add in order
-  if (version == 0)
-    throw std::runtime_error{"Cannot add a hard fork with HF version 0"};
-  if (!heights.empty()) {
-    const auto& [v, h, _thresh, t] = heights.back();
-    if (version <= v)
-      throw std::runtime_error{"Cannot add hard fork: version(" + std::to_string(version) + ") must be > previous HF version(" + std::to_string(v) + ")"};
-    if (height <= h)
-      throw std::runtime_error{"Cannot add hard fork: height(" + std::to_string(height) + ") must be > previous HF height(" + std::to_string(h) + ")"};
-    if (time < t)
-      throw std::runtime_error{"Cannot add hard fork: timestamp(" + std::to_string(time) + ") must be >= previous HF timestamp(" + std::to_string(t) + ")"};
-  }
-  if (threshold > 100)
-    throw std::runtime_error{"Cannot add hard fork: invalid threshold (" + std::to_string(threshold) + ")"};
-
-  heights.push_back({version, height, threshold, time});
-}
-
-void HardFork::add_fork(uint8_t version, uint64_t height, time_t time)
-{
-  add_fork(version, height, default_threshold_percent, time);
-}
-
-uint8_t HardFork::get_effective_version(uint8_t voting_version) const
-{
-  if (!heights.empty()) {
-    uint8_t max_version = heights.back().version;
-    if (voting_version > max_version)
-      voting_version = max_version;
-  }
-  return voting_version;
-}
-
-bool HardFork::do_check(uint8_t block_version, uint8_t voting_version) const
-{
-  return block_version == heights[current_fork_index].version
-      && voting_version >= heights[current_fork_index].version;
-}
-
-bool HardFork::check(const cryptonote::block &block) const
-{
-  std::unique_lock l{lock};
-  return do_check(::get_block_version(block), ::get_block_vote(block));
-}
-
-bool HardFork::do_check_for_height(uint8_t block_version, uint8_t voting_version, uint64_t height) const
-{
-  int fork_index = get_voted_fork_index(height);
-  return block_version == heights[fork_index].version
-      && voting_version >= heights[fork_index].version;
-}
-
-bool HardFork::check_for_height(const cryptonote::block &block, uint64_t height) const
-{
-  std::unique_lock l{lock};
-  return do_check_for_height(::get_block_version(block), ::get_block_vote(block), height);
-}
-
-bool HardFork::add(uint8_t block_version, uint8_t voting_version, uint64_t height)
-{
-  std::unique_lock l{lock};
-
-  if (!do_check(block_version, voting_version))
-    return false;
-
-  db.set_hard_fork_version(height, heights[current_fork_index].version);
-
-  voting_version = get_effective_version(voting_version);
-
-  while (versions.size() >= window_size) {
-    const uint8_t old_version = versions.front();
-    assert(last_versions[old_version] >= 1);
-    last_versions[old_version]--;
-    versions.pop_front();
-  }
-
-  last_versions[voting_version]++;
-  versions.push_back(voting_version);
-
-  uint8_t voted = get_voted_fork_index(height + 1);
-  if (voted > current_fork_index) {
-    current_fork_index = voted;
-  }
-
-  return true;
-}
-
-bool HardFork::add(const cryptonote::block &block, uint64_t height)
-{
-  return add(::get_block_version(block), ::get_block_vote(block), height);
-}
-
-void HardFork::init()
-{
-  std::unique_lock l{lock};
-
-  // add a placeholder for the default version, to avoid special cases
-  if (heights.empty())
-    heights.push_back({original_version, 0, 0, 0});
-
-  versions.clear();
-  for (size_t n = 0; n < 256; ++n)
-    last_versions[n] = 0;
-  current_fork_index = 0;
-
-  // restore state from DB
-  uint64_t height = db.height();
-  if (height > window_size)
-    height -= window_size - 1;
-  else
-    height = 1;
-
-  rescan_from_chain_height(height);
-  MDEBUG("init done");
-}
-
-uint8_t HardFork::get_block_version(uint64_t height) const
-{
-  const cryptonote::block &block = db.get_block_from_height(height);
-  return ::get_block_version(block);
-}
-
-bool HardFork::reorganize_from_block_height(uint64_t height)
-{
-  std::unique_lock l{lock};
-  if (height >= db.height())
-    return false;
-
-  bool stop_batch = db.batch_start();
-
-  versions.clear();
-
-  for (size_t n = 0; n < 256; ++n)
-    last_versions[n] = 0;
-  const uint64_t rescan_height = height >= (window_size - 1) ? height - (window_size  -1) : 0;
-  const uint8_t start_version = height == 0 ? original_version : db.get_hard_fork_version(height);
-  while (current_fork_index > 0 && heights[current_fork_index].version > start_version) {
-    --current_fork_index;
-  }
-  for (uint64_t h = rescan_height; h <= height; ++h) {
-    cryptonote::block b = db.get_block_from_height(h);
-    const uint8_t v = get_effective_version(get_block_vote(b));
-    last_versions[v]++;
-    versions.push_back(v);
-  }
-
-  uint8_t voted = get_voted_fork_index(height + 1);
-  if (voted > current_fork_index) {
-    current_fork_index = voted;
-  }
-
-  const uint64_t bc_height = db.height();
-  for (uint64_t h = height + 1; h < bc_height; ++h) {
-    add(db.get_block_from_height(h), h);
-  }
-
-  if (stop_batch)
-    db.batch_stop();
-
-  return true;
-}
-
-bool HardFork::reorganize_from_chain_height(uint64_t height)
-{
-  if (height == 0)
-    return false;
-  return reorganize_from_block_height(height - 1);
-}
-
-bool HardFork::rescan_from_block_height(uint64_t height)
-{
-  std::unique_lock l{lock};
-  db_rtxn_guard rtxn_guard(&db);
-  if (height >= db.height())
-    return false;
-
-  versions.clear();
-
-  for (size_t n = 0; n < 256; ++n)
-    last_versions[n] = 0;
-  for (uint64_t h = height; h < db.height(); ++h) {
-    cryptonote::block b = db.get_block_from_height(h);
-    const uint8_t v = get_effective_version(get_block_vote(b));
-    last_versions[v]++;
-    versions.push_back(v);
-  }
-
-  uint8_t lastv = db.get_hard_fork_version(db.height() - 1);
-  current_fork_index = 0;
-  while (current_fork_index + 1 < heights.size() && heights[current_fork_index].version != lastv)
-    ++current_fork_index;
-
-  uint8_t voted = get_voted_fork_index(db.height());
-  if (voted > current_fork_index) {
-    current_fork_index = voted;
-  }
-
-  return true;
-}
-
-bool HardFork::rescan_from_chain_height(uint64_t height)
-{
-  if (height == 0)
-    return false;
-  return rescan_from_block_height(height - 1);
-}
-
-void HardFork::on_block_popped(uint64_t nblocks)
-{
-  CHECK_AND_ASSERT_THROW_MES(nblocks > 0, "nblocks must be greater than 0");
-
-  std::unique_lock l{lock};
-
-  const uint64_t new_chain_height = db.height();
-  const uint64_t old_chain_height = new_chain_height + nblocks;
-  uint8_t version;
-  for (uint64_t height = old_chain_height - 1; height >= new_chain_height; --height)
-  {
-    version = versions.back();
-    last_versions[version]--;
-    versions.pop_back();
-    version = db.get_hard_fork_version(height);
-    versions.push_front(version);
-    last_versions[version]++;
-  }
-
-  // does not take voting into account
-  for (current_fork_index = heights.size() - 1; current_fork_index > 0; --current_fork_index)
-    if (new_chain_height >= heights[current_fork_index].height)
+std::pair<std::optional<uint64_t>, std::optional<uint64_t>>
+get_hard_fork_heights(network_type nettype, uint8_t version) {
+  std::pair<std::optional<uint64_t>, std::optional<uint64_t>> found;
+  for (auto [it, end] = get_hard_forks(nettype); it != end; it++) {
+    if (it->version > version) { // This (and anything else) are in the future
+      if (found.first) // Found something suitable in the previous iteration, so one before this hf is the max
+        found.second = it->height - 1;
       break;
-}
-
-int HardFork::get_voted_fork_index(uint64_t height) const
-{
-  std::unique_lock l{lock};
-  uint32_t accumulated_votes = 0;
-  for (int n = heights.size() - 1; n >= 0; --n) {
-    uint8_t v = heights[n].version;
-    accumulated_votes += last_versions[v];
-    uint32_t threshold = (window_size * heights[n].threshold + 99) / 100;
-    if (height >= heights[n].height && accumulated_votes >= threshold) {
-      return n;
+    } else if (it->version == version && !found.first) {
+      found.first = it->height;
     }
   }
-  return current_fork_index;
+  return found;
 }
 
-HardFork::State HardFork::get_state(time_t t) const
-{
-  std::unique_lock l{lock};
+uint8_t hard_fork_ceil(network_type nettype, uint8_t version) {
+  auto [it, end] = get_hard_forks(nettype);
+  for (; it != end; it++)
+    if (it->version >= version)
+      return it->version;
 
-  // no hard forks setup yet
-  if (heights.size() <= 1)
-    return Ready;
-
-  time_t t_last_fork = heights.back().time;
-  time_t t_forked_time = 31557600;
-  if (t >= t_last_fork + t_forked_time)
-    return LikelyForked;
-  if (t >= t_last_fork + update_time)
-    return UpdateNeeded;
-  return Ready;
+  return version;
 }
 
-HardFork::State HardFork::get_state() const
-{
-  return get_state(time(NULL));
-}
-
-uint8_t HardFork::get(uint64_t height) const
-{
-  std::unique_lock l{lock};
-  if (height > db.height()) {
-    assert(false);
-    return INVALID_HF_VERSION;
-  }
-  if (height == db.height()) {
-    return get_current_version();
-  }
-  return db.get_hard_fork_version(height);
-}
-
-uint8_t HardFork::get_current_version() const
-{
-  std::unique_lock l{lock};
-  return heights[current_fork_index].version;
-}
-
-uint8_t HardFork::get_ideal_version() const
-{
-  std::unique_lock l{lock};
-  return heights.back().version;
-}
-
-uint8_t HardFork::get_ideal_version(uint64_t height) const
-{
-  std::unique_lock l{lock};
-  for (unsigned int n = heights.size() - 1; n > 0; --n) {
-    if (height >= heights[n].height) {
-      return heights[n].version;
-    }
-  }
-  return original_version;
-}
-
-uint64_t HardFork::get_earliest_ideal_height_for_version(uint8_t version) const
-{
-  uint64_t height = std::numeric_limits<uint64_t>::max();
-  for (auto i = heights.rbegin(); i != heights.rend(); ++i) {
-    if (i->version >= version) {
-      height = i->height;
-    } else {
+std::pair<uint8_t, uint8_t>
+get_network_version_revision(network_type nettype, uint64_t height) {
+  std::pair<uint8_t, uint8_t> result;
+  for (auto [it, end] = get_hard_forks(nettype); it != end; it++) {
+    if (it->height <= height)
+      result = {it->version, it->mnode_revision};
+    else
       break;
-    }
   }
-  return height;
+  return result;
 }
 
-uint8_t HardFork::get_next_version() const
+bool is_hard_fork_at_least(network_type type, uint8_t version, uint64_t height) {
+  return get_network_version(type, height) >= version;
+}
+
+std::pair<uint8_t, uint8_t>
+get_ideal_block_version(network_type nettype, uint64_t height)
 {
-  std::unique_lock l{lock};
-  uint64_t height = db.height();
-  for (auto i = heights.rbegin(); i != heights.rend(); ++i) {
-    if (height >= i->height) {
-      return (i == heights.rbegin() ? i : (i - 1))->version;
-    }
+  std::pair<uint8_t, uint8_t> result;
+  for (auto [it, end] = get_hard_forks(nettype); it != end; it++) {
+    if (it->height <= height)
+      result.first = it->version;
+    result.second = it->version;
   }
-  return original_version;
+  return result;
 }
-
-bool HardFork::get_voting_info(uint8_t version, uint32_t &window, uint32_t &votes, uint32_t &threshold, uint64_t &earliest_height, uint8_t &voting) const
-{
-  std::unique_lock l{lock};
-
-  const uint8_t current_version = heights[current_fork_index].version;
-  const bool enabled = current_version >= version;
-  window = versions.size();
-  votes = 0;
-  for (size_t n = version; n < 256; ++n)
-      votes += last_versions[n];
-  threshold = (window * heights[current_fork_index].threshold + 99) / 100;
-  //assert((votes >= threshold) == enabled);
-  earliest_height = get_earliest_ideal_height_for_version(version);
-  voting = heights.back().version;
-  return enabled;
 }
-

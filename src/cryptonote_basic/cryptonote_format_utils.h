@@ -152,6 +152,8 @@ namespace cryptonote
   bool get_security_signature_from_tx_extra(const std::vector<uint8_t>& tx_extra, crypto::signature& security_signature);
   bool add_security_signature_to_tx_extra(std::vector<uint8_t>& tx_extra, const crypto::signature& signature);
 
+  void add_beldex_name_system_to_tx_extra(std::vector<uint8_t> &tx_extra, tx_extra_beldex_name_system const &entry);
+
   std::vector<crypto::public_key> get_additional_tx_pub_keys_from_extra(const std::vector<uint8_t>& tx_extra);
   std::vector<crypto::public_key> get_additional_tx_pub_keys_from_extra(const transaction_prefix& tx);
   bool add_additional_tx_pub_keys_to_extra(std::vector<uint8_t>& tx_extra, const std::vector<crypto::public_key>& additional_pub_keys);
@@ -222,6 +224,8 @@ namespace cryptonote
 
   std::string print_tx_verification_context  (tx_verification_context const &tvc, transaction const *tx = nullptr);
   std::string print_vote_verification_context(vote_verification_context const &vvc, master_nodes::quorum_vote_t const *vote = nullptr);
+
+  bool is_valid_address(const std::string address, cryptonote::network_type nettype, bool allow_subaddress = true, bool allow_integrated = true);
 
   inline std::ostream &operator<<(std::ostream &stream, transaction const &tx)
   {

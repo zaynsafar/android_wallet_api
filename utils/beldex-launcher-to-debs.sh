@@ -435,7 +435,7 @@ chown -v _beldex:_beldex /var/lib/beldex/{bns.db*,key*,lmdb/*.mdb}
 
 echo "${GREEN}Updating beldexd configuration in /etc/beldex/beldex.conf$RESET"
 echo "${GREEN}===================================================$RESET"
-echo -e "service-node=1\nservice-node-public-ip=${ip_public}\nstorage-server-port=${ss_http}" >>/etc/beldex/beldex.conf
+echo -e "master-node=1\nmaster-node-public-ip=${ip_public}\nstorage-server-port=${ss_http}" >>/etc/beldex/beldex.conf
 if [ "$beldexd_p2p" != 22022 ]; then
     echo "p2p-bind-port=$beldexd_p2p" >>/etc/beldex/beldex.conf
 fi

@@ -75,10 +75,7 @@ breakdown of the minimum set of required boost packages.
 Install all dependencies at once on Debian/Ubuntu:
 
 ```
-sudo apt update && \
-sudo apt install g++ cmake pkg-config libboost-thread-dev libboost-serialization-dev libboost-program-options-dev \
-    libssl-dev libzmq3-dev libsqlite3-dev libunbound-dev libsodium-dev libunwind8-dev liblzma-dev libreadline-dev \
-    libldns-dev libexpat1-dev doxygen graphviz libsqlite3-dev libcurl4-openssl-dev
+sudo apt update && sudo apt install build-essential cmake pkg-config libboost-all-dev libssl-dev libzmq3-dev libunbound-dev libsodium-dev libunwind8-dev liblzma-dev libreadline6-dev libldns-dev libexpat1-dev doxygen graphviz libpgm-dev libsqlite3-dev libcurl4-openssl-dev
 ```
 
 Install all dependencies at once on macOS with the provided Brewfile:
@@ -104,8 +101,7 @@ commands as needed (alternatively you may create a build directory and invoke cm
 
 #### On Linux and macOS
 
-* Install the dependencies
-* Change to the root of the source code directory, change to the most recent release branch, and build:
+You do not have to build from source if you are on debian or ubuntu as we have apt repositories with pre-built beldex packages on `deb.beldex.io`.
 
     ```bash
     cd beldex
@@ -124,7 +120,7 @@ commands as needed (alternatively you may create a build directory and invoke cm
     both unstable and incompatible with release software, though testing is always
     encouraged.
 
-* The resulting executables can be found in `build/release/bin`
+* The resulting executables can be found in `~/beldex-core/build/bin`
 
 * Add `PATH="$PATH:$HOME/beldex/build/release/bin"` to `.profile`
 

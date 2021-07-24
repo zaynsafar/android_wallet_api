@@ -1074,11 +1074,11 @@ std::vector<std::pair<std::string, uint64_t>>* WalletImpl::listCurrentStakes() c
 
     auto response = m_wallet->list_current_stakes();
 
-    for (rpc::GET_SERVICE_NODES::response::entry const &node_info : response)
+    for (rpc::GET_MASTER_NODES::response::entry const &node_info : response)
     {
         for (const auto& contributor : node_info.contributors)
         {
-            stakes->push_back(std::make_pair(node_info.service_node_pubkey, contributor.amount));
+            stakes->push_back(std::make_pair(node_info.master_node_pubkey, contributor.amount));
         }
     }
     return stakes;
@@ -1596,6 +1596,33 @@ PendingTransaction *WalletImpl::createTransactionMultDest(const std::vector<std:
               setStatusError(tools::ERR_MSG_NETWORK_VERSION_QUERY_FAILED);
               return transaction;
             }
+        }
+        if (error) {
+            break;
+        }
+        if (!extra_nonce.empty() && !add_extra_nonce_to_tx_extra(extra, extra_nonce)) {
+            setStatusError(tr("failed to set up payment id, though it was decoded correctly"));
+            break;
+        }
+        try {
+            std::optional<uint8_t> hf_version = m_wallet->get_hard_fork_version();
+            if (!hf_version)
+            {
+              setStatusError(tools::ERR_MSG_NETWORK_VERSION_QUERY_FAILED);
+              return transaction;
+            }
+
+            if (amount) {
+                beldex_construct_tx_params tx_params = tools::wallet2::construct_params(*hf_version, txtype::standard, priority);
+                transaction->m_pending_tx = m_wallet->create_transactions_2(dsts, CRYPTONOTE_DEFAULT_TX_MIXIN, 0 /* unlock_time */,
+                                                                            priority,
+                                                                            extra, subaddr_account, subaddr_indices, tx_params);
+            } else {
+                transaction->m_pending_tx = m_wallet->create_transactions_all(0, info.address, info.is_subaddress, 1, CRYPTONOTE_DEFAULT_TX_MIXIN, 0 /* unlock_time */,
+                                                                              priority,
+                                                                              extra, subaddr_account, subaddr_indices);
+            }
+            pendingTxPostProcess(transaction);
 
             if (amount) {
                 beldex_construct_tx_params tx_params = tools::wallet2::construct_params(*hf_version, txtype::standard, priority);
@@ -2415,6 +2442,12 @@ EXPORT
 void WalletImpl::hardForkInfo(uint8_t &version, uint64_t &earliest_height) const
 {
     m_wallet->get_hard_fork_info(version, earliest_height);
+}
+
+EXPORT
+std::optional<uint8_t> WalletImpl::hardForkVersion() const
+{
+    m_wallet->get_hard_fork_version();
 }
 
 EXPORT

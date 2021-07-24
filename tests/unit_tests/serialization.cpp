@@ -43,7 +43,6 @@
 #include "serialization/vector.h"
 #include "serialization/binary_utils.h"
 #include "wallet/wallet2.h"
-#include "gtest/gtest.h"
 #include "unit_tests_utils.h"
 #include "device/device.hpp"
 
@@ -595,7 +594,7 @@ TEST(serialization, serializes_ringct)
   ASSERT_EQ(clsag.D, clsag1.D);
 }
 
-// TODO(oxen): These tests are broken because they rely on testnet which has
+// TODO(beldex): These tests are broken because they rely on testnet which has
 // since been restarted, and so the genesis block of these predefined wallets
 // are broken
 //             - 2019-02-25 Doyle
@@ -729,7 +728,7 @@ TEST(serialization, portability_wallet)
   }
 }
 
-#define OUTPUT_EXPORT_FILE_MAGIC "Loki output export\003"
+#define OUTPUT_EXPORT_FILE_MAGIC "Beldex output export\003"
 TEST(serialization, portability_outputs)
 {
   const bool restricted = false;
@@ -864,7 +863,7 @@ TEST(serialization, portability_outputs)
   ASSERT_TRUE(td2.m_pk_index == 0);
 }
 
-#define UNSIGNED_TX_PREFIX "Loki unsigned tx set\004"
+#define UNSIGNED_TX_PREFIX "Beldex unsigned tx set\004"
 struct unsigned_tx_set
 {
   std::vector<tools::wallet2::tx_construction_data> txes;
@@ -878,11 +877,11 @@ inline void serialize(Archive &a, unsigned_tx_set &x, const boost::serialization
 }
 TEST(serialization, portability_unsigned_tx)
 {
-  // TODO(oxen): We updated testnet genesis, is broken
+  // TODO(beldex): We updated testnet genesis, is broken
   const bool restricted = false;
   tools::wallet2 w(cryptonote::TESTNET, restricted);
 
-  const fs::path filename    = unit_test::data_dir / "unsigned_oxen_tx";
+  const fs::path filename    = unit_test::data_dir / "unsigned_beldex_tx";
   const fs::path wallet_file = unit_test::data_dir / "wallet_testnet";
   const std::string password = "test";
   w.load(wallet_file.string(), password);
@@ -1075,13 +1074,13 @@ TEST(serialization, portability_unsigned_tx)
   ASSERT_TRUE(td2.m_pk_index == 0);
 }
 
-#define SIGNED_TX_PREFIX "Loki signed tx set\004"
+#define SIGNED_TX_PREFIX "Beldex signed tx set\004"
 TEST(serialization, portability_signed_tx)
 {
   const bool restricted = false;
   tools::wallet2 w(cryptonote::TESTNET, restricted);
 
-  const fs::path filename    = unit_test::data_dir / "signed_oxen_tx";
+  const fs::path filename    = unit_test::data_dir / "signed_beldex_tx";
   const fs::path wallet_file = unit_test::data_dir / "wallet_testnet";
   const std::string password = "test";
   w.load(wallet_file.string(), password);

@@ -44,7 +44,6 @@
 #include "crypto/crypto.h"
 #include "crypto/hash.h"
 #include "crypto-tests.h"
-#include "../io.h"
 
 using namespace std::literals;
 using namespace crypto;

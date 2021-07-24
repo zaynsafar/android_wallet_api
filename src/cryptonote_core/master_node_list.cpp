@@ -110,25 +110,25 @@ namespace master_nodes
   }
 
   template <typename UnaryPredicate>
-  static std::vector<master_nodes::pubkey_and_sninfo> sort_and_filter(const master_nodes_infos_t &sns_infos, UnaryPredicate p, bool reserve = true) {
-    std::vector<pubkey_and_sninfo> result;
-    if (reserve) result.reserve(sns_infos.size());
-    for (const auto& key_info : sns_infos)
+  static std::vector<master_nodes::pubkey_and_mninfo> sort_and_filter(const master_nodes_infos_t &mns_infos, UnaryPredicate p, bool reserve = true) {
+    std::vector<pubkey_and_mninfo> result;
+    if (reserve) result.reserve(mns_infos.size());
+    for (const auto& key_info : mns_infos)
       if (p(*key_info.second))
         result.push_back(key_info);
 
     std::sort(result.begin(), result.end(),
-      [](const pubkey_and_sninfo &a, const pubkey_and_sninfo &b) {
+      [](const pubkey_and_mninfo &a, const pubkey_and_mninfo &b) {
         return memcmp(reinterpret_cast<const void*>(&a), reinterpret_cast<const void*>(&b), sizeof(a)) < 0;
       });
     return result;
   }
 
-  std::vector<pubkey_and_sninfo> master_node_list::state_t::active_master_nodes_infos() const {
+  std::vector<pubkey_and_mninfo> master_node_list::state_t::active_master_nodes_infos() const {
     return sort_and_filter(master_nodes_infos, [](const master_node_info &info) { return info.is_active(); }, /*reserve=*/ true);
   }
 
-  std::vector<pubkey_and_sninfo> master_node_list::state_t::decommissioned_master_nodes_infos() const {
+  std::vector<pubkey_and_mninfo> master_node_list::state_t::decommissioned_master_nodes_infos() const {
     return sort_and_filter(master_nodes_infos, [](const master_node_info &info) { return info.is_decommissioned() && info.is_fully_funded(); }, /*reserve=*/ false);
   }
 
@@ -1777,7 +1777,7 @@ namespace master_nodes
   master_nodes::quorum generate_pulse_quorum(cryptonote::network_type nettype,
                                               crypto::public_key const &block_leader,
                                               uint8_t hf_version,
-                                              std::vector<pubkey_and_sninfo> const &active_mnode_list,
+                                              std::vector<pubkey_and_mninfo> const &active_mnode_list,
                                               std::vector<crypto::hash> const &pulse_entropy,
                                               uint8_t pulse_round)
   {
@@ -1794,7 +1794,7 @@ namespace master_nodes
       return result;
     }
 
-    std::vector<pubkey_and_sninfo const *> pulse_candidates;
+    std::vector<pubkey_and_mninfo const *> pulse_candidates;
     pulse_candidates.reserve(active_mnode_list.size());
     for (auto &node : active_mnode_list)
     {
@@ -1804,7 +1804,7 @@ namespace master_nodes
 
     // NOTE: Sort ascending in height i.e. sort preferring the longest time since the validator was in a Pulse quorum.
     std::sort(
-        pulse_candidates.begin(), pulse_candidates.end(), [](pubkey_and_sninfo const *a, pubkey_and_sninfo const *b) {
+        pulse_candidates.begin(), pulse_candidates.end(), [](pubkey_and_mninfo const *a, pubkey_and_mninfo const *b) {
           if (a->second->pulse_sorter == b->second->pulse_sorter)
             return memcmp(reinterpret_cast<const void *>(&a->first), reinterpret_cast<const void *>(&b->first), sizeof(a->first)) < 0;
           return a->second->pulse_sorter < b->second->pulse_sorter;
@@ -1855,7 +1855,7 @@ namespace master_nodes
     return result;
   }
 
-  static void generate_other_quorums(master_node_list::state_t &state, std::vector<pubkey_and_sninfo> const &active_mnode_list, cryptonote::network_type nettype, uint8_t hf_version)
+  static void generate_other_quorums(master_node_list::state_t &state, std::vector<pubkey_and_mninfo> const &active_mnode_list, cryptonote::network_type nettype, uint8_t hf_version)
   {
     assert(state.block_hash != crypto::null_hash);
 
@@ -1863,7 +1863,7 @@ namespace master_nodes
     // state change *validators* want only active master nodes, but the state change *workers*
     // (i.e. the nodes to be tested) also include decommissioned master nodes.  (Prior to v12 there
     // are no decommissioned nodes, so this distinction is irrelevant for network concensus).
-    std::vector<pubkey_and_sninfo> decomm_mnode_list;
+    std::vector<pubkey_and_mninfo> decomm_mnode_list;
     if (hf_version >= cryptonote::network_version_13_checkpointing)
       decomm_mnode_list = state.decommissioned_master_nodes_infos();
 
@@ -1926,7 +1926,7 @@ namespace master_nodes
           uint64_t const active_until = state.height + BLINK_EXPIRY_BUFFER;
           for (size_t index = 0; index < active_mnode_list.size(); index++)
           {
-            pubkey_and_sninfo const &entry = active_mnode_list[index];
+            pubkey_and_mninfo const &entry = active_mnode_list[index];
             uint64_t requested_unlock_height = entry.second->requested_unlock_height;
             if (requested_unlock_height == KEY_IMAGE_AWAITING_UNLOCK_HEIGHT || requested_unlock_height > active_until)
               pub_keys_indexes.push_back(index);
@@ -2082,7 +2082,7 @@ namespace master_nodes
     }
 
     // Filtered pubkey-sorted vector of master nodes that are active (fully funded and *not* decommissioned).
-    std::vector<pubkey_and_sninfo> active_mnode_list = sort_and_filter(master_nodes_infos, [](const master_node_info &info) { return info.is_active(); });
+    std::vector<pubkey_and_mninfo> active_mnode_list = sort_and_filter(master_nodes_infos, [](const master_node_info &info) { return info.is_active(); });
 
     if (need_swarm_update)
     {
@@ -2288,14 +2288,14 @@ namespace master_nodes
       auto oldest_waiting = std::make_tuple(std::numeric_limits<uint64_t>::max(), std::numeric_limits<uint32_t>::max(), crypto::null_pkey);
       for (const auto &info_it : master_nodes_infos)
       {
-        const auto &sninfo = *info_it.second;
-        if (sninfo.is_active())
+        const auto &mninfo = *info_it.second;
+        if (mninfo.is_active())
         {
-          auto waiting_since = std::make_tuple(sninfo.last_reward_block_height, sninfo.last_reward_transaction_index, info_it.first);
+          auto waiting_since = std::make_tuple(mninfo.last_reward_block_height, mninfo.last_reward_transaction_index, info_it.first);
           if (waiting_since < oldest_waiting)
           {
             oldest_waiting = waiting_since;
-            info           = &sninfo;
+            info           = &mninfo;
           }
         }
       }
@@ -3639,7 +3639,7 @@ namespace master_nodes
       }
     }
 
-    MTRACE("SN vote at height " << height << " is valid.");
+    MTRACE("MN vote at height " << height << " is valid.");
     return true;
   }
 
@@ -3658,7 +3658,7 @@ namespace master_nodes
         }
       } else if (proposed_state == new_state::ip_change_penalty) {
         if (height <= last_ip_change_height) {
-          MDEBUG("SN ip change penality invalid: vote height (" << height << ") <= last_ip_change_height (" << last_ip_change_height << ")");
+          MDEBUG("MN ip change penality invalid: vote height (" << height << ") <= last_ip_change_height (" << last_ip_change_height << ")");
           return false;
         }
       }
@@ -3684,7 +3684,7 @@ namespace master_nodes
       MDEBUG("MN recommission invalid: not recommissioned");
       return false;
     }
-    MTRACE("SN state change is valid");
+    MTRACE("MN state change is valid");
     return true;
   }
 

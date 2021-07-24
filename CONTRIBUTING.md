@@ -1,4 +1,4 @@
-# Contributing to Monero
+# Contributing to Beldex
 
 A good way to help is to test, and report bugs. See
 [How to Report Bugs Effectively (by Simon Tatham)](https://www.chiark.greenend.org.uk/~sgtatham/bugs.html)
@@ -12,10 +12,7 @@ of software solid and usable.
 * If modifying code for which Doxygen headers exist, that header must be modified to match.
 * Tests would be nice to have if you're adding functionality.
 
-Patches are preferably to be sent via a Github pull request. If that
-can't be done, patches in "git format-patch" format can be sent
-(eg, posted to fpaste.org with a long enough timeout and a link
-posted to #monero-dev on irc.freenode.net).
+Patches are preferably to be sent via a Github pull request.
 
 Patches should be self contained. A good rule of thumb is to have
 one patch per separate issue, feature, or logical change. Also, no
@@ -67,11 +64,6 @@ You should have received a copy of the GNU General Public License along with thi
 ## Language
 
 The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "SHOULD NOT", "RECOMMENDED", "MAY", and "OPTIONAL" in this document are to be interpreted as described in RFC 2119.
-
-The "Monero Maintainer Team" is defined in this document as the following users:
-- fluffypony
-- moneromooo
-- hyc
 
 ## Goals
 

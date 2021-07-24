@@ -734,15 +734,12 @@ bool pulse::convert_time_to_round(pulse::time_point const &time, pulse::time_poi
 bool pulse::get_round_timings(cryptonote::Blockchain const &blockchain, uint64_t block_height, uint64_t prev_timestamp, pulse::timings &times)
 {
   times = {};
-  static uint64_t const hf16_height = blockchain.get_earliest_ideal_height_for_version(cryptonote::network_version_17_pulse);
-  if (hf16_height == std::numeric_limits<uint64_t>::max())
-    return false;
-
-  if (blockchain.get_current_blockchain_height() < hf16_height)
+  auto hf16 = hard_fork_begins(blockchain.nettype(), cryptonote::network_version_17_pulse);
+  if (!hf16 || blockchain.get_current_blockchain_height() < *hf16)
     return false;
 
   cryptonote::block genesis_block;
-  if (!blockchain.get_block_by_height(hf16_height - 1, genesis_block))
+  if (!blockchain.get_block_by_height(*hf16 - 1, genesis_block))
     return false;
 
   uint64_t const delta_height = block_height - cryptonote::get_block_height(genesis_block);
@@ -1165,7 +1162,7 @@ round_state prepare_for_round(round_context &context, master_nodes::master_node_
 
   std::vector<crypto::hash> const entropy = master_nodes::get_pulse_entropy_for_next_block(blockchain.get_db(), context.wait_for_next_block.top_hash, context.prepare_for_round.round);
   auto const active_node_list             = blockchain.get_master_node_list().active_master_nodes_infos();
-  uint8_t const hf_version                = blockchain.get_current_hard_fork_version();
+  uint8_t const hf_version                = blockchain.get_network_version();
   crypto::public_key const &block_leader  = blockchain.get_master_node_list().get_block_leader().key;
 
   context.prepare_for_round.quorum =

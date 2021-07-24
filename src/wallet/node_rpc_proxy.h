@@ -1,7 +1,6 @@
 // Copyright (c) 2017-2019, The Monero Project
 // 
 // All rights reserved.
-// 
 // Redistribution and use in source and binary forms, with or without modification, are
 // permitted provided that the following conditions are met:
 // 
@@ -63,6 +62,8 @@ public:
   std::pair<bool, std::vector<cryptonote::rpc::GET_MASTER_NODE_BLACKLISTED_KEY_IMAGES::entry>> get_master_node_blacklisted_key_images() const;
   std::pair<bool, std::vector<cryptonote::rpc::BNS_OWNERS_TO_NAMES::response_entry>>            bns_owners_to_names(cryptonote::rpc::BNS_OWNERS_TO_NAMES::request const &request) const;
   std::pair<bool, std::vector<cryptonote::rpc::BNS_NAMES_TO_OWNERS::response_entry>>            bns_names_to_owners(cryptonote::rpc::BNS_NAMES_TO_OWNERS::request const &request) const;
+  std::pair<bool, cryptonote::rpc::BNS_RESOLVE::response>
+    bns_resolve(cryptonote::rpc::BNS_RESOLVE::request const &request) const;
 
 private:
   bool get_info() const;

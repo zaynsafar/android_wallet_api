@@ -270,6 +270,28 @@ namespace cryptonote
   /************************************************************************/
   /*                                                                      */
   /************************************************************************/
+  struct NOTIFY_BTENCODED_UPTIME_PROOF
+  {
+    const static int ID = BC_COMMANDS_POOL_BASE + 12;
+
+  struct NOTIFY_RESPONSE_BLOCK_BLINKS
+  {
+    constexpr static int ID = BC_COMMANDS_POOL_BASE + 14;
+    struct request
+    {
+
+      // BT-Encoded string of the Uptime Proof
+      std::string proof;
+      std::string sig;
+      std::string ed_sig;
+
+      KV_MAP_SERIALIZABLE
+    };
+  };
+
+  /************************************************************************/
+  /*                                                                      */
+  /************************************************************************/
   struct NOTIFY_REQUEST_BLOCK_BLINKS
   {
     constexpr static int ID = BC_COMMANDS_POOL_BASE + 13;

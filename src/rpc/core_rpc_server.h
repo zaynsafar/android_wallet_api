@@ -89,7 +89,7 @@ namespace cryptonote::rpc {
   /// Junk that epee makes us deal with to pass in a generically parsed json value
   using jsonrpc_params = std::pair<epee::serialization::portable_storage, epee::serialization::storage_entry>;
 
-  enum struct rpc_source : uint8_t { internal, http, lmq };
+  enum struct rpc_source : uint8_t { internal, http, omq };
 
   /// Contains the context of the invocation, which must be filled out by the glue code (e.g. HTTP
   /// RPC server) with requester-specific context details.
@@ -260,12 +260,11 @@ namespace cryptonote::rpc {
     GET_MASTER_NODE_STATUS::response                   invoke(GET_MASTER_NODE_STATUS::request&& req, rpc_context context);
     GET_MASTER_NODES::response                         invoke(GET_MASTER_NODES::request&& req, rpc_context context);
     GET_STAKING_REQUIREMENT::response                   invoke(GET_STAKING_REQUIREMENT::request&& req, rpc_context context);
-    PERFORM_BLOCKCHAIN_TEST::response                   invoke(PERFORM_BLOCKCHAIN_TEST::request&& req, rpc_context context);
     STORAGE_SERVER_PING::response                       invoke(STORAGE_SERVER_PING::request&& req, rpc_context context);
     BELDEXNET_PING::response                              invoke(BELDEXNET_PING::request&& req, rpc_context context);
     GET_CHECKPOINTS::response                           invoke(GET_CHECKPOINTS::request&& req, rpc_context context);
     GET_MN_STATE_CHANGES::response                      invoke(GET_MN_STATE_CHANGES::request&& req, rpc_context context);
-    REPORT_PEER_STATUS::response                     invoke(REPORT_PEER_STATUS::request&& req, rpc_context context);
+    REPORT_PEER_STATUS::response                        invoke(REPORT_PEER_STATUS::request&& req, rpc_context context);
     TEST_TRIGGER_P2P_RESYNC::response                   invoke(TEST_TRIGGER_P2P_RESYNC::request&& req, rpc_context context);
     TEST_TRIGGER_UPTIME_PROOF::response                 invoke(TEST_TRIGGER_UPTIME_PROOF::request&& req, rpc_context context);
     BNS_NAMES_TO_OWNERS::response                       invoke(BNS_NAMES_TO_OWNERS::request&& req, rpc_context context);

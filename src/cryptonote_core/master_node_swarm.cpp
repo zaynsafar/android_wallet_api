@@ -12,13 +12,9 @@
 
 namespace master_nodes
 {
-  static uint64_t get_new_swarm_id(const swarm_mnode_map_t &swarm_to_mnodes)
+  uint64_t get_new_swarm_id(const swarm_mnode_map_t &swarm_to_mnodes)
   {
-    // UINT64_MAX is reserved for unassigned swarms
-    constexpr uint64_t MAX_ID = UINT64_MAX - 1;
-
     if (swarm_to_mnodes.empty()) return 0;
-    if (swarm_to_mnodes.size() == 1) return MAX_ID / 2;
 
     std::vector<swarm_id_t> all_ids;
     all_ids.reserve(swarm_to_mnodes.size());
@@ -26,7 +22,7 @@ namespace master_nodes
       all_ids.push_back(entry.first);
     }
 
-    std::sort(all_ids.begin(), all_ids.end());
+    assert(std::is_sorted(all_ids.begin(), all_ids.end()));
 
     uint64_t max_dist = 0;
     // The new swarm that is the farthest from its right neighbour
@@ -158,8 +154,15 @@ namespace master_nodes
         remove_excess_mnode_from_swarm(random_excess_mnode, swarm_to_mnodes);
       }
       const auto new_swarm_id = get_new_swarm_id(swarm_to_mnodes);
-      swarm_to_mnodes.insert({new_swarm_id, std::move(new_swarm_mnodes)});
-      LOG_PRINT_L2("Created new swarm from excess: " << new_swarm_id);
+      if (auto [it, ins] = swarm_to_mnodes.emplace(new_swarm_id, std::move(new_swarm_mnodes));
+              !ins) {
+          MFATAL("New swarm ID gave a swarm id (" << new_swarm_id << ") that already exists -- this is a bug!");
+          // If we actually abort() here then hitting this would potentially kill the whole network
+          // if we hit this bug, so just warn very loudly and move on; if it happens we'll have to
+          // track down the bug and fix it separately.
+      } else {
+          LOG_PRINT_L2("Created new swarm from excess: " << new_swarm_id);
+      }
     }
   }
 

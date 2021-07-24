@@ -121,7 +121,7 @@ namespace master_nodes
         // - true if the last test was a pass (regardless of how long ago)
         // - false if the last test was a recent fail (i.e. less than REACHABLE_MAX_FAILURE_VALIDITY ago)
         // - nullopt if the last test was a failure, but is considered stale.
-        // Both true and nullopt are considered a pass for service node testing.
+        // Both true and nullopt are considered a pass for Master node testing.
         std::optional<bool> reachable(const std::chrono::steady_clock::time_point& now = std::chrono::steady_clock::now()) const;
 
         // Returns true if this stats indicates a node that has recently failed reachability (see
@@ -309,7 +309,7 @@ namespace master_nodes
     END_SERIALIZE()
   };
 
-  using pubkey_and_sninfo     =          std::pair<crypto::public_key, std::shared_ptr<const master_node_info>>;
+  using pubkey_and_mninfo     =          std::pair<crypto::public_key, std::shared_ptr<const master_node_info>>;
   using master_nodes_infos_t = std::unordered_map<crypto::public_key, std::shared_ptr<const master_node_info>>;
 
   struct master_node_pubkey_info
@@ -318,7 +318,7 @@ namespace master_nodes
     std::shared_ptr<const master_node_info> info;
 
     master_node_pubkey_info() = default;
-    master_node_pubkey_info(const pubkey_and_sninfo &pair) : pubkey{pair.first}, info{pair.second} {}
+    master_node_pubkey_info(const pubkey_and_mninfo &pair) : pubkey{pair.first}, info{pair.second} {}
 
     BEGIN_SERIALIZE_OBJECT()
       FIELD(pubkey)
@@ -442,7 +442,7 @@ namespace master_nodes
     /// Initializes the x25519 map from current pubkey state; called during initialization
     void initialize_x25519_map();
 
-    /// Remote SN lookup address function for OxenMQ: given a string_view of a x25519 pubkey, this
+    /// Remote MN lookup address function for OxenMQ: given a string_view of a x25519 pubkey, this
     /// returns that master node's quorumnet contact information, if we have it, else empty string.
     std::string remote_lookup(std::string_view x25519_pk);
 
@@ -455,9 +455,9 @@ namespace master_nodes
     void for_each_master_node_info_and_proof(It begin, It end, Func f) const {
       static const proof_info empty_proof{};
       std::lock_guard lock{m_mn_mutex};
-      for (auto sni_end = m_state.master_nodes_infos.end(); begin != end; ++begin) {
+      for (auto mni_end = m_state.master_nodes_infos.end(); begin != end; ++begin) {
         auto it = m_state.master_nodes_infos.find(*begin);
-        if (it != sni_end) {
+        if (it != mni_end) {
           auto pit = proofs.find(it->first);
           f(it->first, *it->second, (pit != proofs.end() ? pit->second : empty_proof));
         }
@@ -479,7 +479,7 @@ namespace master_nodes
       }
     }
 
-    std::vector<pubkey_and_sninfo> active_master_nodes_infos() const {
+    std::vector<pubkey_and_mninfo> active_master_nodes_infos() const {
       return m_state.active_master_nodes_infos();
     }
 
@@ -584,8 +584,8 @@ namespace master_nodes
       friend bool operator<(const state_t &s, block_height h)   { return s.height < h; }
       friend bool operator<(block_height h, const state_t &s)   { return        h < s.height; }
 
-      std::vector<pubkey_and_sninfo>  active_master_nodes_infos() const;
-      std::vector<pubkey_and_sninfo>  decommissioned_master_nodes_infos() const; // return: All nodes that are fully funded *and* decommissioned.
+      std::vector<pubkey_and_mninfo>  active_master_nodes_infos() const;
+      std::vector<pubkey_and_mninfo>  decommissioned_master_nodes_infos() const; // return: All nodes that are fully funded *and* decommissioned.
       std::vector<crypto::public_key> get_expired_nodes(cryptonote::BlockchainDB const &db, cryptonote::network_type nettype, uint8_t hf_version, uint64_t block_height) const;
       void update_from_block(
           cryptonote::BlockchainDB const &db,
@@ -710,7 +710,7 @@ namespace master_nodes
   master_nodes::quorum generate_pulse_quorum(cryptonote::network_type nettype,
                                               crypto::public_key const &leader,
                                               uint8_t hf_version,
-                                              std::vector<pubkey_and_sninfo> const &active_mnode_list,
+                                              std::vector<pubkey_and_mninfo> const &active_mnode_list,
                                               std::vector<crypto::hash> const &pulse_entropy,
                                               uint8_t pulse_round);
 

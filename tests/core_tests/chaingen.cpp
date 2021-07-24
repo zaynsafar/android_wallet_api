@@ -28,6 +28,7 @@
 // 
 // Parts of this file are originally copyright (c) 2012-2013 The Cryptonote developers
 
+#include <iterator>
 #include <limits>
 #include <vector>
 #include <iostream>
@@ -39,6 +40,7 @@
 #include <fstream>
 
 #include "common/string_util.h"
+#include "common/varint.h"
 #include "epee/console_handler.h"
 #include "common/rules.h"
 
@@ -48,6 +50,7 @@
 #include "cryptonote_basic/cryptonote_basic_impl.h"
 #include "cryptonote_basic/cryptonote_format_utils.h"
 #include "cryptonote_basic/miner.h"
+#include "cryptonote_core/uptime_proof.h"
 #include "beldex_economy.h"
 #include "ringct/rctSigs.h"
 
@@ -68,25 +71,21 @@ void beldex_register_callback(std::vector<test_event_entry> &events,
   events.push_back(beldex_callback_entry{callback_name, callback});
 }
 
-std::vector<std::pair<uint8_t, uint64_t>>
-beldex_generate_sequential_hard_fork_table(uint8_t max_hf_version, uint64_t pos_delay)
+std::vector<cryptonote::hard_fork>
+beldex_generate_hard_fork_table(uint8_t hf_version, uint64_t pos_delay)
 {
-  assert(max_hf_version < cryptonote::network_version_count);
-  std::vector<std::pair<uint8_t, uint64_t>> result = {};
-  uint64_t version_height = 0;
-
-  // HF15 reduces and HF16 eliminates miner block rewards, so we need to ensure we have enough
-  // pre-HF15 blocks to generate enough BELDEX for tests:
-  bool delayed = false;
-  for (uint8_t version = cryptonote::network_version_7; version <= max_hf_version; version++)
-  {
-    if (version >= cryptonote::network_version_16_bns && !delayed)
-    {
+  assert(hf_version < cryptonote::network_version_count);
+  // We always need block 0 == v7 for the genesis block:
+  std::vector<cryptonote::hard_fork> result{{cryptonote::network_version_7, 0, 0}};
+  uint64_t version_height = 1;
+  // HF15 reduces and HF16+ eliminates miner block rewards, so we need to ensure we have enough
+  // HF14 blocks to generate enough BELDEX for tests:
+  if (hf_version > cryptonote::network_version_14_blink) {
+      result.push_back({cryptonote::network_version_14_blink, 0, version_height});
       version_height += pos_delay;
-      delayed = true;
-    }
-    result.emplace_back(version, version_height++);
   }
+
+  result.push_back({hf_version, 0, version_height});
   return result;
 }
 

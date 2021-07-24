@@ -146,7 +146,7 @@ namespace rpc {
       std::string status;         // Generic RPC error code. "OK" is the success value.
       bool untrusted;             // If the result is obtained using bootstrap mode, and therefore not trusted `true`, or otherwise `false`.
       std::string hash;           // Hash of the block at the current height
-      uint64_t immutable_height;  // The latest height in the blockchain that can not be reorganized from (backed by atleast 2 Master Node, or 1 hardcoded checkpoint, 0 if N/A).
+      uint64_t immutable_height;  // The latest height in the blockchain that can not be reorganized from (backed by atleast 2 Service Node, or 1 hardcoded checkpoint, 0 if N/A).
       std::string immutable_hash; // Hash of the highest block in the chain that can not be reorganized.
 
       KV_MAP_SERIALIZABLE
@@ -293,9 +293,11 @@ namespace rpc {
       {
         std::optional<bool> old_dereg; // Will be present and set to true iff this record is an old (pre-HF12) deregistration field
         std::string type;              // "dereg", "decom", "recom", or "ip" indicating the state change type
-        uint64_t height;               // The voting block height for the changing master node and validators
+        uint64_t height;               // The voting block height for the changing service node and validators
         uint32_t index;                // The index of all tested nodes at the given height for which this state change applies
         std::vector<uint32_t> voters;  // The position of validators in the testing quorum who validated and voted for this state change. This typically contains just 7 required voter slots (of 10 eligible voters).
+        std::optional<std::vector<std::string>> reasons; // Reasons for the decommissioning/deregistration as reported by the voting quorum.  This contains any reasons that all voters agreed on, one or more of: "uptime" (missing uptime proofs), "checkpoints" (missed checkpoint votes), "pulse" (missing pulse votes), "storage" (storage server pings failed), "beldexnet" (beldexnet router unreachable), "timecheck" (time sync pings failed), "timesync" (time was out of sync)
+        std::optional<std::vector<std::string>> reasons_maybe; // If present, this contains any decomm/dereg reasons that were given by some but not all quorum voters
         KV_MAP_SERIALIZABLE
       };
       struct bns_details
@@ -320,10 +322,8 @@ namespace rpc {
       std::optional<uint32_t> mm_depth;             // (Merge-mining) the merge-mined depth
       std::optional<std::string> mm_root;           // (Merge-mining) the merge mining merkle root hash
       std::vector<std::string> additional_pubkeys;  // Additional public keys
-      std::optional<std::string> mn_winner;         // Master node block reward winner public key
+      std::optional<std::string> mn_winner;         // Service node block reward winner public key
       std::optional<std::string> mn_pubkey;         // Master node public key (e.g. for registrations, stakes, unlocks)
-      std::optional<std::string> security_sig;       // Security Signature
-
       std::optional<mn_reg_info> mn_registration;   // Master node registration details
       std::optional<std::string> mn_contributor;    // Master node contributor wallet address (for stakes)
       std::optional<state_change> mn_state_change;  // A state change transaction (deregistration, decommission, recommission, ip change)
@@ -640,10 +640,11 @@ namespace rpc {
       uint64_t block_weight_limit;          // Maximum allowed block weight.
       uint64_t block_size_median;           // Median block size of latest 100 blocks.
       uint64_t block_weight_median;         // Median block weight of latest 100 blocks.
-      std::optional<bool> master_node;                    // Will be true if the node is running in --master-node mode.
+      std::array<int, 3> bns_counts;        // BNS registration counts, [session, wallet, beldexnet]
+      std::optional<bool> master_node;                    // Will be true if the node is running in --service-node mode.
       std::optional<uint64_t> start_time;                  // Start time of the daemon, as UNIX time.
-      std::optional<uint64_t> last_storage_server_ping;    // Last ping time of the storage server (0 if never or not running as a master node)
-      std::optional<uint64_t> last_beldexnet_ping;           // Last ping time of beldexnet (0 if never or not running as a master node)
+      std::optional<uint64_t> last_storage_server_ping;    // Last ping time of the storage server (0 if never or not running as a service node)
+      std::optional<uint64_t> last_beldexnet_ping;           // Last ping time of beldexnet (0 if never or not running as a service node)
       std::optional<uint64_t> free_space;                  // Available disk space on the node.
       bool offline;                         // States if the node is offline (`true`) or online (`false`).
       bool untrusted;                       // States if the result is obtained using the bootstrap mode, and is therefore not trusted (`true`), or when the daemon is fully synced (`false`).
@@ -813,7 +814,7 @@ namespace rpc {
       std::string hash;                       // The hash of this block.
       difficulty_type difficulty;             // The strength of the Beldex network based on mining power.
       difficulty_type cumulative_difficulty;  // The cumulative strength of the Beldex network based on mining power.
-      uint64_t reward;                        // The amount of new generated in this block and rewarded to the miner, foundation and master Nodes. Note: 1 BELDEX = 1e9 atomic units.
+      uint64_t reward;                        // The amount of new generated in this block and rewarded to the miner, foundation and service Nodes. Note: 1 BELDEX = 1e9 atomic units.
       uint64_t miner_reward;                  // The amount of new generated in this block and rewarded to the miner. Note: 1 BELDEX = 1e9 atomic units.
       uint64_t block_size;                    // The block size in bytes.
       uint64_t block_weight;                  // The block weight in bytes.
@@ -1428,7 +1429,8 @@ namespace rpc {
 
     struct request
     {
-      uint8_t version; // The major block version for the fork.
+      uint8_t version; // The major block version for the fork (only one of `version` and `height` may be given).
+      uint64_t height; // Request hard fork info about this height (only one of `version` and `height` may be given).
 
       KV_MAP_SERIALIZABLE
     };
@@ -1436,13 +1438,9 @@ namespace rpc {
     struct response
     {
       uint8_t version;          // The major block version for the fork.
-      bool enabled;             // Tells if hard fork is enforced.
-      uint32_t window;          // Number of blocks over which current votes are cast. Default is 10080 blocks.
-      uint32_t votes;           // Number of votes towards hard fork.
-      uint32_t threshold;       // Minimum percent of votes to trigger hard fork. Default is 80.
-      uint8_t voting;           // Hard fork voting status.
-      uint32_t state;           // Current hard fork state: 0 (There is likely a hard fork), 1 (An update is needed to fork properly), or 2 (Everything looks good).
-      uint64_t earliest_height; // Block height at which hard fork would be enabled if voted in.
+      bool enabled;             // Indicates whether hard fork is enforced (that is, at or above the requested hardfork)
+      std::optional<uint64_t> earliest_height; // Block height at which hard fork will be enabled.
+      std::optional<uint64_t> last_height; // The last block height at which this hard fork will be active; will be omitted if this beldexd is not aware of any future hard fork.
       std::string status;       // General RPC error code. "OK" means everything looks good.
       bool untrusted;           // States if the result is obtained using the bootstrap mode, and is therefore not trusted (`true`), or when the daemon is fully synced (`false`).
 
@@ -1620,7 +1618,7 @@ namespace rpc {
       std::string status;       // General RPC error code. "OK" means everything looks good.
       uint64_t emission_amount; // Amount of coinbase reward in atomic units.
       uint64_t fee_amount;      // Amount of fees in atomic units.
-      uint64_t burn_amount;      // Amount of burnt BELDEX.
+      uint64_t burn_amount;      // Amount of burnt beldex.
 
       KV_MAP_SERIALIZABLE
     };
@@ -1861,7 +1859,7 @@ namespace rpc {
 
     struct quorum_t
     {
-      std::vector<std::string> validators; // List of master node public keys in the quorum. For obligations quorums these are the testing nodes; for checkpoint and blink these are the participating nodes (there are no workers); for Pulse blink quorums these are the block signers.
+      std::vector<std::string> validators; // List of service node public keys in the quorum. For obligations quorums these are the testing nodes; for checkpoint and blink these are the participating nodes (there are no workers); for Pulse blink quorums these are the block signers.
       std::vector<std::string> workers; // Public key of the quorum workers. For obligations quorums these are the nodes being tested; for Pulse quorums this is the block producer. Checkpoint and Blink quorums do not populate this field.
 
       KV_MAP_SERIALIZABLE
@@ -1946,8 +1944,8 @@ namespace rpc {
   };
 
   BELDEX_RPC_DOC_INTROSPECT
-  // Get the master public keys of the queried daemon, encoded in hex.  All three keys are used
-  // when running as a master node; when running as a regular node only the x25519 key is regularly
+  // Get the service public keys of the queried daemon, encoded in hex.  All three keys are used
+  // when running as a service node; when running as a regular node only the x25519 key is regularly
   // used for some RPC and and node-to-MN communication requests.
   struct GET_MASTER_KEYS : RPC_COMMAND
   {
@@ -1957,7 +1955,7 @@ namespace rpc {
 
     struct response
     {
-      std::string master_node_pubkey;         // The queried daemon's master node public key.  Will be empty if not running as a master node.
+      std::string master_node_pubkey;         // The queried daemon's service node public key.  Will be empty if not running as a service node.
       std::string master_node_ed25519_pubkey; // The daemon's ed25519 auxiliary public key.
       std::string master_node_x25519_pubkey;  // The daemon's x25519 auxiliary public key.
       std::string status;                      // Generic RPC error code. "OK" is the success value.
@@ -1967,9 +1965,9 @@ namespace rpc {
   };
 
   BELDEX_RPC_DOC_INTROSPECT
-  // Get the master private keys of the queried daemon, encoded in hex.  Do not ever share
-  // these keys: they would allow someone to impersonate your master node.  All three keys are used
-  // when running as a master node; when running as a regular node only the x25519 key is regularly
+  // Get the service private keys of the queried daemon, encoded in hex.  Do not ever share
+  // these keys: they would allow someone to impersonate your service node.  All three keys are used
+  // when running as a service node; when running as a regular node only the x25519 key is regularly
   // used for some RPC and and node-to-MN communication requests.
   struct GET_MASTER_PRIVKEYS : RPC_COMMAND
   {
@@ -1979,33 +1977,10 @@ namespace rpc {
 
     struct response
     {
-      std::string master_node_privkey;         // The queried daemon's master node private key.  Will be empty if not running as a master node.
+      std::string master_node_privkey;         // The queried daemon's service node private key.  Will be empty if not running as a service node.
       std::string master_node_ed25519_privkey; // The daemon's ed25519 private key (note that this is in sodium's format, which consists of the private and public keys concatenated together)
       std::string master_node_x25519_privkey;  // The daemon's x25519 private key.
       std::string status;                       // Generic RPC error code. "OK" is the success value.
-
-      KV_MAP_SERIALIZABLE
-    };
-  };
-
-  BELDEX_RPC_DOC_INTROSPECT
-  // TODO: Undocumented, -- unused
-  struct PERFORM_BLOCKCHAIN_TEST : RPC_COMMAND
-  {
-    static constexpr auto names() { return NAMES("perform_blockchain_test"); }
-
-    struct request
-    {
-      uint64_t max_height;
-      uint64_t seed;
-
-      KV_MAP_SERIALIZABLE
-    };
-
-    struct response
-    {
-      std::string status;
-      uint64_t res_height;
 
       KV_MAP_SERIALIZABLE
     };
@@ -2051,9 +2026,13 @@ namespace rpc {
       bool funded;
       bool state_height;
       bool decommission_count;
+      bool last_decommission_reason_consensus_all;
+      bool last_decommission_reason_consensus_any;
       bool earned_downtime_blocks;
 
       bool master_node_version;
+      bool beldexnet_version;
+      bool storage_server_version;
       bool contributors;
       bool total_contributed;
       bool total_reserved;
@@ -2070,18 +2049,23 @@ namespace rpc {
 
       bool last_uptime_proof;
       bool storage_server_reachable;
-      bool storage_server_reachable_timestamp;
+      bool storage_server_last_reachable;
+      bool storage_server_last_unreachable;
+      bool storage_server_first_unreachable;
       bool beldexnet_reachable;
       bool beldexnet_last_reachable;
       bool beldexnet_last_unreachable;
       bool beldexnet_first_unreachable;
       bool checkpoint_participation;
       bool pulse_participation;
+      bool timestamp_participation;
+      bool timesync_status;
 
       bool block_hash;
       bool height;
       bool target_height;
       bool hardfork;
+      bool mnode_revision;
       KV_MAP_SERIALIZABLE
     };
 
@@ -2089,11 +2073,11 @@ namespace rpc {
     {
       std::vector<std::string> master_node_pubkeys; // Array of public keys of registered Master Nodes to get information about. Omit to query all Master Nodes.
       bool include_json;                             // When set, the response's as_json member is filled out.
-      uint32_t limit;                                // If non-zero, select a random sample (in random order) of the given number of master nodes to return from the full list.
-      bool active_only;                              // If true, only include results for active (fully staked, not decommissioned) master nodes.
+      uint32_t limit;                                // If non-zero, select a random sample (in random order) of the given number of service nodes to return from the full list.
+      bool active_only;                              // If true, only include results for active (fully staked, not decommissioned) service nodes.
       std::optional<requested_fields_t> fields;      // If omitted return all fields; otherwise return only the specified fields
 
-      std::string poll_block_hash;                   // If specified this changes the behaviour to only return master node records if the block hash is *not* equal to the given hash; otherwise it omits the records and instead sets `"unchanged": true` in the response. This is primarily used to poll for new results where the requested results only change with new blocks.
+      std::string poll_block_hash;                   // If specified this changes the behaviour to only return service node records if the block hash is *not* equal to the given hash; otherwise it omits the records and instead sets `"unchanged": true` in the response. This is primarily used to poll for new results where the requested results only change with new blocks.
 
       KV_MAP_SERIALIZABLE
     };
@@ -2106,14 +2090,18 @@ namespace rpc {
         uint64_t                              registration_height;           // The height at which the registration for the Master Node arrived on the blockchain.
         uint16_t                              registration_hf_version;       // The hard fork at which the registration for the Master Node arrived on the blockchain.
         uint64_t                              requested_unlock_height;       // The height at which contributions will be released and the Master Node expires. 0 if not requested yet.
-        uint64_t                              last_reward_block_height;      // The height that determines when this Master node will next receive a reward.  This field is updated when receiving a reward, but is also updated when a MN is activated, recommissioned, or has an IP change position reset.
+        uint64_t                              last_reward_block_height;      // The height that determines when this service node will next receive a reward.  This field is updated when receiving a reward, but is also updated when a MN is activated, recommissioned, or has an IP change position reset.
         uint32_t                              last_reward_transaction_index; // When multiple Master Nodes register (or become active/reactivated) at the same height (i.e. have the same last_reward_block_height), this field contains the activating transaction position in the block which is used to break ties in determining which MN is next in the reward list.
         bool                                  active;                        // True if fully funded and not currently decommissioned (and so `active && !funded` implicitly defines decommissioned)
         bool                                  funded;                        // True if the required stakes have been submitted to activate this Master Node
-        uint64_t                              state_height;                  // If active: the state at which the master node became active (i.e. fully staked height, or last recommissioning); if decommissioned: the decommissioning height; if awaiting: the last contribution (or registration) height
+        uint64_t                              state_height;                  // If active: the state at which the service node became active (i.e. fully staked height, or last recommissioning); if decommissioned: the decommissioning height; if awaiting: the last contribution (or registration) height
         uint32_t                              decommission_count;            // The number of times the Master Node has been decommissioned since registration
+        uint16_t                              last_decommission_reason_consensus_all;      // The reason for the last decommission as voted by all MNs
+        uint16_t                              last_decommission_reason_consensus_any;      // The reason for the last decommission as voted by any MNs
         int64_t                               earned_downtime_blocks;        // The number of blocks earned towards decommissioning, or the number of blocks remaining until deregistration if currently decommissioned
         std::array<uint16_t, 3>               master_node_version;          // The major, minor, patch version of the Master Node respectively.
+        std::array<uint16_t, 3>               beldexnet_version;               // The major, minor, patch version of the Master Node's beldexnet router.
+        std::array<uint16_t, 3>               storage_server_version;        // The major, minor, patch version of the Master Node's storage server.
         std::vector<master_node_contributor> contributors;                  // Array of contributors, contributing to this Master Node.
         uint64_t                              total_contributed;             // The total amount of Beldex in atomic units contributed to this Master Node.
         uint64_t                              total_reserved;                // The total amount of Beldex in atomic units reserved in this Master Node.
@@ -2121,24 +2109,28 @@ namespace rpc {
         uint64_t                              portions_for_operator;         // The operator percentage cut to take from each reward expressed in portions, see cryptonote_config.h's STAKING_PORTIONS.
         uint64_t                              swarm_id;                      // The identifier of the Master Node's current swarm.
         std::string                           operator_address;              // The wallet address of the operator to which the operator cut of the staking reward is sent to.
-        std::string                           public_ip;                     // The public ip address of the master node
+        std::string                           public_ip;                     // The public ip address of the service node
         uint16_t                              storage_port;                  // The port number associated with the storage server
-        uint16_t                              storage_lmq_port;              // The port number associated with the storage server (lokimq interface)
+        uint16_t                              storage_lmq_port;              // The port number associated with the storage server (oxenmq interface)
         uint16_t                              quorumnet_port;                // The port for direct MN-to-MN communication
-        std::string                           pubkey_ed25519;                // The master node's ed25519 public key for auxiliary services
-        std::string                           pubkey_x25519;                 // The master node's x25519 public key for auxiliary services
+        std::string                           pubkey_ed25519;                // The service node's ed25519 public key for auxiliary services
+        std::string                           pubkey_x25519;                 // The service node's x25519 public key for auxiliary services
 
         // Master Node Testing
         uint64_t                                last_uptime_proof;                   // The last time this Master Node's uptime proof was relayed by at least 1 Master Node other than itself in unix epoch time.
-        bool                                    storage_server_reachable;            // Whether the node's storage server has been reported as unreachable for a long time
-        uint64_t                                storage_server_reachable_timestamp;  // The last time this Master Node's storage server was contacted
-        bool                                    beldexnet_reachable;                   // True if this lokinet is currently passing tests for the purposes of SN node testing: true if the last test passed, or if it has been unreachable for less than an hour; false if it has been failing tests for more than an hour (and thus is considered unreachable).
-        uint64_t                                beldexnet_first_unreachable;           // If the last test we received was a failure, this field contains the timestamp when failures started.  Will be 0 if the last result was a success or the node has not yet been tested.  (To disinguish between these cases check lokinet_last_reachable).
-        uint64_t                                beldexnet_last_unreachable;            // The last time this service node's lokinet failed a reachable test (regardless of whether or not it is currently failing); 0 if it never failed a test since startup.
-        uint64_t                                beldexnet_last_reachable;              // The last time we received a successful test response for this service node's lokinet router (whether or not it is currently failing); 0 if we have never received a success since startup.
+        bool                                    storage_server_reachable;            // True if this storage server is currently passing tests for the purposes of MN node testing: true if the last test passed, or if it has been unreachable for less than an hour; false if it has been failing tests for more than an hour (and thus is considered unreachable).
+        uint64_t                                storage_server_first_unreachable;    // If the last test we received was a failure, this field contains the timestamp when failures started.  Will be 0 if the last result was a success or the node has not yet been tested.  (To disinguish between these cases check storage_server_last_reachable).
+        uint64_t                                storage_server_last_unreachable;     // The last time this service node's storage server failed a ping test (regardless of whether or not it is currently failing); 0 if it never failed a test since startup.
+        uint64_t                                storage_server_last_reachable;       // The last time we received a successful ping response for this storage server (whether or not it is currently failing); 0 if we have never received a success since startup.
+        bool                                    beldexnet_reachable;                   // True if this beldexnet is currently passing tests for the purposes of MN node testing: true if the last test passed, or if it has been unreachable for less than an hour; false if it has been failing tests for more than an hour (and thus is considered unreachable).
+        uint64_t                                beldexnet_first_unreachable;           // If the last test we received was a failure, this field contains the timestamp when failures started.  Will be 0 if the last result was a success or the node has not yet been tested.  (To disinguish between these cases check beldexnet_last_reachable).
+        uint64_t                                beldexnet_last_unreachable;            // The last time this service node's beldexnet failed a reachable test (regardless of whether or not it is currently failing); 0 if it never failed a test since startup.
+        uint64_t                                beldexnet_last_reachable;              // The last time we received a successful test response for this service node's beldexnet router (whether or not it is currently failing); 0 if we have never received a success since startup.
 
         std::vector<master_nodes::participation_entry> checkpoint_participation;    // Of the last N checkpoints the Master Node is in a checkpointing quorum, record whether or not the Master Node voted to checkpoint a block
         std::vector<master_nodes::participation_entry> pulse_participation;         // Of the last N pulse blocks the Master Node is in a pulse quorum, record whether or not the Master Node voted (participated) in that block
+        std::vector<master_nodes::timestamp_participation_entry> timestamp_participation;         // Of the last N timestamp messages, record whether or not the Master Node was in sync with the network
+        std::vector<master_nodes::timesync_entry> timesync_status;         // Of the last N timestamp messages, record whether or not the Master Node responded
 
         KV_MAP_SERIALIZABLE
       };
@@ -2146,12 +2138,13 @@ namespace rpc {
       requested_fields_t fields; // @NoBeldexRPCDocGen Internal use only, not serialized
       bool polling_mode;         // @NoBeldexRPCDocGen Internal use only, not serialized
 
-      std::vector<entry> master_node_states; // Array of master node registration information
+      std::vector<entry> master_node_states; // Array of service node registration information
       uint64_t    height;                     // Current block's height.
       uint64_t    target_height;              // Blockchain's target height.
       std::string block_hash;                 // Current block's hash.
       bool        unchanged;                  // Will be true (and `master_node_states` omitted) if you gave the current block hash to poll_block_hash
       uint8_t     hardfork;                   // Current hardfork version.
+      uint8_t     mnode_revision;             // mnode revision for non-hardfork but mandatory mnode updates
       std::string status;                     // Generic RPC error code. "OK" is the success value.
       std::string as_json;                    // If `include_json` is set in the request, this contains the json representation of the `entry` data structure
 
@@ -2192,10 +2185,9 @@ namespace rpc {
 
     struct request
     {
-      int version_major; // Storage Server Major version
-      int version_minor; // Storage Server Minor version
-      int version_patch; // Storage Server Patch version
-      uint16_t storage_lmq_port; // Storage Server lmq port to include in uptime proofs
+      std::array<uint16_t, 3> version; // Storage server version
+      uint16_t https_port; // Storage server https port to include in uptime proofs
+      uint16_t omq_port; // Storage Server oxenmq port to include in uptime proofs
       KV_MAP_SERIALIZABLE
     };
 
@@ -2209,7 +2201,7 @@ namespace rpc {
 
     struct request
     {
-      std::array<int, 3> version; // Beldexnet version
+      std::array<uint16_t, 3> version; // Beldexnet version
       KV_MAP_SERIALIZABLE
     };
 
@@ -2272,7 +2264,6 @@ namespace rpc {
   struct GET_OUTPUT_BLACKLIST : PUBLIC, BINARY
   {
     static constexpr auto names() { return NAMES("get_output_blacklist.bin"); }
-
     struct request : EMPTY {};
 
     struct response
@@ -2286,7 +2277,7 @@ namespace rpc {
   };
 
   BELDEX_RPC_DOC_INTROSPECT
-  // Query hardcoded/master node checkpoints stored for the blockchain. Omit all arguments to retrieve the latest "count" checkpoints.
+  // Query hardcoded/service node checkpoints stored for the blockchain. Omit all arguments to retrieve the latest "count" checkpoints.
   struct GET_CHECKPOINTS : PUBLIC
   {
     static constexpr auto names() { return NAMES("get_checkpoints"); }
@@ -2366,7 +2357,7 @@ namespace rpc {
   };
 
   BELDEX_RPC_DOC_INTROSPECT
-  // Query hardcoded/master node checkpoints stored for the blockchain. Omit all arguments to retrieve the latest "count" checkpoints.
+  // Query hardcoded/service node checkpoints stored for the blockchain. Omit all arguments to retrieve the latest "count" checkpoints.
   struct GET_MN_STATE_CHANGES : PUBLIC
   {
     static constexpr auto names() { return NAMES("get_master_nodes_state_changes"); }
@@ -2399,14 +2390,17 @@ namespace rpc {
 
 
   BELDEX_RPC_DOC_INTROSPECT
+  // Reports service node peer status (success/fail) from beldexnet and storage server.
   struct REPORT_PEER_STATUS : RPC_COMMAND
   {
-    static constexpr auto names() { return NAMES("report_peer_status","report_peer_storage_server_status"); }
+    // TODO: remove the `report_peer_storage_server_status` once we require a storage server version
+    // that stops using the old name.
+    static constexpr auto names() { return NAMES("report_peer_status", "report_peer_storage_server_status"); }
 
     struct request
     {
-      std::string type; // test type (currently used: ["reachability"])
-      std::string pubkey; // master node pubkey
+      std::string type; // test type; currently supported are: "storage" and "beldexnet" for storage server and beldexnet tests, respectively.
+      std::string pubkey; // service node pubkey
       bool passed; // whether the node is passing the test
 
       KV_MAP_SERIALIZABLE
@@ -2437,7 +2431,7 @@ namespace rpc {
   // for Session and Beldexnet.
   struct BNS_NAMES_TO_OWNERS : PUBLIC
   {
-    static constexpr auto names() { return NAMES("bns_names_to_owners"); }
+    static constexpr auto names() { return NAMES("bns_names_to_owners", "lns_names_to_owners"); }
 
     static constexpr size_t MAX_REQUEST_ENTRIES      = 256;
     static constexpr size_t MAX_TYPE_REQUEST_ENTRIES = 8;
@@ -2460,7 +2454,7 @@ namespace rpc {
     struct response_entry
     {
       uint64_t entry_index;     // The index in request_entry's `entries` array that was resolved via Beldex Name Service.
-      bns::mapping_type type;   // The type of Beldex Name Service entry that the owner owns: currently supported values are 0 (session), 2 (beldexnet)
+      bns::mapping_type type;   // The type of Beldex Name Service entry that the owner owns: currently supported values are 0 (session), 1 (wallet) and 2 (beldexnet)
       std::string name_hash;    // The hash of the name that was queried, in base64
       std::string owner;        // The public key that purchased the Beldex Name Service entry.
       std::optional<std::string> backup_owner; // The backup public key that the owner specified when purchasing the Beldex Name Service entry. Omitted if no backup owner.
@@ -2486,12 +2480,12 @@ namespace rpc {
   // public key; by default purchases are owned by the spend public key of the purchasing wallet.
   struct BNS_OWNERS_TO_NAMES : PUBLIC
   {
-    static constexpr auto names() { return NAMES("bns_owners_to_names"); }
+    static constexpr auto names() { return NAMES("bns_owners_to_names", "lns_owners_to_names"); }
 
     static constexpr size_t MAX_REQUEST_ENTRIES = 256;
     struct request
     {
-      std::vector<std::string> entries; // The owner's public key to find all BELDEX Name Service entries for.
+      std::vector<std::string> entries; // The owner's public key to find all Beldex Name Service entries for.
       bool include_expired;             // Optional: if provided and true, include entries in the results even if they are expired
 
       KV_MAP_SERIALIZABLE
@@ -2500,7 +2494,7 @@ namespace rpc {
     struct response_entry
     {
       uint64_t    request_index;   // (Deprecated) The index in request's `entries` array that was resolved via Beldex Name Service.
-      bns::mapping_type type;      // The category the Beldex Name Service entry belongs to; currently 0 for Session and 2 for Beldexnet.
+      bns::mapping_type type;      // The category the Beldex Name Service entry belongs to; currently 0 for Session, 1 for Wallet and 2 for Beldexnet.
       std::string name_hash;       // The hash of the name that the owner purchased via Beldex Name Service in base64
       std::string owner;           // The backup public key specified by the owner that purchased the Beldex Name Service entry.
       std::optional<std::string> backup_owner; // The backup public key specified by the owner that purchased the Beldex Name Service entry. Omitted if no backup owner.
@@ -2542,11 +2536,11 @@ namespace rpc {
   //   first 24 bytes of the name hash as the public nonce.
   struct BNS_RESOLVE : PUBLIC
   {
-    static constexpr auto names() { return NAMES("bns_resolve"); }
+    static constexpr auto names() { return NAMES("bns_resolve", "lns_resolve"); }
 
     struct request
     {
-      uint16_t type;         // The BNS type (mandatory); currently supported values are: 0 = session, 2 = beldexnet.
+      uint16_t type;         // The BNS type (mandatory); currently supported values are: 0 = session, 1 = wallet, 2 = beldexnet.
       std::string name_hash; // The 32-byte BLAKE2b hash of the name to look up, encoded as 64 hex digits or 44/43 base64 characters (with/without padding).
 
       KV_MAP_SERIALIZABLE
@@ -2647,7 +2641,6 @@ namespace rpc {
     GET_MASTER_NODE_REGISTRATION_CMD,
     GET_MASTER_KEYS,
     GET_MASTER_PRIVKEYS,
-    PERFORM_BLOCKCHAIN_TEST,
     GET_MASTER_NODES,
     GET_MASTER_NODE_STATUS,
     STORAGE_SERVER_PING,

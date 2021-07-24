@@ -276,7 +276,7 @@ namespace tools {
   }
   fs::path get_depreciated_default_data_dir()
   {
-    return get_special_folder_path(CSIDL_COMMON_APPDATA, true) / fs::u8path("loki");
+    return get_special_folder_path(CSIDL_COMMON_APPDATA, true) / fs::u8path("beldex");
   }
 #else
   // Non-windows: ~/.CRYPTONOTE_NAME

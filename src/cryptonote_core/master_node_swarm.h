@@ -7,6 +7,8 @@
 #include <random>
 
 namespace master_nodes {
+    inline constexpr uint64_t MAX_ID = UNASSIGNED_SWARM_ID - 1;
+
     using swarm_mnode_map_t = std::map<swarm_id_t, std::vector<crypto::public_key>>;
     struct swarm_size {
         swarm_id_t swarm_id;
@@ -16,6 +18,8 @@ namespace master_nodes {
         crypto::public_key public_key;
         swarm_id_t swarm_id;
     };
+
+    uint64_t get_new_swarm_id(const swarm_mnode_map_t& swarm_to_mnodes);
 
     void calc_swarm_changes(swarm_mnode_map_t& swarm_to_mnodes, uint64_t seed);
 

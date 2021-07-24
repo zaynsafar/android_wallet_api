@@ -50,6 +50,8 @@
 #include "cryptonote_basic/cryptonote_basic.h"
 #include "cryptonote_basic/cryptonote_basic_impl.h"
 #include "cryptonote_basic/cryptonote_format_utils.h"
+#include "cryptonote_basic/hardfork.h"
+#include "cryptonote_config.h"
 #include "cryptonote_core/cryptonote_core.h"
 #include "cryptonote_basic/cryptonote_boost_serialization.h"
 #include "cryptonote_protocol/quorumnet.h"
@@ -217,7 +219,6 @@ private:
     ar & hard_forks;
   }
 };
-
 
 BINARY_VARIANT_TAG(callback_entry, 0xcb);
 BINARY_VARIANT_TAG(cryptonote::account_base, 0xcc);
@@ -905,7 +906,7 @@ inline bool replay_events_through_core_plain(cryptonote::core& cr, const std::ve
 //--------------------------------------------------------------------------
 template<typename t_test_class>
 struct get_test_options {
-  const std::vector<std::pair<uint8_t, uint64_t>> hard_forks = {{7, 0}};
+  const std::vector<cryptonote::hard_fork> hard_forks = {{7, 0, 0, 0}};
   const cryptonote::test_options test_options = {
     hard_forks, 0
   };
@@ -1239,17 +1240,41 @@ inline bool do_replay_file(const std::string& filename)
     CATCH_GENERATE_REPLAY_CORE(generator_class, generator_class_instance, CORE);                                       \
   }
 
-#define CALL_TEST(test_name, function)                                                                     \
-  {                                                                                                        \
-    if(!function())                                                                                        \
-    {                                                                                                      \
-      MERROR("#TEST# Failed " << test_name);                                                               \
-      return 1;                                                                                            \
-    }                                                                                                      \
-    else                                                                                                   \
-    {                                                                                                      \
-      MGINFO_GREEN("#TEST# Succeeded " << test_name);                                                      \
-    }                                                                                                      \
+#define CATCH_GENERATE_REPLAY(generator_class, generator_class_instance)                                               \
+  CATCH_REPLAY(generator_class);                                                                                       \
+  REPLAY_CORE(generator_class, generator_class_instance);
+
+#define CATCH_GENERATE_REPLAY_CORE(generator_class, generator_class_instance, CORE)                                    \
+  CATCH_REPLAY(generator_class);                                                                                       \
+  REPLAY_WITH_CORE(generator_class, generator_class_instance, CORE);
+
+#define GENERATE_AND_PLAY(generator_class)                                                                             \
+  if (list_tests)                                                                                                      \
+    std::cout << #generator_class << std::endl;                                                                        \
+  else if (std::cmatch m; filter.empty() || std::regex_match(#generator_class, m, std::regex(filter)))                 \
+  {                                                                                                                    \
+    std::vector<test_event_entry> events;                                                                              \
+    ++tests_count;                                                                                                     \
+    bool generated = false;                                                                                            \
+    generator_class generator_class_instance;                                                                          \
+    try                                                                                                                \
+    {                                                                                                                  \
+      generated = generator_class_instance.generate(events);                                                           \
+    }                                                                                                                  \
+    CATCH_GENERATE_REPLAY(generator_class, generator_class_instance);                                                  \
+  }
+
+#define GENERATE_AND_PLAY_INSTANCE(generator_class, generator_class_instance, CORE)                                    \
+  if (std::cmatch m; filter.empty() || std::regex_match(#generator_class, m, std::regex(filter)))                      \
+  {                                                                                                                    \
+    std::vector<test_event_entry> events;                                                                              \
+    ++tests_count;                                                                                                     \
+    bool generated = false;                                                                                            \
+    try                                                                                                                \
+    {                                                                                                                  \
+      generated = ins.generate(events);                                                                                \
+    }                                                                                                                  \
+    CATCH_GENERATE_REPLAY_CORE(generator_class, generator_class_instance, CORE);                                       \
   }
 
 #define QUOTEME(x) #x

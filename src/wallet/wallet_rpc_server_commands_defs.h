@@ -2,21 +2,21 @@
 // Copyright (c)      2018, The Beldex Project
 // 
 // All rights reserved.
-// 
+//
 // Redistribution and use in source and binary forms, with or without modification, are
 // permitted provided that the following conditions are met:
-// 
+//
 // 1. Redistributions of source code must retain the above copyright notice, this list of
 //    conditions and the following disclaimer.
-// 
+//
 // 2. Redistributions in binary form must reproduce the above copyright notice, this list
 //    of conditions and the following disclaimer in the documentation and/or other
 //    materials provided with the distribution.
-// 
+//
 // 3. Neither the name of the copyright holder nor the names of its contributors may be
 //    used to endorse or promote products derived from this software without specific
 //    prior written permission.
-// 
+//
 // THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY
 // EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
 // MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL
@@ -26,7 +26,7 @@
 // INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
 // STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
 // THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-// 
+//
 // Parts of this file are originally copyright (c) 2012-2013 The Cryptonote developers
 
 #pragma once
@@ -395,7 +395,7 @@ namespace tools::wallet_rpc {
   };
 
   BELDEX_RPC_DOC_INTROSPECT
-  // Send beldex to a number of recipients. To preview the transaction fee, set do_not_relay to true and get_tx_metadata to true. 
+  // Send beldex to a number of recipients. To preview the transaction fee, set do_not_relay to true and get_tx_metadata to true.
   // Submit the response using the data in get_tx_metadata in the RPC call, relay_tx.
   struct TRANSFER : RESTRICTED
   {
@@ -923,39 +923,6 @@ namespace tools::wallet_rpc {
       KV_MAP_SERIALIZABLE
     };
 
-    using response = EMPTY;
-  };
-
-  BELDEX_RPC_DOC_INTROSPECT
-  // Set arbitrary string notes for transactions.
-  struct SET_TX_NOTES : RESTRICTED
-  {
-    static constexpr auto names() { return NAMES("set_tx_notes"); }
-
-    struct request
-    {
-      std::list<std::string> txids; // Transaction ids.
-      std::list<std::string> notes; // Notes for the transactions.
-
-      KV_MAP_SERIALIZABLE
-    };
-
-    using response = EMPTY;
-  };
-
-  BELDEX_RPC_DOC_INTROSPECT
-  // Get string notes for transactions.
-  struct GET_TX_NOTES : RPC_COMMAND
-  {
-    static constexpr auto names() { return NAMES("get_tx_notes"); }
-
-    struct request
-    {
-      std::list<std::string> txids; // Transaction ids.
-
-      KV_MAP_SERIALIZABLE
-    };
-
     struct response
     {
       std::list<std::string> notes; // Notes for the transactions.
@@ -1099,7 +1066,7 @@ namespace tools::wallet_rpc {
     };
   };
 
-  BELDEX_RPC_DOC_INTROSPECT
+  BELDEXRPC_DOC_INTROSPECT
   // Generate a signature to prove a spend. Unlike proving a transaction, it does not requires the destination public address.
   struct GET_SPEND_PROOF : RPC_COMMAND
   {
@@ -1187,7 +1154,7 @@ namespace tools::wallet_rpc {
     {
       bool good;      // States if the inputs proves the reserve.
       uint64_t total; //
-      uint64_t spent; // 
+      uint64_t spent; //
 
       KV_MAP_SERIALIZABLE
     };
@@ -1310,7 +1277,7 @@ namespace tools::wallet_rpc {
 
     struct response
     {
-      bool good; // 
+      bool good; //
 
       KV_MAP_SERIALIZABLE
     };
@@ -1332,6 +1299,39 @@ namespace tools::wallet_rpc {
     struct response
     {
       std::string outputs_data_hex; // Wallet outputs in hex format.
+
+      KV_MAP_SERIALIZABLE
+    };
+  };
+
+  BELDEX_RPC_DOC_INTROSPECT
+  // Export transfers to csv
+  struct EXPORT_TRANSFERS : RPC_COMMAND
+  {
+    static constexpr auto names() { return NAMES("export_transfers"); }
+
+    struct request
+    {
+      bool in = false;
+      bool out = false;
+      bool stake = false;
+      bool pending = false;
+      bool failed = false;
+      bool pool = false;
+      bool coinbase = false;
+      bool filter_by_height = false;
+      uint64_t min_height = 0;
+      uint64_t max_height = CRYPTONOTE_MAX_BLOCK_NUMBER;
+      std::set<uint32_t> subaddr_indices;
+      uint32_t account_index;
+      bool all_accounts;
+
+      KV_MAP_SERIALIZABLE
+    };
+
+    struct response
+    {
+      std::string data; // CSV data to be written to file by wallet
 
       KV_MAP_SERIALIZABLE
     };
@@ -1373,8 +1373,8 @@ namespace tools::wallet_rpc {
 
     struct signed_key_image
     {
-      std::string key_image; // 
-      std::string signature; // 
+      std::string key_image; //
+      std::string signature; //
 
       KV_MAP_SERIALIZABLE
     };
@@ -1412,7 +1412,7 @@ namespace tools::wallet_rpc {
 
     struct response
     {
-      uint64_t height;  
+      uint64_t height;
       uint64_t spent;   // Amount (in atomic units) spent from those key images.
       uint64_t unspent; // Amount (in atomic units) still available from those key images.
 
@@ -1464,7 +1464,7 @@ namespace tools::wallet_rpc {
     struct response
     {
       uri_spec uri;                                // JSON object containing payment information:
-      std::vector<std::string> unknown_parameters; // 
+      std::vector<std::string> unknown_parameters; //
 
       KV_MAP_SERIALIZABLE
     };
@@ -1540,6 +1540,8 @@ namespace tools::wallet_rpc {
 
       KV_MAP_SERIALIZABLE
     };
+
+    using response = EMPTY;
   };
 
   BELDEX_RPC_DOC_INTROSPECT
@@ -1744,13 +1746,24 @@ namespace tools::wallet_rpc {
       KV_MAP_SERIALIZABLE
     };
 
-    struct response
+    using response = EMPTY;
+  };
+
+  BELDEX_RPC_DOC_INTROSPECT
+  // Change a wallet password.
+  struct CHANGE_WALLET_PASSWORD : RESTRICTED
+  {
+    static constexpr auto names() { return NAMES("change_wallet_password"); }
+
+    struct request
     {
       std::string address;
       std::string info;
 
       KV_MAP_SERIALIZABLE
     };
+
+    using response = EMPTY;
   };
 
   BELDEX_RPC_DOC_INTROSPECT
@@ -1764,7 +1777,7 @@ namespace tools::wallet_rpc {
       uint64_t restore_height; // Height in which to start scanning the blockchain for transactions into and out of this Wallet.
       std::string filename;    // Set the name of the Wallet.
       std::string seed;        // Mnemonic seed of wallet (25 words).
-      std::string seed_offset; // 
+      std::string seed_offset; //
       std::string password;    // Set password for Wallet.
       std::string language;    // Set language for the wallet.
       bool autosave_current;   // (Optional: Default true): If a pre-existing wallet is open, save to disk before opening the new wallet.
@@ -1777,12 +1790,12 @@ namespace tools::wallet_rpc {
       std::string address; // Public address of wallet.
       std::string seed;    // Seed of wallet.
       std::string info;    // Wallet information.
-      bool was_deprecated; // 
+      bool was_deprecated; //
 
       KV_MAP_SERIALIZABLE
     };
   };
-  
+
   BELDEX_RPC_DOC_INTROSPECT
   // Check if a wallet is a multisig one.
   struct IS_MULTISIG : RPC_COMMAND
@@ -1794,7 +1807,7 @@ namespace tools::wallet_rpc {
     struct response
     {
       bool multisig;      // States if the wallet is multisig.
-      bool ready;         // 
+      bool ready;         //
       uint32_t threshold; // Amount of signature needed to sign a transfer.
       uint32_t total;     // Total amount of signature in the multisig wallet.
 
@@ -1902,7 +1915,7 @@ namespace tools::wallet_rpc {
   };
 
   BELDEX_RPC_DOC_INTROSPECT
-  // 
+  //
   struct EXCHANGE_MULTISIG_KEYS : RESTRICTED
   {
     static constexpr auto names() { return NAMES("exchange_multisig_keys"); }
@@ -2029,7 +2042,7 @@ namespace tools::wallet_rpc {
     {
       std::string register_master_node_str; // String supplied by the prepare_registration command.
       bool        get_tx_key;                // (Optional) Return the transaction key after sending.
-      bool        do_not_relay;              // (Optional) If true, the newly created transaction will not be relayed to the beldex network. (Defaults to false)
+      bool        do_not_relay;              // (Optional) If true, the newly created transaction will not be relayed to the oxen network. (Defaults to false)
       bool        get_tx_hex;                // Return the transaction as hex string after sending (Defaults to false)
       bool        get_tx_metadata;           // Return the metadata needed to relay the transaction. (Defaults to false)
 
@@ -2072,7 +2085,7 @@ namespace tools::wallet_rpc {
       KV_MAP_SERIALIZABLE
     };
   };
-  
+
   BELDEX_RPC_DOC_INTROSPECT
   // Check if Master Node can unlock its stake.
   struct CAN_REQUEST_STAKE_UNLOCK : RESTRICTED
@@ -2094,7 +2107,7 @@ namespace tools::wallet_rpc {
       KV_MAP_SERIALIZABLE
     };
   };
-  
+
   BELDEX_RPC_DOC_INTROSPECT
   // Parse an address to validate if it's a valid Beldex address.
   struct VALIDATE_ADDRESS : RPC_COMMAND
@@ -2104,8 +2117,8 @@ namespace tools::wallet_rpc {
     struct request
     {
       std::string address;  // Address to check.
-      bool any_net_type;    // 
-      bool allow_openalias; // 
+      bool any_net_type;    //
+      bool allow_openalias; //
 
       KV_MAP_SERIALIZABLE
     };
@@ -2186,7 +2199,7 @@ namespace tools::wallet_rpc {
     static constexpr const char *description =
 R"(Buy a Beldex Name System (BNS) mapping that maps a unique name to a Session ID or Beldexnet address.
 
-Currently supports Session and Beldexnet registrations. Beldexnet registrations can be for 1, 2, 5, or 10 years by specifying a type value of "beldexnet", "beldexnet_2y", "beldexnet_5y", "beldexnet_10y". Session registrations do not expire.
+Currently supports Session, Beldexnet and Wallet registrations. Beldexnet registrations can be for 1, 2, 5, or 10 years by specifying a type value of "beldexnet", "beldexnet_2y", "beldexnet_5y", "beldexnet_10y". Session registrations do not expire.
 
 The owner of the BNS entry (by default, the purchasing wallet) will be permitted to submit BNS update transactions to the Beldex blockchain (for example to update a Session pubkey or the target Beldexnet address). You may change the primary owner or add a backup owner in the registration and can change them later with update transactions. Owner addresses can be either Beldex wallets, or generic ed25519 pubkeys (for advanced uses).
 
@@ -2198,17 +2211,17 @@ For more information on updating and signing see the BNS_UPDATE_MAPPING document
 
     struct request
     {
-      std::string        type;            // The mapping type: "session", "beldexnet", "beldexnet_2y", "beldexnet_5y", "beldexnet_10y".
+      std::string        type;            // The mapping type: "session", "beldexnet", "beldexnet_2y", "beldexnet_5y", "beldexnet_10y", "wallet".
       std::string        owner;           // (Optional): The ed25519 public key or wallet address that has authority to update the mapping.
       std::string        backup_owner;    // (Optional): The secondary, backup public key that has authority to update the mapping.
       std::string        name;            // The name to purchase via Beldex Name Service
-      std::string        value;           // The value that the name maps to via Beldex Name Service, (i.e. For Session: [display name->session public key]. In future, for wallets: [name->wallet address], for Beldexnet: [name->domain name]).
+      std::string        value;           // The value that the name maps to via Beldex Name Service, (i.e. For Session: [display name->session public key],  for wallets: [name->wallet address], for Beldexnet: [name->domain name]).
 
       uint32_t           account_index;   // (Optional) Transfer from this account index. (Defaults to 0)
       std::set<uint32_t> subaddr_indices; // (Optional) Transfer from this set of subaddresses. (Defaults to 0)
       uint32_t           priority;        // Set a priority for the transaction. Accepted values are: or 0-4 for: default, unimportant, normal, elevated, priority.
       bool               get_tx_key;      // (Optional) Return the transaction key after sending.
-      bool               do_not_relay;    // (Optional) If true, the newly created transaction will not be relayed to the beldex network. (Defaults to false)
+      bool               do_not_relay;    // (Optional) If true, the newly created transaction will not be relayed to the oxen network. (Defaults to false)
       bool               get_tx_hex;      // Return the transaction as hex string after sending (Defaults to false)
       bool               get_tx_metadata; // Return the metadata needed to relay the transaction. (Defaults to false)
 
@@ -2250,7 +2263,7 @@ The renewal can be for 1, 2, 5, or 10 years by specifying a `type` value of "bel
       std::set<uint32_t> subaddr_indices;  // (Optional) Transfer from this set of subaddresses. (Defaults to 0)
       uint32_t           priority;         // Set a priority for the transaction. Accepted values are: 0-4 for: default, unimportant, normal, elevated, priority.
       bool               get_tx_key;       // (Optional) Return the transaction key after sending.
-      bool               do_not_relay;     // (Optional) If true, the newly created transaction will not be relayed to the beldex network. (Defaults to false)
+      bool               do_not_relay;     // (Optional) If true, the newly created transaction will not be relayed to the oxen network. (Defaults to false)
       bool               get_tx_hex;       // Return the transaction as hex string after sending (Defaults to false)
       bool               get_tx_metadata;  // Return the metadata needed to relay the transaction. (Defaults to false)
 
@@ -2277,7 +2290,7 @@ If signing is performed externally then you must first encrypt the `value` (if b
 
     struct request
     {
-      std::string        type;      // The mapping type, "session" or "beldexnet".
+      std::string        type;      // The mapping type, "session", "beldexnet", or "wallet".
       std::string        name;      // The name to update via Beldex Name Service
       std::string        value;     // (Optional): The new value that the name maps to via Beldex Name Service. If not specified or given the empty string "", then the mapping's value remains unchanged. If using a `signature` then this value (if non-empty) must be already encrypted.
       std::string        owner;     // (Optional): The new owner of the mapping. If not specified or given the empty string "", then the mapping's owner remains unchanged.
@@ -2288,7 +2301,7 @@ If signing is performed externally then you must first encrypt the `value` (if b
       std::set<uint32_t> subaddr_indices;  // (Optional) Transfer from this set of subaddresses. (Defaults to 0)
       uint32_t           priority;         // Set a priority for the transaction. Accepted values are: 0-4 for: default, unimportant, normal, elevated, priority.
       bool               get_tx_key;       // (Optional) Return the transaction key after sending.
-      bool               do_not_relay;     // (Optional) If true, the newly created transaction will not be relayed to the beldex network. (Defaults to false)
+      bool               do_not_relay;     // (Optional) If true, the newly created transaction will not be relayed to the oxen network. (Defaults to false)
       bool               get_tx_hex;       // Return the transaction as hex string after sending (Defaults to false)
       bool               get_tx_metadata;  // Return the metadata needed to relay the transaction. (Defaults to false)
 
@@ -2323,7 +2336,7 @@ This command is only required if the open wallet is one of the owners of a BNS r
 
     struct request
     {
-      std::string type;  // The mapping type, currently we only support "session". In future "beldexnet" and "blockchain" mappings will be available.
+      std::string type;  // The mapping type, currently we support "session", "beldexnet" and "wallet" mappings.
       std::string name;  // The desired name to update via Beldex Name Service
       std::string encrypted_value; // (Optional): The new encrypted value that the name maps to via Beldex Name Service. If not specified or given the empty string "", then the mapping's value remains unchanged.
       std::string owner;     // (Optional): The new owner of the mapping. If not specified or given the empty string "", then the mapping's owner remains unchanged.
@@ -2349,7 +2362,7 @@ This command is only required if the open wallet is one of the owners of a BNS r
 
     struct request
     {
-      std::string type; // The mapping type, "session" or "beldexnet".
+      std::string type; // The mapping type, "session", "beldexnet" or "wallet".
       std::string name; // The desired name to hash
 
       KV_MAP_SERIALIZABLE
@@ -2528,6 +2541,7 @@ This command is only required if the open wallet is one of the owners of a BNS r
     SIGN,
     VERIFY,
     EXPORT_OUTPUTS,
+    EXPORT_TRANSFERS,
     IMPORT_OUTPUTS,
     EXPORT_KEY_IMAGES,
     IMPORT_KEY_IMAGES,

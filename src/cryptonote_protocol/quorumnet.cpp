@@ -27,12 +27,14 @@
 // THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "quorumnet.h"
+#include "cryptonote_basic/hardfork.h"
 #include "cryptonote_core/cryptonote_core.h"
 #include "cryptonote_core/master_node_voting.h"
 #include "cryptonote_core/master_node_rules.h"
 #include "cryptonote_core/tx_blink.h"
 #include "cryptonote_core/tx_pool.h"
 #include "cryptonote_core/pulse.h"
+#include "cryptonote_core/uptime_proof.h"
 #include "quorumnet_conn_matrix.h"
 #include "cryptonote_config.h"
 #include "common/random.h"
@@ -41,6 +43,7 @@
 #include <oxenmq/hex.h>
 #include <shared_mutex>
 #include <iterator>
+#include <time.h>
 
 #undef BELDEX_DEFAULT_LOG_CATEGORY
 #define BELDEX_DEFAULT_LOG_CATEGORY "qnet"
@@ -69,7 +72,7 @@ using pending_signature_set = std::unordered_set<pending_signature, pending_sign
 
 struct QnetState {
     cryptonote::core &core;
-    OxenMQ &lmq{core.get_lmq()};
+    OxenMQ &omq{core.get_omq()};
 
     // Track submitted blink txes here; unlike the blinks stored in the mempool we store these ones
     // more liberally to track submitted blinks, even if unsigned/unacceptable, while the mempool
@@ -203,7 +206,7 @@ void peer_relay_to_prepared_destinations(cryptonote::core &core, std::vector<pre
 {
     for (auto const &[x25519_string, connect_string]: destinations) {
         MINFO("Relaying data to " << to_hex(x25519_string) << " @ " << connect_string);
-        core.get_lmq().send(x25519_string, command, std::move(data), send_option::hint{connect_string});
+        core.get_omq().send(x25519_string, command, std::move(data), send_option::hint{connect_string});
     }
 }
 
@@ -259,7 +262,7 @@ public:
             std::unordered_set<crypto::public_key> exclude = {},
             bool include_workers = false
             )
-    : lmq{qnet.lmq} {
+    : omq{qnet.omq} {
 
         const auto& keys = qnet.core.get_master_keys();
         assert(qnet.core.master_node());
@@ -317,7 +320,7 @@ public:
     }
 
 private:
-    OxenMQ &lmq;
+    OxenMQ &omq;
 
     /// Looks up a pubkey in known remotes and adds it to `peers`.  If strong, it is added with an
     /// address, otherwise it is added with an empty address.  If the element already exists, it
@@ -433,9 +436,9 @@ private:
         for (auto &peer : peers) {
             MTRACE("Relaying " << cmd << " to peer " << to_hex(peer.first) << (peer.second.empty() ? " (if connected)"s : " @ " + peer.second));
             if (peer.second.empty())
-                lmq.send(peer.first, cmd, relay_data[I]..., send_option::optional{});
+                omq.send(peer.first, cmd, relay_data[I]..., send_option::optional{});
             else
-                lmq.send(peer.first, cmd, relay_data[I]..., send_option::hint{peer.second});
+                omq.send(peer.first, cmd, relay_data[I]..., send_option::hint{peer.second});
         }
     }
 
@@ -456,6 +459,7 @@ bt_dict serialize_vote(const quorum_vote_t &vote) {
     else {
         result["wi"] = vote.state_change.worker_index;
         result["sc"] = static_cast<std::underlying_type_t<new_state>>(vote.state_change.state);
+        result["re"] = static_cast<uint16_t>(vote.state_change.reason);
     }
     return result;
 }
@@ -479,6 +483,7 @@ quorum_vote_t deserialize_vote(std::string_view v) {
     } else {
         vote.state_change.worker_index = get_int<uint16_t>(d.at("wi"));
         vote.state_change.state = get_enum<new_state>(d, "sc");
+        vote.state_change.reason = get_int<uint16_t>(d.at("re"));
     }
 
     return vote;
@@ -562,6 +567,12 @@ void handle_obligation_vote(Message& m, QnetState& qnet) {
     catch (const std::exception &e) {
         MWARNING("Deserialization of vote from " << to_hex(m.conn.pubkey()) << " failed: " << e.what());
     }
+}
+
+void handle_timestamp(Message& m) {
+    MDEBUG("Received a timestamp request from " << to_hex(m.conn.pubkey()));
+    const time_t seconds = time(nullptr);
+    m.send_reply(std::to_string(seconds));
 }
 
 /// Gets an integer value out of a bt_dict, if present and fits (i.e. get_int<> succeeds); if not
@@ -787,10 +798,10 @@ void process_blink_signatures(QnetState &qnet, const std::shared_ptr<blink_tx> &
     if (reply_tag && reply_conn) {
         if (became_approved) {
             MINFO("Blink tx became approved; sending result back to originating node");
-            qnet.lmq.send(reply_conn, "bl.good", bt_serialize(bt_dict{{"!", reply_tag}}), send_option::optional{});
+            qnet.omq.send(reply_conn, "bl.good", bt_serialize(bt_dict{{"!", reply_tag}}), send_option::optional{});
         } else if (became_rejected) {
             MINFO("Blink tx became rejected; sending result back to originating node");
-            qnet.lmq.send(reply_conn, "bl.bad", bt_serialize(bt_dict{{"!", reply_tag}}), send_option::optional{});
+            qnet.omq.send(reply_conn, "bl.bad", bt_serialize(bt_dict{{"!", reply_tag}}), send_option::optional{});
         }
     }
 }
@@ -827,7 +838,7 @@ void handle_blink(oxenmq::Message& m, QnetState& qnet) {
     //   message and close it.
     // If an outgoing connection - refuse reconnections via ZAP and just close it.
 
-    MDEBUG("Received a blink tx from " << (m.conn.sn() ? "MN " : "non-MN ") << to_hex(m.conn.pubkey()));
+    MDEBUG("Received a blink tx from " << (m.conn.mn() ? "MN " : "non-MN ") << to_hex(m.conn.pubkey()));
 
     assert(qnet.core.master_node());
     if (!qnet.core.master_node())
@@ -843,7 +854,9 @@ void handle_blink(oxenmq::Message& m, QnetState& qnet) {
 
     auto tag = get_or<uint64_t>(data, "!", 0);
 
-    auto hf_version = qnet.core.get_blockchain_storage().get_current_hard_fork_version();
+    auto local_height = qnet.core.get_current_blockchain_height();
+
+    auto hf_version = get_network_version(qnet.core.get_nettype(), local_height);
     if (hf_version < HF_VERSION_BLINK) {
         MWARNING("Rejecting blink message: blink is not available for hardfork " << (int) hf_version);
         if (tag)
@@ -853,7 +866,6 @@ void handle_blink(oxenmq::Message& m, QnetState& qnet) {
 
     // verify that height is within-2 of current height
     auto blink_height = get_int<uint64_t>(data.at("h"));
-    auto local_height = qnet.core.get_current_blockchain_height();
 
     if (blink_height < local_height - 2) {
         MINFO("Rejecting blink tx because blink auth height is too low (" << blink_height << " vs. " << local_height << ")");
@@ -1592,7 +1604,7 @@ void handle_pulse_participation_bit_or_bitset(Message &m, QnetState& qnet, bool 
       throw std::invalid_argument(std::string(INVALID_ARG_PREFIX) + tag + "'");
   }
 
-  qnet.lmq.job([&qnet, data = std::move(msg)]() { pulse::handle_message(&qnet, data); }, qnet.core.pulse_thread_id());
+  qnet.omq.job([&qnet, data = std::move(msg)]() { pulse::handle_message(&qnet, data); }, qnet.core.pulse_thread_id());
 }
 
 void handle_pulse_block_template(Message &m, QnetState &qnet)
@@ -1609,7 +1621,7 @@ void handle_pulse_block_template(Message &m, QnetState &qnet)
   else
     throw std::invalid_argument(std::string(INVALID_ARG_PREFIX) + tag + "'");
 
-  qnet.lmq.job([&qnet, data = std::move(msg)]() { pulse::handle_message(&qnet, data); }, qnet.core.pulse_thread_id());
+  qnet.omq.job([&qnet, data = std::move(msg)]() { pulse::handle_message(&qnet, data); }, qnet.core.pulse_thread_id());
 }
 
 void handle_pulse_random_value_hash(Message &m, QnetState &qnet)
@@ -1632,7 +1644,7 @@ void handle_pulse_random_value_hash(Message &m, QnetState &qnet)
     throw std::invalid_argument(std::string(INVALID_ARG_PREFIX) + tag + "'");
   }
 
-  qnet.lmq.job([&qnet, data = std::move(msg)]() { pulse::handle_message(&qnet, data); }, qnet.core.pulse_thread_id());
+  qnet.omq.job([&qnet, data = std::move(msg)]() { pulse::handle_message(&qnet, data); }, qnet.core.pulse_thread_id());
 }
 
 void handle_pulse_random_value(Message &m, QnetState &qnet)
@@ -1653,7 +1665,7 @@ void handle_pulse_random_value(Message &m, QnetState &qnet)
     throw std::invalid_argument(std::string(INVALID_ARG_PREFIX) + tag + "'");
   }
 
-  qnet.lmq.job([&qnet, data = std::move(msg)]() { pulse::handle_message(&qnet, data); }, qnet.core.pulse_thread_id());
+  qnet.omq.job([&qnet, data = std::move(msg)]() { pulse::handle_message(&qnet, data); }, qnet.core.pulse_thread_id());
 }
 
 void handle_pulse_signed_block(Message &m, QnetState &qnet)
@@ -1672,7 +1684,7 @@ void handle_pulse_signed_block(Message &m, QnetState &qnet)
     throw std::invalid_argument("Invalid pulse signed block: missing required field '"s + tag + "'");
   }
 
-  qnet.lmq.job([&qnet, data = std::move(msg)]() { pulse::handle_message(&qnet, data); }, qnet.core.pulse_thread_id());
+  qnet.omq.job([&qnet, data = std::move(msg)]() { pulse::handle_message(&qnet, data); }, qnet.core.pulse_thread_id());
 }
 
 } // end empty namespace
@@ -1691,29 +1703,31 @@ void init_core_callbacks() {
 
 namespace {
 void setup_endpoints(cryptonote::core& core, void* obj) {
-    auto& lmq = core.get_lmq();
+    auto& omq = core.get_omq();
 
     if (core.master_node()) {
         if (!obj)
             throw std::logic_error{"qnet initialization failure: quorumnet_new must be called for master node operation"};
         auto& qnet = QnetState::from(obj);
         // quorum.*: commands between quorum members, requires that both side of the connection is a MN
-        lmq.add_category("quorum", Access{AuthLevel::none, true /*remote mn*/, true /*local mn*/}, 2 /*reserved threads*/)
+        omq.add_category("quorum", Access{AuthLevel::none, true /*remote mn*/, true /*local mn*/}, 2 /*reserved threads*/)
             // Receives an obligation vote
             .add_command("vote_ob", [&qnet](Message& m) { handle_obligation_vote(m, qnet); })
             // Receives blink tx signatures or rejections between quorum members (either original or
             // forwarded).  These are propagated by the receiver if new
             .add_command("blink_sign", [&qnet](Message& m) { handle_blink_signature(m, qnet); })
+            // Receives a request for the timestamp
+            .add_request_command("timestamp", [](Message& m) { handle_timestamp(m); })
             ;
 
         // blink.*: commands sent to blink quorum members from anyone (e.g. blink submission)
-        lmq.add_category("blink", Access{AuthLevel::none, false /*remote mn*/, true /*local mn*/}, 1 /*reserved thread*/)
+        omq.add_category("blink", Access{AuthLevel::none, false /*remote mn*/, true /*local mn*/}, 1 /*reserved thread*/)
             // Receives a new blink tx submission from an external node, or forward from other quorum
             // members who received it from an external node.
             .add_command("submit", [&qnet](Message& m) { handle_blink(m, qnet); })
             ;
 
-        lmq.add_category(PULSE_CMD_CATEGORY, Access{AuthLevel::none, true /*remote mn*/, true /*local mn*/}, 1 /*reserved thread*/)
+        omq.add_category(PULSE_CMD_CATEGORY, Access{AuthLevel::none, true /*remote mn*/, true /*local mn*/}, 1 /*reserved thread*/)
             .add_command(PULSE_CMD_VALIDATOR_BIT, [&qnet](Message& m) { handle_pulse_participation_bit_or_bitset(m, qnet, false /*bitset*/); })
             .add_command(PULSE_CMD_VALIDATOR_BITSET, [&qnet](Message& m) { handle_pulse_participation_bit_or_bitset(m, qnet, true /*bitset*/); })
             .add_command(PULSE_CMD_BLOCK_TEMPLATE, [&qnet](Message& m) { handle_pulse_block_template(m, qnet); })
@@ -1724,7 +1738,7 @@ void setup_endpoints(cryptonote::core& core, void* obj) {
     }
 
     // bl.*: responses to blinks sent from quorum members back to the node who submitted the blink
-    lmq.add_category("bl", Access{AuthLevel::none, true /*remote mn*/, false /*local mn*/})
+    omq.add_category("bl", Access{AuthLevel::none, true /*remote mn*/, false /*local mn*/})
         // Message sent back to the blink initiator that the transaction was NOT relayed, either
         // because the height was invalid or the quorum checksum failed.  This is only sent by the
         // entry point master nodes into the quorum to let it know the tx verification has not
@@ -1748,12 +1762,13 @@ void setup_endpoints(cryptonote::core& core, void* obj) {
     // 8.x.1 (i.e. the first post-hard-fork release): remove the aliases since no 7.1.x nodes will
     // be left.
 
-    lmq.add_command_alias("vote_ob", "quorum.vote_ob");
-    lmq.add_command_alias("blink_sign", "quorum.blink_sign");
-    lmq.add_command_alias("blink", "blink.submit");
-    lmq.add_command_alias("bl_nostart", "bl.nostart");
-    lmq.add_command_alias("bl_bad", "bl.bad");
-    lmq.add_command_alias("bl_good", "bl.good");
+    omq.add_command_alias("vote_ob", "quorum.vote_ob");
+    omq.add_command_alias("blink_sign", "quorum.blink_sign");
+    omq.add_command_alias("timestamp", "quorum.timestamp");
+    omq.add_command_alias("blink", "blink.submit");
+    omq.add_command_alias("bl_nostart", "bl.nostart");
+    omq.add_command_alias("bl_bad", "bl.bad");
+    omq.add_command_alias("bl_good", "bl.good");
 }
 }
 
