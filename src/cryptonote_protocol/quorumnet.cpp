@@ -162,7 +162,7 @@ peer_prepare_relay_to_quorum_subset(cryptonote::core &core, It quorum_begin, It 
 
     MDEBUG("Have " << candidates.size() << " MN candidates");
 
-    std::vector<std::tuple<std::string, std::string, decltype(proof_info{}.version)>> remotes; // {x25519 pubkey, connect string, version}
+    std::vector<std::tuple<std::string, std::string, decltype(proof_info{}.proof->version)>> remotes; // {x25519 pubkey, connect string, version}
     remotes.reserve(candidates.size());
     core.get_master_node_list().for_each_master_node_info_and_proof(candidates.begin(), candidates.end(),
         [&remotes](const auto &pubkey, const auto &info, const auto &proof) {
@@ -170,14 +170,14 @@ peer_prepare_relay_to_quorum_subset(cryptonote::core &core, It quorum_begin, It 
                 MTRACE("Not include inactive node " << pubkey);
                 return;
             }
-            if (!proof.pubkey_x25519 || !proof.quorumnet_port || !proof.public_ip) {
+            if (!proof.pubkey_x25519 || !proof.proof->qnet_port || !proof.proof->public_ip) {
                 MTRACE("Not including node " << pubkey << ": missing x25519(" << to_hex(get_data_as_string(proof.pubkey_x25519)) << "), "
-                        "public_ip(" << epee::string_tools::get_ip_string_from_int32(proof.public_ip) << "), or qnet port(" << proof.quorumnet_port << ")");
+                        "public_ip(" << epee::string_tools::get_ip_string_from_int32(proof.proof->public_ip) << "), or qnet port(" << proof.proof->qnet_port << ")");
                 return;
             }
             remotes.emplace_back(get_data_as_string(proof.pubkey_x25519),
-                    "tcp://" + epee::string_tools::get_ip_string_from_int32(proof.public_ip) + ":" + std::to_string(proof.quorumnet_port),
-                    proof.version);
+                    "tcp://" + epee::string_tools::get_ip_string_from_int32(proof.proof->public_ip) + ":" + std::to_string(proof.proof->qnet_port),
+                    proof.proof->version);
         });
 
     // Select 4 random MNs to send the data to, but prefer MNs with newer versions because they may have network fixes.
@@ -251,7 +251,7 @@ public:
     /// \param opportunistic - if true then the peers to relay will also attempt to relay to any
     ///     incoming peers *if* those peers are already connected when the message is relayed.
     /// \param exclude - can be specified as a set of peers that should be excluded from the peer
-    ///     list.  Typically for peers that we already know have the relayed information.  This MN's
+    ///     list.  Typically for peers that we already know have the relayed information.  This SN's
     ///     pubkey is always added to this exclude list.
     template <typename QuorumIt>
     peer_info(
@@ -296,9 +296,9 @@ public:
         // Lookup the x25519 and ZMQ connection string for all peers
         qnet.core.get_master_node_list().for_each_master_node_info_and_proof(need_remotes.begin(), need_remotes.end(),
             [this](const auto &pubkey, const auto &info, const auto &proof) {
-              if (info.is_active() && proof.pubkey_x25519 && proof.quorumnet_port && proof.public_ip)
+              if (info.is_active() && proof.pubkey_x25519 && proof.proof->qnet_port && proof.proof->public_ip)
                 remotes.emplace(pubkey, std::make_pair(proof.pubkey_x25519,
-                    "tcp://" + epee::string_tools::get_ip_string_from_int32(proof.public_ip) + ":" + std::to_string(proof.quorumnet_port)));
+                    "tcp://" + epee::string_tools::get_ip_string_from_int32(proof.proof->public_ip) + ":" + std::to_string(proof.proof->qnet_port)));
             });
 
         compute_validator_peers(qbegin, qend, opportunistic);
@@ -351,7 +351,7 @@ private:
     template <typename QuorumIt>
     void compute_validator_peers(QuorumIt qbegin, QuorumIt qend, bool opportunistic) {
 
-        // TODO: when we receive a new block, if our quorum starts soon we can tell MNNetwork to
+        // TODO: when we receive a new block, if our quorum starts soon we can tell SNNetwork to
         // pre-connect (to save the time in handshaking when we get an actual blink tx).
 
         strong_peers = 0;
@@ -838,7 +838,7 @@ void handle_blink(oxenmq::Message& m, QnetState& qnet) {
     //   message and close it.
     // If an outgoing connection - refuse reconnections via ZAP and just close it.
 
-    MDEBUG("Received a blink tx from " << (m.conn.mn() ? "MN " : "non-MN ") << to_hex(m.conn.pubkey()));
+    MDEBUG("Received a blink tx from " << (m.conn.sn() ? "MN " : "non-MN ") << to_hex(m.conn.pubkey()));
 
     assert(qnet.core.master_node());
     if (!qnet.core.master_node())

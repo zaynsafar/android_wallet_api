@@ -923,6 +923,39 @@ namespace tools::wallet_rpc {
       KV_MAP_SERIALIZABLE
     };
 
+    using response = EMPTY;
+  };
+
+BELDEX_RPC_DOC_INTROSPECT
+  // Set arbitrary string notes for transactions.
+  struct SET_TX_NOTES : RESTRICTED
+  {
+    static constexpr auto names() { return NAMES("set_tx_notes"); }
+
+    struct request
+    {
+      std::list<std::string> txids; // Transaction ids.
+      std::list<std::string> notes; // Notes for the transactions.
+
+      KV_MAP_SERIALIZABLE
+    };
+
+    using response = EMPTY;
+  };
+
+  BELDEX_RPC_DOC_INTROSPECT
+  // Get string notes for transactions.
+  struct GET_TX_NOTES : RPC_COMMAND
+  {
+    static constexpr auto names() { return NAMES("get_tx_notes"); }
+
+    struct request
+    {
+      std::list<std::string> txids; // Transaction ids.
+
+      KV_MAP_SERIALIZABLE
+    };
+
     struct response
     {
       std::list<std::string> notes; // Notes for the transactions.
@@ -1066,7 +1099,7 @@ namespace tools::wallet_rpc {
     };
   };
 
-  BELDEXRPC_DOC_INTROSPECT
+  BELDEX_RPC_DOC_INTROSPECT
   // Generate a signature to prove a spend. Unlike proving a transaction, it does not requires the destination public address.
   struct GET_SPEND_PROOF : RPC_COMMAND
   {
@@ -1540,8 +1573,6 @@ namespace tools::wallet_rpc {
 
       KV_MAP_SERIALIZABLE
     };
-
-    using response = EMPTY;
   };
 
   BELDEX_RPC_DOC_INTROSPECT
@@ -1711,23 +1742,6 @@ namespace tools::wallet_rpc {
   };
 
   BELDEX_RPC_DOC_INTROSPECT
-  // Change a wallet password.
-  struct CHANGE_WALLET_PASSWORD : RESTRICTED
-  {
-    static constexpr auto names() { return NAMES("change_wallet_password"); }
-
-    struct request
-    {
-      std::string old_password; // (Optional) Current wallet password, if defined.
-      std::string new_password; // (Optional) New wallet password, if not blank.
-
-      KV_MAP_SERIALIZABLE
-    };
-
-    using response = EMPTY;
-  };
-
-  BELDEX_RPC_DOC_INTROSPECT
   // Restore a wallet using the private spend key, view key and public address.
   struct GENERATE_FROM_KEYS : RPC_COMMAND
   {
@@ -1746,7 +1760,13 @@ namespace tools::wallet_rpc {
       KV_MAP_SERIALIZABLE
     };
 
-    using response = EMPTY;
+     struct response
+    {
+      std::string address;
+      std::string info;
+
+      KV_MAP_SERIALIZABLE
+    };
   };
 
   BELDEX_RPC_DOC_INTROSPECT
@@ -1757,8 +1777,8 @@ namespace tools::wallet_rpc {
 
     struct request
     {
-      std::string address;
-      std::string info;
+      std::string old_password; // (Optional) Current wallet password, if defined.
+      std::string new_password; // (Optional) New wallet password, if not blank.
 
       KV_MAP_SERIALIZABLE
     };

@@ -301,13 +301,13 @@ namespace cryptonote
     END_SERIALIZE()
   };
 
-  struct tx_extra_security_signature
+  struct tx_extra_security_signature 
   {
-      crypto::signature m_security_signature;
+    crypto::signature m_security_signature;
 
-      BEGIN_SERIALIZE()
-          FIELD(m_security_signature)
-      END_SERIALIZE()
+    BEGIN_SERIALIZE()
+      FIELD(m_security_signature)
+    END_SERIALIZE()
   };
 
   struct tx_extra_master_node_register
@@ -354,8 +354,6 @@ namespace cryptonote
         FIELD(signature);
       END_SERIALIZE()
     };
-#pragma pack(pop)
-    static_assert(sizeof(vote) == sizeof(crypto::signature) + sizeof(uint32_t), "deregister_old tx extra vote size is not packed");
 
     enum struct version_t : uint8_t { v0, v4_reasons = 4 };
 

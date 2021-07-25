@@ -212,7 +212,7 @@ namespace cryptonote
              val;
     }
   };
-  static const command_line::arg_descriptor<bool> arg_lmq_quorumnet_public{
+  static const command_line::arg_descriptor<bool> arg_omq_quorumnet_public{
     "lmq-public-quorumnet",
     "Allow the curve-enabled quorumnet address (for a Master Node) to be used for public RPC commands as if passed to --lmq-curve-public. "
       "Note that even without this option the quorumnet port can be used for RPC commands by --lmq-admin and --lmq-user pubkeys.",
@@ -367,7 +367,7 @@ namespace cryptonote
     command_line::add_arg(desc, integration_test::arg_hardforks_override);
     command_line::add_arg(desc, integration_test::arg_pipe_name);
 #endif
-    command_line::add_arg(desc, arg_lmq_quorumnet_public);
+    command_line::add_arg(desc, arg_omq_quorumnet_public);
 
     miner::init_options(desc);
     BlockchainDB::init_options(desc);
@@ -432,7 +432,7 @@ namespace cryptonote
 
       if (!args_okay) {
         MERROR("IMPORTANT: One or more required master node-related configuration settings/options were omitted or invalid; "
-                << "please fix them and restart oxend.");
+                << "please fix them and restart beldexd.");
         return false;
       }
     }
@@ -1004,9 +1004,9 @@ namespace cryptonote
     }
   }
 
-  oxenmq::AuthLevel core::lmq_check_access(const crypto::x25519_public_key& pubkey) const {
-    auto it = m_lmq_auth.find(pubkey);
-    if (it != m_lmq_auth.end())
+  oxenmq::AuthLevel core::omq_check_access(const crypto::x25519_public_key& pubkey) const {
+    auto it = m_omq_auth.find(pubkey);
+    if (it != m_omq_auth.end())
       return it->second;
     return oxenmq::AuthLevel::denied;
   }
@@ -1564,157 +1564,6 @@ namespace cryptonote
 
     return added;
   }
-
-  //-----------------------------------------------------------------------------------------------
-  std::future<std::pair<blink_result, std::string>> core::handle_blink_tx(const std::string &tx_blob)
-  {
-    return quorumnet_send_blink(*this, tx_blob);
-  }
-  //-----------------------------------------------------------------------------------------------
-  bool core::check_tx_semantic(const transaction& tx, bool keeped_by_block) const
-  {
-    if (tx.is_transfer())
-    {
-      if (tx.vin.empty())
-      {
-        MERROR_VER("tx with empty inputs, rejected for tx id= " << get_transaction_hash(tx));
-        return false;
-      }
-    }
-    else
-    {
-      if (tx.vin.size() != 0)
-      {
-        MERROR_VER("tx type: " << tx.type << " must have 0 inputs, received: " << tx.vin.size() << ", rejected for tx id = " << get_transaction_hash(tx));
-        return false;
-      }
-    }
-
-    if(!check_inputs_types_supported(tx))
-    {
-      MERROR_VER("unsupported input types for tx id= " << get_transaction_hash(tx));
-      return false;
-    }
-
-    if(!check_outs_valid(tx))
-    {
-      MERROR_VER("tx with invalid outputs, rejected for tx id= " << get_transaction_hash(tx));
-      return false;
-    }
-
-    if (tx.version >= txversion::v2_ringct)
-    {
-      auto mempool_lock = m_mempool.blink_shared_lock();
-      for (size_t i = 0; i < blinks.size(); i++)
-      {
-        if (want[i] && m_mempool.has_blink(blinks[i].tx_hash))
-        {
-          MDEBUG("Ignoring blink data for " << blinks[i].tx_hash << ": already have blink signatures");
-          want[i] = false; // Already have it, move along
-          want_count--;
-        }
-      }
-    }
-
-    MDEBUG("Want " << want_count << " of " << blinks.size() << " incoming blink signature sets after filtering out existing blink sigs");
-    if (!want_count) return results;
-
-    // Step 3: create new blink_tx objects for txes and add the blink signatures.  We can do all of
-    // this without a lock since these are (for now) just local instances.
-    new_blinks.reserve(want_count);
-
-    if (tx.version == txversion::v1)
-    {
-      if (!want[i])
-        continue;
-      auto &bdata = blinks[i];
-      new_blinks.push_back(std::make_shared<blink_tx>(bdata.height, bdata.tx_hash));
-      auto &blink = *new_blinks.back();
-
-      // Data structure checks (we have more stringent checks for validity later, but if these fail
-      // now then there's no point of even trying to do signature validation.
-      if (bdata.signature.size() != bdata.position.size() ||  // Each signature must have an associated quorum position
-          bdata.signature.size() != bdata.quorum.size()   ||  // and quorum index
-          bdata.signature.size() < master_nodes::BLINK_MIN_VOTES * tools::enum_count<blink_tx::subquorum> || // too few signatures for possible validity
-          bdata.signature.size() > master_nodes::BLINK_SUBQUORUM_SIZE * tools::enum_count<blink_tx::subquorum> || // too many signatures
-          blink_tx::quorum_height(bdata.height, blink_tx::subquorum::base) == 0 || // Height is too early (no blink quorum height)
-          std::any_of(bdata.position.begin(), bdata.position.end(), [](const auto &p) { return p >= master_nodes::BLINK_SUBQUORUM_SIZE; }) || // invalid position
-          std::any_of(bdata.quorum.begin(), bdata.quorum.end(), [](const auto &qi) { return qi >= tools::enum_count<blink_tx::subquorum>; }) // invalid quorum index
-      ) {
-        MINFO("Invalid blink tx " << bdata.tx_hash << ": invalid signature data");
-        continue;
-      }
-
-      bool no_quorum = false;
-      std::array<const std::vector<crypto::public_key> *, tools::enum_count<blink_tx::subquorum>> validators;
-      for (uint8_t qi = 0; qi < tools::enum_count<blink_tx::subquorum>; qi++)
-      {
-        auto q_height = blink.quorum_height(static_cast<blink_tx::subquorum>(qi));
-        auto &q = quorum_cache[q_height];
-        if (!q)
-          q = get_quorum(master_nodes::quorum_type::blink, q_height);
-        if (!q)
-        {
-          MINFO("Don't have a quorum for height " << q_height << " (yet?), ignoring this blink");
-          no_quorum = true;
-          break;
-        }
-        validators[qi] = &q->validators;
-      }
-      if (no_quorum)
-        continue;
-
-      std::vector<std::pair<size_t, std::string>> failures;
-      for (size_t s = 0; s < bdata.signature.size(); s++)
-      {
-        try {
-          blink.add_signature(static_cast<blink_tx::subquorum>(bdata.quorum[s]), bdata.position[s], true /*approved*/, bdata.signature[s],
-              validators[bdata.quorum[s]]->at(bdata.position[s]));
-        } catch (const std::exception &e) {
-          failures.emplace_back(s, e.what());
-        }
-      }
-      if (blink.approved())
-      {
-        MINFO("Blink tx " << bdata.tx_hash << " blink signatures approved with " << failures.size() << " signature validation failures");
-        for (auto &f : failures)
-          MDEBUG("- failure for quorum " << int(bdata.quorum[f.first]) << ", position " << int(bdata.position[f.first]) << ": " << f.second);
-      }
-      else
-      {
-        std::ostringstream os;
-        os << "Blink validation failed:";
-        for (auto &f : failures)
-          os << " [" << int(bdata.quorum[f.first]) << ":" << int(bdata.position[f.first]) << "]: " << f.second;
-        MINFO("Invalid blink tx " << bdata.tx_hash << ": " << os.str());
-      }
-    }
-
-    return results;
-  }
-
-  int core::add_blinks(const std::vector<std::shared_ptr<blink_tx>> &blinks)
-  {
-    int added = 0;
-    if (blinks.empty())
-      return added;
-
-    auto lock = m_mempool.blink_unique_lock();
-
-    for (auto &b : blinks)
-      if (b->approved())
-        if (m_mempool.add_existing_blink(b))
-          added++;
-
-    if (added)
-    {
-      MINFO("Added blink signatures for " << added << " blinks");
-      long_poll_trigger(m_mempool);
-    }
-
-    return added;
-  }
-
   //-----------------------------------------------------------------------------------------------
   std::future<std::pair<blink_result, std::string>> core::handle_blink_tx(const std::string &tx_blob)
   {
@@ -2108,7 +1957,7 @@ namespace cryptonote
     {
       oxenmq::pubkey_set added;
       added.insert(tools::copy_guts(pkey));
-      m_omq->update_active_mns(added, {} /*removed*/);
+      m_omq->update_active_sns(added, {} /*removed*/);
     }
     return result;
   }
@@ -2125,7 +1974,7 @@ namespace cryptonote
     {
       oxenmq::pubkey_set added;
       added.insert(tools::copy_guts(pkey));
-      m_omq->update_active_mns(added, {} /*removed*/);
+      m_omq->update_active_sns(added, {} /*removed*/);
     }
     return result;
   }
@@ -2655,14 +2504,6 @@ namespace cryptonote
     return true;
   }
   
-  //-----------------------------------------------------------------------------------------------
-  void core::flush_bad_txs_cache()
-  {
-    bad_semantics_txes_lock.lock();
-    for (int idx = 0; idx < 2; ++idx)
-      bad_semantics_txes[idx].clear();
-    bad_semantics_txes_lock.unlock();
-  }
   //-----------------------------------------------------------------------------------------------
   void core::flush_bad_txs_cache()
   {

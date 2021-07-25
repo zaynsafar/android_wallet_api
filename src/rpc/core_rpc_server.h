@@ -44,7 +44,7 @@
 #include "cryptonote_protocol/cryptonote_protocol_handler.h"
 
 #if defined(BELDEX_ENABLE_INTEGRATION_TEST_HOOKS)
-#include "common/BELDEX_integration_test_hooks.h"
+#include "common/beldex_integration_test_hooks.h"
 #endif
 
 #undef BELDEX_DEFAULT_LOG_CATEGORY

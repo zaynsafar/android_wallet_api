@@ -253,16 +253,16 @@ namespace cryptonote
     {
       std::array<uint16_t, 3> mnode_version;
 
-      uint64_t timestamp;
+       uint64_t timestamp;
       crypto::public_key pubkey;
       crypto::signature sig;
       crypto::ed25519_public_key pubkey_ed25519;
       crypto::ed25519_signature sig_ed25519;
       uint32_t public_ip;
-      uint16_t storage_port;
-      uint16_t storage_lmq_port;
+      uint16_t storage_https_port;
+      uint16_t storage_omq_port;
       uint16_t qnet_port;
-
+      
       KV_MAP_SERIALIZABLE
     };
   };
@@ -274,9 +274,6 @@ namespace cryptonote
   {
     const static int ID = BC_COMMANDS_POOL_BASE + 12;
 
-  struct NOTIFY_RESPONSE_BLOCK_BLINKS
-  {
-    constexpr static int ID = BC_COMMANDS_POOL_BASE + 14;
     struct request
     {
 

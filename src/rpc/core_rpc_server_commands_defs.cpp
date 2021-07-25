@@ -108,6 +108,8 @@ KV_SERIALIZE_MAP_CODE_BEGIN(GET_TRANSACTIONS::extra_entry::state_change)
   KV_SERIALIZE(height)
   KV_SERIALIZE(index)
   KV_SERIALIZE(voters)
+  KV_SERIALIZE(reasons);
+  KV_SERIALIZE(reasons_maybe);
 KV_SERIALIZE_MAP_CODE_END()
 KV_SERIALIZE_MAP_CODE_BEGIN(GET_TRANSACTIONS::extra_entry::bns_details)
   KV_SERIALIZE(buy)
@@ -1051,6 +1053,15 @@ KV_SERIALIZE_MAP_CODE_BEGIN(GET_MASTER_KEYS::response)
   KV_SERIALIZE(master_node_x25519_pubkey)
   KV_SERIALIZE(status)
 KV_SERIALIZE_MAP_CODE_END()
+
+
+KV_SERIALIZE_MAP_CODE_BEGIN(GET_MASTER_PRIVKEYS::response)
+  KV_SERIALIZE(master_node_privkey)
+  KV_SERIALIZE(master_node_ed25519_privkey)
+  KV_SERIALIZE(master_node_x25519_privkey)
+  KV_SERIALIZE(status)
+KV_SERIALIZE_MAP_CODE_END()
+
 
 KV_SERIALIZE_MAP_CODE_BEGIN(master_node_contribution)
   KV_SERIALIZE(key_image)

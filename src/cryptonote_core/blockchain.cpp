@@ -50,6 +50,7 @@
 #include "epee/misc_language.h"
 #include "epee/profile_tools.h"
 #include "epee/int-util.h"
+#include "epee/string_tools.h"
 #include "common/threadpool.h"
 #include "common/boost_serialization_helper.h"
 #include "epee/warnings.h"
@@ -300,8 +301,8 @@ uint64_t Blockchain::get_current_blockchain_height(bool lock) const
 //------------------------------------------------------------------
 bool Blockchain::load_missing_blocks_into_beldex_subsystems()
 {
-  uint64_t const snl_height   = std::max(m_hardfork->get_earliest_ideal_height_for_version(network_version_9_master_nodes), m_master_node_list.height() + 1);
-  uint64_t const bns_height   = std::max(m_hardfork->get_earliest_ideal_height_for_version(network_version_16_bns),          m_bns_db.height() + 1);
+  uint64_t const snl_height   = std::max(hard_fork_begins(m_nettype, network_version_9_master_nodes).value_or(0), m_master_node_list.height() + 1);
+  uint64_t const bns_height   = std::max(hard_fork_begins(m_nettype, network_version_16_bns).value_or(0),          m_bns_db.height() + 1);
   uint64_t const end_height   = m_db->height();
   uint64_t const start_height = std::min(end_height, std::min(bns_height, snl_height));
 
@@ -1644,35 +1645,6 @@ bool Blockchain::create_block_template_internal(block& b, const crypto::hash *fr
 }
 //------------------------------------------------------------------
 bool Blockchain::create_miner_block_template(block& b, const crypto::hash *from_block, const account_public_address& miner_address, difficulty_type& diffic, uint64_t& height, uint64_t& expected_reward, const blobdata& ex_nonce)
-{
-  block_template_info info = {};
-  info.is_miner            = true;
-  info.miner_address       = miner_address;
-  return create_block_template_internal(b, from_block, info, diffic, height, expected_reward, ex_nonce);
-}
-//------------------------------------------------------------------
-bool Blockchain::create_next_miner_block_template(block& b, const account_public_address& miner_address, difficulty_type& diffic, uint64_t& height, uint64_t& expected_reward, const blobdata& ex_nonce)
-{
-  return create_miner_block_template(b, nullptr /*from_block*/, miner_address, diffic, height, expected_reward, ex_nonce);
-}
-//------------------------------------------------------------------
-bool Blockchain::create_next_pulse_block_template(block& b, const master_nodes::payout& block_producer, uint8_t round, uint16_t validator_bitset, uint64_t& height)
-{
-  uint64_t expected_reward = 0;
-  block_template_info info = {};
-  info.master_node_payout = block_producer;
-  uint64_t diffic          = 0;
-  blobdata nonce           = {};
-
-  bool result = create_block_template_internal(b, NULL /*from_block*/, info, diffic, height, expected_reward, nonce);
-  b.pulse.round = round;
-  b.pulse.validator_bitset = validator_bitset;
-  return result;
-}
-//------------------------------------------------------------------
-// for an alternate chain, get the timestamps from the main chain to complete
-// the needed number of timestamps for the BLOCKCHAIN_TIMESTAMP_CHECK_WINDOW.
-bool Blockchain::complete_timestamps_vector(uint64_t start_top_height, std::vector<uint64_t>& timestamps) const
 {
   block_template_info info = {};
   info.is_miner            = true;
@@ -3151,43 +3123,7 @@ bool Blockchain::check_tx_outputs(const transaction& tx, tx_verification_context
     tvc.m_invalid_output = true;
     return false;
   }
-
-  if (hf_version > HF_VERSION_SMALLER_BP) {
-    if (tx.version >= txversion::v4_tx_types && tx.is_transfer())
-    {
-      if (tx.rct_signatures.type == rct::RCTType::Bulletproof)
-      {
-        MERROR_VER("Ringct type " << (unsigned)rct::RCTType::Bulletproof << " is not allowed from v" << (HF_VERSION_SMALLER_BP + 1));
-        tvc.m_invalid_output = true;
-        return false;
-      }
-    }
-  }
-
-  // Disallow CLSAGs before the CLSAG hardfork
-  if (hf_version < HF_VERSION_CLSAG) {
-    if (tx.version >= txversion::v4_tx_types && tx.is_transfer()) {
-      if (tx.rct_signatures.type == rct::RCTType::CLSAG)
-      {
-        MERROR_VER("Ringct type " << (unsigned)rct::RCTType::CLSAG << " is not allowed before v" << HF_VERSION_CLSAG);
-        tvc.m_invalid_output = true;
-        return false;
-      }
-    }
-  }
-
-  // Require CLSAGs starting 10 blocks after the CLSAG-enabling hard fork (the 10 block buffer is to
-  // allow staggling txes around fork time to still make it into a block).
-  if (hf_version >= HF_VERSION_CLSAG
-      && tx.rct_signatures.type < rct::RCTType::CLSAG
-      && tx.version >= txversion::v4_tx_types && tx.is_transfer()
-      && (hf_version > HF_VERSION_CLSAG || get_current_blockchain_height() >= 10 + m_hardfork->get_earliest_ideal_height_for_version(HF_VERSION_CLSAG)))
-  {
-    MERROR_VER("Ringct type " << (unsigned)tx.rct_signatures.type << " is not allowed from v" << HF_VERSION_CLSAG);
-    tvc.m_invalid_output = true;
-    return false;
-  }
-
+  
   return true;
 }
 //------------------------------------------------------------------

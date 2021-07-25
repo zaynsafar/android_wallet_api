@@ -1,6 +1,5 @@
 // Copyright (c) 2014-2018, The Monero Project
 // Copyright (c)      2018, The Beldex Project
-// 
 // All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without modification, are
@@ -126,9 +125,9 @@ namespace {
 
   constexpr float SECOND_OUTPUT_RELATEDNESS_THRESHOLD = 0.0f;
 
-  constexpr std::string_view KEY_IMAGE_EXPORT_FILE_MAGIC = "Beldex key image export\002"sv;
-  constexpr std::string_view MULTISIG_EXPORT_FILE_MAGIC = "Beldex multisig export\001"sv;
-  constexpr std::string_view OUTPUT_EXPORT_FILE_MAGIC = "Beldex output export\003"sv;
+  constexpr std::string_view KEY_IMAGE_EXPORT_FILE_MAGIC = "Loki key image export\002"sv;
+  constexpr std::string_view MULTISIG_EXPORT_FILE_MAGIC = "Loki multisig export\001"sv;
+  constexpr std::string_view OUTPUT_EXPORT_FILE_MAGIC = "Loki output export\003"sv;
 
   constexpr uint64_t SEGREGATION_FORK_HEIGHT = 99999999;
   constexpr uint64_t SEGREGATION_FORK_VICINITY = 1500; // blocks
@@ -2546,10 +2545,6 @@ void wallet2::process_unconfirmed(const crypto::hash &txid, const cryptonote::tr
   if(unconf_it != m_unconfirmed_txs.end()) {
     if (store_tx_info()) {
       try {
-        // TODO(doyle): BNS introduces tx type stake, we can use this to quickly determine if a transaction is staking
-        // transaction without having to parse tx_extra.
-        bool stake = master_nodes::tx_get_staking_components(tx, nullptr /*stake*/);
-        wallet::pay_type pay_type = stake ? wallet::pay_type::stake : wallet::pay_type::out;
         m_confirmed_txs.insert(std::make_pair(txid, confirmed_transfer_details(unconf_it->second, height)));
       }
       catch (...) {
@@ -3504,7 +3499,6 @@ void wallet2::refresh(bool trusted_daemon, uint64_t start_height, uint64_t & blo
       encrypt_keys(*m_encrypt_keys_after_refresh);
       m_encrypt_keys_after_refresh = std::nullopt;
     }
-    
     hwdev.computing_key_images(false);
   };
 
@@ -6538,7 +6532,7 @@ std::optional<std::string> wallet2::resolve_address(std::string address, uint64_
       auto [success, addr_response] = resolve(lookup_req);
       if (success && addr_response.encrypted_value)
       {
-        std::optional<cryptonote::address_parse_info> addr_info = ons::encrypted_wallet_value_to_info(name, *addr_response.encrypted_value, *addr_response.nonce);
+        std::optional<cryptonote::address_parse_info> addr_info = bns::encrypted_wallet_value_to_info(name, *addr_response.encrypted_value, *addr_response.nonce);
         if (addr_info)
         {
           info = std::move(*addr_info);
@@ -7786,7 +7780,7 @@ uint64_t wallet2::get_fee_percent(uint32_t priority, txtype type) const
       THROW_WALLET_EXCEPTION(error::invalid_priority);
 
     uint64_t burn_pct = 0;
-    if (use_fork_rules(network_version_16_bns, 0))
+   if (use_fork_rules(network_version_16_bns, 0))
       burn_pct = BLINK_BURN_TX_FEE_PERCENT;
     else if (use_fork_rules(network_version_15_blink, 0))
       burn_pct = BLINK_BURN_TX_FEE_PERCENT_OLD;
@@ -7834,7 +7828,7 @@ uint64_t wallet2::get_fee_quantization_mask() const
   return 1;
 }
 
-beldex_construct_tx_params wallet2::construct_params(uint8_t hf_version, txtype tx_type, uint32_t priority, bns::mapping_type type)
+beldex_construct_tx_params wallet2::construct_params(uint8_t hf_version, txtype tx_type, uint32_t priority, uint64_t extra_burn, bns::mapping_type type)
 {
   beldex_construct_tx_params tx_params;
   tx_params.hf_version = hf_version;
@@ -7843,15 +7837,15 @@ beldex_construct_tx_params wallet2::construct_params(uint8_t hf_version, txtype 
   if (tx_type == txtype::beldex_name_system)
   {
     assert(priority != tools::tx_priority_blink);
-    tx_params.burn_fixed   = bns::burn_needed(hf_version, type);
+    tx_params.burn_fixed = bns::burn_needed(hf_version, type);
   }
   else if (priority == tools::tx_priority_blink)
   {
     tx_params.burn_fixed   = BLINK_BURN_FIXED;
-    tx_params.burn_percent = hf_version <= network_version_15_blink
-        ? BLINK_BURN_TX_FEE_PERCENT_OLD
-        : BLINK_BURN_TX_FEE_PERCENT;
+    tx_params.burn_percent = BLINK_BURN_TX_FEE_PERCENT;
   }
+  if (extra_burn)
+      tx_params.burn_fixed += extra_burn;
 
   return tx_params;
 }
@@ -8391,7 +8385,7 @@ wallet2::register_master_node_result wallet2::create_register_master_node_tx(con
       }
     }
 
-    staking_requirement = master_nodes::get_staking_requirement(nettype(), bc_height, *hf_version);
+    staking_requirement = master_nodes::get_staking_requirement(nettype(), bc_height);
     std::vector<std::string> const args(local_args.begin(), local_args.begin() + local_args.size() - 3);
     contributor_args = master_nodes::convert_registration_args(nettype(), args, staking_requirement, *hf_version);
 
@@ -8554,7 +8548,6 @@ wallet2::register_master_node_result wallet2::create_register_master_node_tx(con
       result.msg += e.what();
       return result;
     }
-
   }
 
   assert(result.status != register_master_node_result_status::invalid);
@@ -8873,7 +8866,7 @@ std::vector<wallet2::pending_tx> wallet2::bns_create_buy_mapping_tx(bns::mapping
     return {};
   }
 
-  beldex_construct_tx_params tx_params = wallet2::construct_params(*hf_version, txtype::beldex_name_system, priority, type);
+  beldex_construct_tx_params tx_params = wallet2::construct_params(*hf_version, txtype::beldex_name_system, priority, 0, type);
   auto result = create_transactions_2({} /*dests*/,
                                       CRYPTONOTE_DEFAULT_TX_MIXIN,
                                       0 /*unlock_at_block*/,
@@ -8930,7 +8923,7 @@ std::vector<wallet2::pending_tx> wallet2::bns_create_renewal_tx(
     return {};
   }
 
-  beldex_construct_tx_params tx_params = wallet2::construct_params(*hf_version, txtype::beldex_name_system, priority, type);
+  beldex_construct_tx_params tx_params = wallet2::construct_params(*hf_version, txtype::beldex_name_system, priority, 0, type);
   auto result = create_transactions_2({} /*dests*/,
                                       CRYPTONOTE_DEFAULT_TX_MIXIN,
                                       0 /*unlock_at_block*/,
@@ -8989,7 +8982,7 @@ std::vector<wallet2::pending_tx> wallet2::bns_create_update_mapping_tx(bns::mapp
     if (reason) *reason = ERR_MSG_NETWORK_VERSION_QUERY_FAILED;
     return {};
   }
-  beldex_construct_tx_params tx_params = wallet2::construct_params(*hf_version, txtype::beldex_name_system, priority, bns::mapping_type::update_record_internal);
+  beldex_construct_tx_params tx_params = wallet2::construct_params(*hf_version, txtype::beldex_name_system, priority, 0, bns::mapping_type::update_record_internal);
 
   auto result = create_transactions_2({} /*dests*/,
                                       CRYPTONOTE_DEFAULT_TX_MIXIN,
@@ -9109,14 +9102,10 @@ bool wallet2::tx_add_fake_output(std::vector<std::vector<tools::wallet2::get_out
 }
 
 void wallet2::light_wallet_get_outs(std::vector<std::vector<tools::wallet2::get_outs_entry>> &outs, const std::vector<size_t> &selected_transfers, size_t fake_outputs_count) {
-  
   MDEBUG("LIGHTWALLET - Getting random outs");
-      
   light_rpc::GET_RANDOM_OUTS::request oreq{};
   light_rpc::GET_RANDOM_OUTS::response ores{};
-  
   size_t light_wallet_requested_outputs_count = (size_t)((fake_outputs_count + 1) * 1.5 + 1);
-  
   // Amounts to ask for
   // MyMonero api handle amounts and fees as strings
   for(size_t idx: selected_transfers) {
@@ -9130,7 +9119,6 @@ void wallet2::light_wallet_get_outs(std::vector<std::vector<tools::wallet2::get_
   bool r = invoke_http<light_rpc::GET_RANDOM_OUTS>(oreq, ores);
   THROW_WALLET_EXCEPTION_IF(!r, error::no_connection_to_daemon, "get_random_outs");
   THROW_WALLET_EXCEPTION_IF(ores.amount_outs.empty() , error::wallet_internal_error, "No outputs received from light wallet node. Error: " + ores.Error);
-  
   // Check if we got enough outputs for each amount
   for(auto& out: ores.amount_outs) {
     const uint64_t out_amount = boost::lexical_cast<uint64_t>(out.amount);
@@ -9141,25 +9129,25 @@ void wallet2::light_wallet_get_outs(std::vector<std::vector<tools::wallet2::get_
   MDEBUG("selected transfers size: " << selected_transfers.size());
 
   for(size_t idx: selected_transfers)
-  { 
+  {
     // Create new index
     outs.push_back(std::vector<get_outs_entry>());
     outs.back().reserve(fake_outputs_count + 1);
-    
+
     // add real output first
     const transfer_details &td = m_transfers[idx];
     const uint64_t amount = td.is_rct() ? 0 : td.amount();
     outs.back().push_back(std::make_tuple(td.m_global_output_index, td.get_public_key(), rct::commit(td.amount(), td.m_mask)));
     MDEBUG("added real output " << tools::type_to_hex(td.get_public_key()));
-    
+
     // Even if the lightwallet server returns random outputs, we pick them randomly.
     std::vector<size_t> order;
     order.resize(light_wallet_requested_outputs_count);
     for (size_t n = 0; n < order.size(); ++n)
       order[n] = n;
     std::shuffle(order.begin(), order.end(), crypto::random_device{});
-    
-    
+
+
     LOG_PRINT_L2("Looking for " << (fake_outputs_count+1) << " outputs with amounts " << print_money(td.is_rct() ? 0 : td.amount()));
     MDEBUG("OUTS SIZE: " << outs.back().size());
     for (size_t o = 0; o < light_wallet_requested_outputs_count && outs.back().size() < fake_outputs_count + 1; ++o)
@@ -10073,7 +10061,7 @@ void wallet2::transfer_selected_rct(std::vector<cryptonote::tx_destination_entry
 
   if (update_splitted_dsts)
   {
-    // NOTE: If BNS, there's already a dummy destination entry in there that
+    // NOTE: If ONS, there's already a dummy destination entry in there that
     // we placed in (for fake calculating the TX fees and parts) that we
     // repurpose for change after the fact.
     if (tx_params.tx_type == txtype::beldex_name_system)
@@ -10361,7 +10349,7 @@ bool wallet2::light_wallet_login(bool &new_address)
   // Always create account if it doesn't exist.
   request.create_account = true;
   bool connected = invoke_http<light_rpc::LOGIN>(request, response);
-  // MyMonero doesn't send any status message. OpenMonero does. 
+  // MyMonero doesn't send any status message. OpenMonero does.
   m_light_wallet_connected  = connected && (response.status.empty() || response.status == "success");
   new_address = response.new_address;
   MDEBUG("Status: " << response.status);
@@ -10393,10 +10381,10 @@ bool wallet2::light_wallet_import_wallet_request(light_rpc::IMPORT_WALLET_REQUES
 void wallet2::light_wallet_get_unspent_outs()
 {
   MDEBUG("Getting unspent outs");
-  
+
   light_rpc::GET_UNSPENT_OUTS::request oreq{};
   light_rpc::GET_UNSPENT_OUTS::response ores{};
-  
+
   oreq.amount = "0";
   oreq.address = get_account().get_public_address_str(m_nettype);
   oreq.view_key = tools::type_to_hex(get_account().get_keys().m_view_secret_key);
@@ -10433,7 +10421,7 @@ void wallet2::light_wallet_get_unspent_outs()
     crypto::public_key tx_public_key{};
     THROW_WALLET_EXCEPTION_IF(o.tx_pub_key.size() != 64 || !oxenmq::is_hex(o.tx_pub_key), error::wallet_internal_error, "Invalid tx_pub_key field");
     tools::hex_to_type(o.tx_pub_key, tx_public_key);
-    
+
     for (const std::string &ski: o.spend_key_images) {
       spent = false;
 
@@ -10459,7 +10447,7 @@ void wallet2::light_wallet_get_unspent_outs()
     tools::hex_to_type(o.tx_hash, txid);
     tools::hex_to_type(o.public_key, public_key);
     tools::hex_to_type(o.tx_pub_key, tx_pub_key);
-    
+
     for(auto &t: m_transfers){
       if(t.get_public_key() == public_key) {
         t.m_spent = spent;
@@ -10470,7 +10458,7 @@ void wallet2::light_wallet_get_unspent_outs()
 
     if(!add_transfer)
       continue;
-    
+
     m_transfers.emplace_back();
     transfer_details& td = m_transfers.back();
 
@@ -10480,7 +10468,7 @@ void wallet2::light_wallet_get_unspent_outs()
 
     // Add to extra
     add_tx_extra<tx_extra_pub_key>(td.m_tx, tx_pub_key);
-    
+
     td.m_key_image = unspent_key_image;
     td.m_key_image_known = !m_watch_only && !m_multisig;
     td.m_key_image_request = false;
@@ -10547,9 +10535,9 @@ void wallet2::light_wallet_get_unspent_outs()
 bool wallet2::light_wallet_get_address_info(light_rpc::GET_ADDRESS_INFO::response &response)
 {
   MTRACE(__FUNCTION__);
-  
+
   light_rpc::GET_ADDRESS_INFO::request request{};
-  
+
   request.address = get_account().get_public_address_str(m_nettype);
   request.view_key = tools::type_to_hex(get_account().get_keys().m_view_secret_key);
   bool r = invoke_http<light_rpc::GET_ADDRESS_INFO>(request, response);
@@ -10561,10 +10549,10 @@ bool wallet2::light_wallet_get_address_info(light_rpc::GET_ADDRESS_INFO::respons
 void wallet2::light_wallet_get_address_txs()
 {
   MDEBUG("Refreshing light wallet");
-  
+
   light_rpc::GET_ADDRESS_TXS::request ireq{};
   light_rpc::GET_ADDRESS_TXS::response ires{};
-  
+
   ireq.address = get_account().get_public_address_str(m_nettype);
   ireq.view_key = tools::type_to_hex(get_account().get_keys().m_view_secret_key);
   bool r = invoke_http<light_rpc::GET_ADDRESS_TXS>(ireq, ires);
@@ -10616,7 +10604,7 @@ void wallet2::light_wallet_get_address_txs()
 
     crypto::hash payment_id = null_hash;
     crypto::hash tx_hash;
-    
+
     THROW_WALLET_EXCEPTION_IF(t.payment_id.size() != 64 || !oxenmq::is_hex(t.payment_id), error::wallet_internal_error, "Invalid payment_id field");
     THROW_WALLET_EXCEPTION_IF(t.hash.size() != 64 || !oxenmq::is_hex(t.hash), error::wallet_internal_error, "Invalid hash field");
     tools::hex_to_type(t.payment_id, payment_id);
@@ -10651,8 +10639,8 @@ void wallet2::light_wallet_get_address_txs()
       payment.m_unlock_time  = t.unlock_time;
       payment.m_timestamp = t.timestamp;
       payment.m_type = t.coinbase ? wallet::pay_type::miner : wallet::pay_type::in; // TODO(beldex): Only accounts for miner, but wait, do we even care about this code? Looks like openmonero code
-        
-      if (t.mempool) {   
+
+      if (t.mempool) {
         if (std::find(unconfirmed_payments_txs.begin(), unconfirmed_payments_txs.end(), tx_hash) == unconfirmed_payments_txs.end()) {
           pool_txs.push_back(tx_hash);
           // assume false as we don't get that info from the light wallet server
@@ -10816,14 +10804,6 @@ bool wallet2::light_wallet_key_image_is_ours(const crypto::key_image& key_image,
   return key_image == calculated_key_image;
 }
 
-// Before we have the final fee we can't determine the amount to burn, so we stick in this
-// placeholder then go back once we know the fee and replace it.  This value (~4398 BELDEX) was chosen
-// because it's unlikely to ever be needed to be burned in a single transaction, and is the maximum
-// encoded value we can store in 6 bytes (tx extra integers are encoded 7 bits per byte -- see
-// common/varint.h).  7 bytes is likely just wasteful (we don't need more than 4400 BELDEX burned at a
-// time), and 5 bytes (max 34.3 BELDEX) might conceivable not be enough.
-static constexpr uint64_t BURN_FEE_PLACEHOLDER = (1ULL << (6*7)) - 1;
-
 // Another implementation of transaction creation that is hopefully better
 // While there is anything left to pay, it goes through random outputs and tries
 // to fill the next destination/amount. If it fully fills it, it will use the
@@ -10960,7 +10940,7 @@ std::vector<wallet2::pending_tx> wallet2::create_transactions_2(std::vector<cryp
   // early out if we know we can't make it anyway
   // we could also check for being within FEE_PER_KB, but if the fee calculation
   // ever changes, this might be missed, so let this go through
-  const uint64_t min_outputs = tx_params.tx_type == cryptonote::txtype::beldex_name_system ? 1 : 2; // if bns, only request the change output
+  const uint64_t min_outputs = tx_params.tx_type == cryptonote::txtype::beldex_name_system ? 1 : 2; // if ons, only request the change output
   {
     uint64_t min_fee = (
         base_fee.first * estimate_rct_tx_size(1, fake_outs_count, min_outputs, extra.size(), clsag) +
@@ -11727,11 +11707,7 @@ std::vector<wallet2::pending_tx> wallet2::create_transactions_from(const crypton
     // the base fee that would apply at 100% (the actual fee here is that times the priority-based
     // fee percent)
     if (burning)
-    {
       beldex_tx_params.burn_fixed = burn_fixed + tx.needed_fee * burn_percent / fee_percent;
-      // Make sure we can't enlarge the tx because that could make it invalid:
-      THROW_WALLET_EXCEPTION_IF(beldex_tx_params.burn_fixed > BURN_FEE_PLACEHOLDER, error::wallet_internal_error, "attempt to burn a larger amount than is internally supported");
-    }
 
     cryptonote::transaction test_tx;
     pending_tx test_ptx;

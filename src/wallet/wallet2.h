@@ -819,6 +819,7 @@ private:
     std::vector<cryptonote::rpc::GET_MASTER_NODES::response::entry> list_current_stakes();
     auto bns_owners_to_names(cryptonote::rpc::BNS_OWNERS_TO_NAMES::request const &request) const { return m_node_rpc_proxy.bns_owners_to_names(request); }
     auto bns_names_to_owners(cryptonote::rpc::BNS_NAMES_TO_OWNERS::request const &request) const { return m_node_rpc_proxy.bns_names_to_owners(request); }
+    auto resolve(cryptonote::rpc::BNS_RESOLVE::request const &request) const { return m_node_rpc_proxy.bns_resolve(request); }
 
     struct bns_detail
     {
@@ -1423,37 +1424,6 @@ private:
     uint64_t get_bytes_sent() const;
     uint64_t get_bytes_received() const;
 
-    // Attempts to convert the bns type string to a mapping type (checking the current hard fork).
-    // If type isn't valid then returns std::nullopt and sets the failure reason in `reason` (if not
-    // nullptr).
-    std::optional<bns::mapping_type> bns_validate_type(std::string_view type, bns::bns_tx_type bns_action, std::string *reason);
-
-    std::vector<pending_tx> bns_create_buy_mapping_tx(bns::mapping_type type, std::string const *owner, std::string const *backup_owner, std::string name, std::string const &value, std::string *reason, uint32_t priority = 0, uint32_t account_index = 0, std::set<uint32_t> subaddr_indices = {});
-
-    // signature: (Optional) If set, use the signature given, otherwise by default derive the signature from the wallet spend key as an ed25519 key.
-    //            The signature is derived from the hash of the previous txid blob and previous value blob of the mapping. By default this is signed using the wallet's spend key as an ed25519 keypair.
-    std::vector<pending_tx> bns_create_update_mapping_tx(bns::mapping_type type, std::string name, std::string const *value, std::string const *owner, std::string const *backup_owner, std::string const *signature, std::string *reason, uint32_t priority = 0, uint32_t account_index = 0, std::set<uint32_t> subaddr_indices = {}, std::vector<cryptonote::rpc::bns_NAMES_TO_OWNERS::response_entry> *response = {});
-
-    // BNS renewal (for beldexnet registrations, not for session/wallet)
-    std::vector<pending_tx> bns_create_renewal_tx(bns::mapping_type type, std::string name, std::string *reason, uint32_t priority = 0, uint32_t account_index = 0, std::set<uint32_t> subaddr_indices = {}, std::vector<cryptonote::rpc::bns_NAMES_TO_OWNERS::response_entry> *response = {});
-
-    // Generate just the signature required for putting into bns_update_mapping command in the wallet
-    bool bns_make_update_mapping_signature(bns::mapping_type type, std::string name, std::string const *value, std::string const *owner, std::string const *backup_owner, bns::generic_signature &signature, uint32_t account_index = 0, std::string *reason = nullptr);
-
-    void freeze(size_t idx);
-    void thaw(size_t idx);
-    bool frozen(size_t idx) const;
-    void freeze(const crypto::key_image &ki);
-    void thaw(const crypto::key_image &ki);
-    bool frozen(const crypto::key_image &ki) const;
-    bool frozen(const transfer_details &td) const;
-
-    bool save_to_file(const fs::path& path_to_file, std::string_view binary, bool is_printable = false) const;
-    static bool load_from_file(const fs::path& path_to_file, std::string& target_str);
-
-    uint64_t get_bytes_sent() const;
-    uint64_t get_bytes_received() const;
-
     // MMS -------------------------------------------------------------------------------------------------
     mms::message_store& get_message_store() { return m_message_store; };
     const mms::message_store& get_message_store() const { return m_message_store; };
@@ -1692,7 +1662,7 @@ private:
     bool m_light_wallet; /* sends view key to daemon for scanning */
     uint64_t m_light_wallet_scanned_block_height;
     uint64_t m_light_wallet_blockchain_height;
-    uint64_t m_light_wallet_per_kb_fee = FEE_PER_BYTE_V13 * 1024;
+    uint64_t m_light_wallet_per_kb_fee = FEE_PER_BYTE_V12 * 1024;
     bool m_light_wallet_connected;
     uint64_t m_light_wallet_balance;
     uint64_t m_light_wallet_unlocked_balance;

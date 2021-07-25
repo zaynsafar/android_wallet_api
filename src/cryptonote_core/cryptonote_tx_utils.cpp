@@ -240,7 +240,7 @@ namespace cryptonote
     keypair const gov_key = get_deterministic_keypair_from_height(height); // NOTE: Always need since we use same key for master node
 
     // NOTE: TX Extra
-    {
+    
       add_tx_extra<tx_extra_pub_key>(tx, txkey.pub);
       if(!extra_nonce.empty())
       {
@@ -253,16 +253,20 @@ namespace cryptonote
         add_tx_extra<tx_extra_pub_key>(tx, gov_key.pub);
 
       add_master_node_winner_to_tx_extra(tx.extra, miner_tx_context.block_leader.key);
-    }
+    
 
-    block_reward_parts reward_parts = {};
-    {
       beldex_block_reward_context block_reward_context = {};
       block_reward_context.fee                       = fee;
       block_reward_context.height                    = height;
       block_reward_context.block_leader_payouts      = miner_tx_context.block_leader.payouts;
       block_reward_context.batched_governance        = miner_tx_context.batched_governance;
 
+    block_reward_parts reward_parts{};
+    if(!get_beldex_block_reward(median_weight, current_block_weight, already_generated_coins, hard_fork_version, reward_parts, block_reward_context))
+    {
+      LOG_PRINT_L0("Failed to calculate block reward");
+      return false;
+    }
     // TODO(doyle): Batching awards
     //
     // NOTE: Summarise rewards to payout (up to 9 payout entries/outputs)

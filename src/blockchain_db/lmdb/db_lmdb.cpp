@@ -1,5 +1,5 @@
-// Copyright (c) 2014-2018, The Monero Project
-// Copyright (c)      2018, The Beldex Project
+// Copyright (c) 2014-2019, The Monero Project
+// Copyright (c) 2018-2019, The Beldex Project
 // All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without modification, are
@@ -49,7 +49,7 @@
 #include "checkpoints/checkpoints.h"
 #include "cryptonote_core/master_node_rules.h"
 #include "cryptonote_core/master_node_list.h"
-#include "cryptonote_basic/hardfork.h"
+#include "cryptonote_core/uptime_proof.h"
 
 #undef BELDEX_DEFAULT_LOG_CATEGORY
 #define BELDEX_DEFAULT_LOG_CATEGORY "blockchain.db.lmdb"
@@ -1529,8 +1529,6 @@ void BlockchainLMDB::open(const fs::path& filename, cryptonote::network_type net
 
   lmdb_db_open(txn, LMDB_MASTER_NODE_LATEST, MDB_CREATE, m_master_node_proofs, "Failed to open db handle for m_master_node_proofs");
 
-  lmdb_db_open(txn, LMDB_MASTER_NODE_LATEST, MDB_CREATE, m_master_node_proofs, "Failed to open db handle for m_master_node_proofs");
-
   lmdb_db_open(txn, LMDB_PROPERTIES, MDB_CREATE, m_properties, "Failed to open db handle for m_properties");
 
   mdb_set_dupsort(txn, m_spent_keys, compare_hash32);
@@ -2760,135 +2758,6 @@ std::vector<uint64_t> BlockchainLMDB::get_block_info_64bit_fields(uint64_t start
 
   std::vector<uint64_t> ret;
   ret.reserve(count);
-
-  MDB_val v;
-  uint64_t range_begin = 0, range_end = 0;
-  for (uint64_t height = start_height; height < h && count--; ++height)
-  {
-    if (height >= range_begin && height < range_end)
-    {
-      // nothing to do
-    }
-    else
-    {
-      int result = 0;
-      if (range_end > 0)
-      {
-        MDB_val k2;
-        result = mdb_cursor_get(m_cur_block_info, &k2, &v, MDB_NEXT_MULTIPLE);
-        range_begin = ((const mdb_block_info*)v.mv_data)->bi_height;
-        range_end = range_begin + v.mv_size / sizeof(mdb_block_info); // whole records please
-        if (height < range_begin || height >= range_end)
-          throw0(DB_ERROR(("Height " + std::to_string(height) + " not included in multiple record range: " + std::to_string(range_begin) + "-" + std::to_string(range_end)).c_str()));
-      }
-      else
-      {
-        v.mv_size = sizeof(uint64_t);
-        v.mv_data = (void*)&height;
-        result = mdb_cursor_get(m_cur_block_info, (MDB_val *)&zerokval, &v, MDB_GET_BOTH);
-        range_begin = height;
-        range_end = range_begin + 1;
-      }
-      if (result)
-        throw0(DB_ERROR(lmdb_error("Error attempting to retrieve block_info from the db: ", result).c_str()));
-    }
-    ret.push_back(extract(static_cast<const mdb_block_info *>(v.mv_data) + (height - range_begin)));
-  }
-
-  return ret;
-}
-
-uint64_t BlockchainLMDB::get_max_block_size()
-{
-  LOG_PRINT_L3("BlockchainLMDB::" << __func__);
-  check_open();
-
-  TXN_PREFIX_RDONLY();
-  RCURSOR(properties)
-  MDB_val_str(k, "max_block_size");
-  MDB_val v;
-  int result = mdb_cursor_get(m_cur_properties, &k, &v, MDB_SET);
-  if (result == MDB_NOTFOUND)
-    return std::numeric_limits<uint64_t>::max();
-  if (result)
-    throw0(DB_ERROR(lmdb_error("Failed to retrieve max block size: ", result).c_str()));
-  if (v.mv_size != sizeof(uint64_t))
-    throw0(DB_ERROR("Failed to retrieve or create max block size: unexpected value size"));
-  uint64_t max_block_size;
-  memcpy(&max_block_size, v.mv_data, sizeof(max_block_size));
-  return max_block_size;
-}
-
-void BlockchainLMDB::add_max_block_size(uint64_t sz)
-{
-  LOG_PRINT_L3("BlockchainLMDB::" << __func__);
-  check_open();
-  mdb_txn_cursors *m_cursors = &m_wcursors;
-
-  CURSOR(properties)
-
-  MDB_val_str(k, "max_block_size");
-  MDB_val v;
-  int result = mdb_cursor_get(m_cur_properties, &k, &v, MDB_SET);
-  if (result && result != MDB_NOTFOUND)
-    throw0(DB_ERROR(lmdb_error("Failed to retrieve max block size: ", result).c_str()));
-  uint64_t max_block_size = 0;
-  if (result == 0)
-  {
-    if (v.mv_size != sizeof(uint64_t))
-      throw0(DB_ERROR("Failed to retrieve or create max block size: unexpected value size"));
-    memcpy(&max_block_size, v.mv_data, sizeof(max_block_size));
-  }
-  if (sz > max_block_size)
-    max_block_size = sz;
-  v.mv_data = (void*)&max_block_size;
-  v.mv_size = sizeof(max_block_size);
-  result = mdb_cursor_put(m_cur_properties, &k, &v, 0);
-  if (result)
-    throw0(DB_ERROR(lmdb_error("Failed to set max_block_size: ", result).c_str()));
-}
-
-std::vector<uint64_t> BlockchainLMDB::get_block_weights(uint64_t start_height, size_t count) const
-{
-  return get_block_info_64bit_fields(start_height, count,
-      [](const mdb_block_info* bi) { return bi->bi_weight; });
-}
-
-std::vector<uint64_t> BlockchainLMDB::get_long_term_block_weights(uint64_t start_height, size_t count) const
-{
-  return get_block_info_64bit_fields(start_height, count,
-      [](const mdb_block_info* bi) { return bi->bi_long_term_block_weight; });
-}
-
-difficulty_type BlockchainLMDB::get_block_cumulative_difficulty(const uint64_t& height) const
-{
-  LOG_PRINT_L3("BlockchainLMDB::" << __func__ << "  height: " << height);
-  check_open();
-
-  TXN_PREFIX_RDONLY();
-  RCURSOR(block_info);
-
-  MDB_val_set(result, height);
-  auto get_result = mdb_cursor_get(m_cur_block_info, (MDB_val *)&zerokval, &result, MDB_GET_BOTH);
-  if (get_result == MDB_NOTFOUND)
-  {
-    throw0(BLOCK_DNE(std::string("Attempt to get cumulative difficulty from height ").append(std::to_string(height)).append(" failed -- difficulty not in db").c_str()));
-  }
-  else if (get_result)
-    throw0(DB_ERROR("Error attempting to retrieve a cumulative difficulty from the db"));
-
-  mdb_block_info *bi = (mdb_block_info *)result.mv_data;
-  difficulty_type ret = bi->bi_diff;
-  return ret;
-}
-
-difficulty_type BlockchainLMDB::get_block_difficulty(const uint64_t& height) const
-{
-  LOG_PRINT_L3("BlockchainLMDB::" << __func__);
-  check_open();
-
-  difficulty_type diff1 = 0;
-  difficulty_type diff2 = 0;
 
   MDB_val v;
   uint64_t range_begin = 0, range_end = 0;

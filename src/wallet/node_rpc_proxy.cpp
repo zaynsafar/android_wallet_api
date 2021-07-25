@@ -337,18 +337,18 @@ std::pair<bool, std::vector<cryptonote::rpc::GET_MASTER_NODE_BLACKLISTED_KEY_IMA
   return result;
 }
 
-std::pair<bool, std::vector<cryptonote::rpc::ONS_OWNERS_TO_NAMES::response_entry>> NodeRPCProxy::bns_owners_to_names(cryptonote::rpc::ONS_OWNERS_TO_NAMES::request const &request) const
+std::pair<bool, std::vector<cryptonote::rpc::BNS_OWNERS_TO_NAMES::response_entry>> NodeRPCProxy::bns_owners_to_names(cryptonote::rpc::BNS_OWNERS_TO_NAMES::request const &request) const
 {
-  return get_result_pair<rpc::ONS_OWNERS_TO_NAMES>(request, [](auto&& res) { return std::move(res.entries); });
+  return get_result_pair<rpc::BNS_OWNERS_TO_NAMES>(request, [](auto&& res) { return std::move(res.entries); });
 }
 
-std::pair<bool, std::vector<cryptonote::rpc::ONS_NAMES_TO_OWNERS::response_entry>> NodeRPCProxy::bns_names_to_owners(cryptonote::rpc::ONS_NAMES_TO_OWNERS::request const &request) const
+std::pair<bool, std::vector<cryptonote::rpc::BNS_NAMES_TO_OWNERS::response_entry>> NodeRPCProxy::bns_names_to_owners(cryptonote::rpc::BNS_NAMES_TO_OWNERS::request const &request) const
 {
-  return get_result_pair<rpc::ONS_NAMES_TO_OWNERS>(request, [](auto&& res) { return std::move(res.entries); });
+  return get_result_pair<rpc::BNS_NAMES_TO_OWNERS>(request, [](auto&& res) { return std::move(res.entries); });
 }
-std::pair<bool,cryptonote::rpc::ONS_RESOLVE::response> NodeRPCProxy::bns_resolve(cryptonote::rpc::ONS_RESOLVE::request const &request) const
+std::pair<bool,cryptonote::rpc::BNS_RESOLVE::response> NodeRPCProxy::bns_resolve(cryptonote::rpc::BNS_RESOLVE::request const &request) const
 {
-  std::pair<bool, cryptonote::rpc::ONS_RESOLVE::response> result;
+  std::pair<bool, cryptonote::rpc::BNS_RESOLVE::response> result;
   auto& [success, resolved] = result;
   success = false;
 
@@ -358,7 +358,7 @@ std::pair<bool,cryptonote::rpc::ONS_RESOLVE::response> NodeRPCProxy::bns_resolve
 
   {
     try {
-      auto res = m_http_client.json_rpc<rpc::ONS_RESOLVE>(rpc::ONS_RESOLVE::names().front(), request);
+      auto res = m_http_client.json_rpc<rpc::BNS_RESOLVE>(rpc::BNS_RESOLVE::names().front(), request);
       resolved = res;
     } catch (...) {
       return result;
@@ -368,16 +368,6 @@ std::pair<bool,cryptonote::rpc::ONS_RESOLVE::response> NodeRPCProxy::bns_resolve
 
   success = true;
   return result;
-}
-
-std::pair<bool, std::vector<cryptonote::rpc::BNS_OWNERS_TO_NAMES::response_entry>> NodeRPCProxy::bns_owners_to_names(cryptonote::rpc::BNS_OWNERS_TO_NAMES::request const &request) const
-{
-  return get_result_pair<rpc::BNS_OWNERS_TO_NAMES>(request, [](auto&& res) { return std::move(res.entries); });
-}
-
-std::pair<bool, std::vector<cryptonote::rpc::BNS_NAMES_TO_OWNERS::response_entry>> NodeRPCProxy::bns_names_to_owners(cryptonote::rpc::BNS_NAMES_TO_OWNERS::request const &request) const
-{
-  return get_result_pair<rpc::BNS_NAMES_TO_OWNERS>(request, [](auto&& res) { return std::move(res.entries); });
 }
 
 }

@@ -88,7 +88,7 @@ enum struct mapping_record_column
 };
 
 static constexpr unsigned char OLD_ENCRYPTION_NONCE[crypto_secretbox_NONCEBYTES] = {};
-std::pair<std::basic_string_view<unsigned char>, std::basic_string_view<unsigned char>> ons::mapping_value::value_nonce(mapping_type type) const
+std::pair<std::basic_string_view<unsigned char>, std::basic_string_view<unsigned char>> bns::mapping_value::value_nonce(mapping_type type) const
 {
   std::pair<std::basic_string_view<unsigned char>, std::basic_string_view<unsigned char>> result;
   auto& [head, tail] = result;
@@ -104,13 +104,13 @@ std::pair<std::basic_string_view<unsigned char>, std::basic_string_view<unsigned
   return result;
 }
 
-std::string ons::mapping_value::to_readable_value(cryptonote::network_type nettype, ons::mapping_type type) const
+std::string bns::mapping_value::to_readable_value(cryptonote::network_type nettype, bns::mapping_type type) const
 {
   std::string result;
   if (is_beldexnet_type(type))
   {
     result = oxenmq::to_base32z(to_view()) + ".beldex";
-  } else if (type == ons::mapping_type::wallet) {
+  } else if (type == bns::mapping_type::wallet) {
     std::optional<cryptonote::address_parse_info> addr = get_wallet_address_info();
     if(addr)
     {
@@ -228,7 +228,7 @@ bool bind(sql_compiled_statement& s, int index, blob_view blob)
 // Binds a variant of bindable types; calls one of the above according to the contained type
 template <typename... T>
 bool bind(sql_compiled_statement& s, int index, const std::variant<T...>& v) {
-  return var::visit([&](const auto& val) { return ons::bind(s, index, val); }, v);
+  return var::visit([&](const auto& val) { return bns::bind(s, index, val); }, v);
 }
 
 template <typename T> constexpr bool is_int_enum_impl() {
@@ -242,13 +242,13 @@ template <typename T> constexpr bool is_int_enum = is_int_enum_impl<T>();
 template <typename T, typename I, std::enable_if_t<is_int_enum<I>, int> = 0>
 bool bind(sql_compiled_statement& s, I index, T&& val)
 {
-  return ons::bind(s, static_cast<int>(index), std::forward<T>(val));
+  return bns::bind(s, static_cast<int>(index), std::forward<T>(val));
 }
 
 template <int... I, typename... T>
 bool bind_all_impl(sql_compiled_statement& s, std::integer_sequence<int, I...>, T&&... args) {
   clear_bindings(s);
-  for (bool r : {ons::bind(s, I+1, std::forward<T>(args))...})
+  for (bool r : {bns::bind(s, I+1, std::forward<T>(args))...})
     if (!r)
       return false;
   return true;
@@ -280,7 +280,7 @@ bool bind_container(sql_compiled_statement& s, const Container& c)
   clear_bindings(s);
   int bind_pos = 1;
   for (const auto& v : c)
-    if (!ons::bind(s, bind_pos++, v))
+    if (!bns::bind(s, bind_pos++, v))
       return false;
   return true;
 }
@@ -612,9 +612,9 @@ sqlite3 *init_beldex_name_system(const fs::path& file_path, bool read_only)
 std::vector<mapping_type> all_mapping_types(uint8_t hf_version) {
   std::vector<mapping_type> result;
   result.reserve(2);
-  if (hf_version >= cryptonote::network_version_15_ons)
+  if (hf_version >= cryptonote::network_version_16_bns)
     result.push_back(mapping_type::session);
-  if (hf_version >= cryptonote::network_version_16_pulse)
+  if (hf_version >= cryptonote::network_version_17_pulse)
     result.push_back(mapping_type::beldexnet);
   if (hf_version >= cryptonote::network_version_18)
     result.push_back(mapping_type::wallet);
@@ -645,17 +645,17 @@ std::optional<uint64_t> expiry_blocks(cryptonote::network_type nettype, mapping_
   return result;
 }
 
-static void append_owner(std::string& buffer, const ons::generic_owner* owner)
+static void append_owner(std::string& buffer, const bns::generic_owner* owner)
 {
   if (owner) {
     buffer += static_cast<char>(owner->type);
-    buffer += owner->type == ons::generic_owner_sig_type::ed25519
+    buffer += owner->type == bns::generic_owner_sig_type::ed25519
         ? tools::view_guts(owner->ed25519)
         : tools::view_guts(owner->wallet.address);
   }
 }
 
-std::string tx_extra_signature(std::string_view value, ons::generic_owner const *owner, ons::generic_owner const *backup_owner, crypto::hash const &prev_txid)
+std::string tx_extra_signature(std::string_view value, bns::generic_owner const *owner, bns::generic_owner const *backup_owner, crypto::hash const &prev_txid)
 {
   static_assert(sizeof(crypto::hash) == crypto_generichash_BYTES, "Using libsodium generichash for signature hash, require we fit into crypto::hash");
   if (value.size() > mapping_value::BUFFER_SIZE)
@@ -674,27 +674,27 @@ std::string tx_extra_signature(std::string_view value, ons::generic_owner const 
   return result;
 }
 
-ons::generic_signature make_ed25519_signature(crypto::hash const &hash, crypto::ed25519_secret_key const &skey)
+bns::generic_signature make_ed25519_signature(crypto::hash const &hash, crypto::ed25519_secret_key const &skey)
 {
-  ons::generic_signature result = {};
-  result.type                   = ons::generic_owner_sig_type::ed25519;
+  bns::generic_signature result = {};
+  result.type                   = bns::generic_owner_sig_type::ed25519;
   crypto_sign_detached(result.ed25519.data, NULL, reinterpret_cast<unsigned char const *>(hash.data), sizeof(hash), skey.data);
   return result;
 }
 
-ons::generic_owner make_monero_owner(cryptonote::account_public_address const &owner, bool is_subaddress)
+bns::generic_owner make_monero_owner(cryptonote::account_public_address const &owner, bool is_subaddress)
 {
-  ons::generic_owner result   = {};
-  result.type                 = ons::generic_owner_sig_type::monero;
+  bns::generic_owner result   = {};
+  result.type                 = bns::generic_owner_sig_type::monero;
   result.wallet.address       = owner;
   result.wallet.is_subaddress = is_subaddress;
   return result;
 }
 
-ons::generic_owner make_ed25519_owner(crypto::ed25519_public_key const &pkey)
+bns::generic_owner make_ed25519_owner(crypto::ed25519_public_key const &pkey)
 {
-  ons::generic_owner result = {};
-  result.type               = ons::generic_owner_sig_type::ed25519;
+  bns::generic_owner result = {};
+  result.type               = bns::generic_owner_sig_type::ed25519;
   result.ed25519            = pkey;
   return result;
 }
@@ -705,12 +705,12 @@ bool parse_owner_to_generic_owner(cryptonote::network_type nettype, std::string_
   crypto::ed25519_public_key ed_owner;
   if (cryptonote::get_account_address_from_str(parsed_addr, nettype, owner))
   {
-    result = ons::make_monero_owner(parsed_addr.address, parsed_addr.is_subaddress);
+    result = bns::make_monero_owner(parsed_addr.address, parsed_addr.is_subaddress);
   }
   else if (owner.size() == 2*sizeof(ed_owner.data) && oxenmq::is_hex(owner))
   {
     oxenmq::from_hex(owner.begin(), owner.end(), ed_owner.data);
-    result = ons::make_ed25519_owner(ed_owner);
+    result = bns::make_ed25519_owner(ed_owner);
   }
   else
   {
@@ -757,8 +757,8 @@ bool validate_bns_name(mapping_type type, std::string name, std::string *reason)
     max_name_len = name.find('-') != std::string::npos
       ? BELDEXNET_DOMAIN_NAME_MAX
       : BELDEXNET_DOMAIN_NAME_MAX_NOHYPHEN;
-  else if (type == mapping_type::session) max_name_len = ons::SESSION_DISPLAY_NAME_MAX;
-  else if (type == mapping_type::wallet)  max_name_len = ons::WALLET_NAME_MAX;
+  else if (type == mapping_type::session) max_name_len = bns::SESSION_DISPLAY_NAME_MAX;
+  else if (type == mapping_type::wallet)  max_name_len = bns::WALLET_NAME_MAX;
   else
   {
     if (reason)
@@ -927,9 +927,9 @@ bool mapping_value::validate(cryptonote::network_type nettype, mapping_type type
       auto iter = blob->buffer.begin();
       uint8_t identifier = 0;
       if (addr_info.is_subaddress) {
-        identifier |= ONS_WALLET_TYPE_SUBADDRESS;
+        identifier |= BNS_WALLET_TYPE_SUBADDRESS;
       } else if (addr_info.has_payment_id) {
-        identifier |= ONS_WALLET_TYPE_INTEGRATED;
+        identifier |= BNS_WALLET_TYPE_INTEGRATED;
       }
       iter = std::copy_n(&identifier, 1, iter);
       iter = std::copy_n(addr_info.address.m_spend_public_key.data, sizeof(addr_info.address.m_spend_public_key.data), iter);
@@ -1070,11 +1070,11 @@ static std::string hash_to_base64(crypto::hash const &hash)
   return name_hash_bytes_to_base64(tools::view_guts(hash));
 }
 
-static bool verify_bns_signature(crypto::hash const &hash, ons::generic_signature const &signature, ons::generic_owner const &owner)
+static bool verify_bns_signature(crypto::hash const &hash, bns::generic_signature const &signature, bns::generic_owner const &owner)
 {
   if (!owner || !signature) return false;
   if (owner.type != signature.type) return false;
-  if (signature.type == ons::generic_owner_sig_type::monero)
+  if (signature.type == bns::generic_owner_sig_type::monero)
   {
     return crypto::check_signature(hash, owner.wallet.address.m_spend_public_key, signature.monero);
   }
@@ -1084,7 +1084,7 @@ static bool verify_bns_signature(crypto::hash const &hash, ons::generic_signatur
   }
 }
 
-static bool validate_against_previous_mapping(ons::name_system_db &bns_db, uint64_t blockchain_height, cryptonote::transaction const &tx, cryptonote::tx_extra_beldex_name_system const &bns_extra, std::string *reason)
+static bool validate_against_previous_mapping(bns::name_system_db &bns_db, uint64_t blockchain_height, cryptonote::transaction const &tx, cryptonote::tx_extra_beldex_name_system const &bns_extra, std::string *reason)
 {
   std::stringstream err_stream;
   BELDEX_DEFER { if (reason && reason->empty()) *reason = err_stream.str(); };
@@ -1201,16 +1201,16 @@ bool name_system_db::validate_bns_tx(uint8_t hf_version, uint64_t blockchain_hei
   // -----------------------------------------------------------------------------------------------
   {
     constexpr auto VALUE_SPECIFIED_BUT_NOT_REQUESTED = ", given field but field is not requested to be serialised="sv;
-    if (check_condition(!bns_extra.field_is_set(ons::extra_field::encrypted_value) && bns_extra.encrypted_value.size(), reason, tx, ", ", bns_extra_string(nettype, bns_extra), VALUE_SPECIFIED_BUT_NOT_REQUESTED, "encrypted_value"))
+    if (check_condition(!bns_extra.field_is_set(bns::extra_field::encrypted_value) && bns_extra.encrypted_value.size(), reason, tx, ", ", bns_extra_string(nettype, bns_extra), VALUE_SPECIFIED_BUT_NOT_REQUESTED, "encrypted_value"))
       return false;
 
-    if (check_condition(!bns_extra.field_is_set(ons::extra_field::owner) && bns_extra.owner, reason, tx, ", ", bns_extra_string(nettype, bns_extra), VALUE_SPECIFIED_BUT_NOT_REQUESTED, "owner"))
+    if (check_condition(!bns_extra.field_is_set(bns::extra_field::owner) && bns_extra.owner, reason, tx, ", ", bns_extra_string(nettype, bns_extra), VALUE_SPECIFIED_BUT_NOT_REQUESTED, "owner"))
       return false;
 
-    if (check_condition(!bns_extra.field_is_set(ons::extra_field::backup_owner) && bns_extra.backup_owner, reason, tx, ", ", bns_extra_string(nettype, bns_extra), VALUE_SPECIFIED_BUT_NOT_REQUESTED, "backup_owner"))
+    if (check_condition(!bns_extra.field_is_set(bns::extra_field::backup_owner) && bns_extra.backup_owner, reason, tx, ", ", bns_extra_string(nettype, bns_extra), VALUE_SPECIFIED_BUT_NOT_REQUESTED, "backup_owner"))
       return false;
 
-    if (check_condition(!bns_extra.field_is_set(ons::extra_field::signature) && bns_extra.signature, reason, tx, ", ", bns_extra_string(nettype, bns_extra), VALUE_SPECIFIED_BUT_NOT_REQUESTED, "signature"))
+    if (check_condition(!bns_extra.field_is_set(bns::extra_field::signature) && bns_extra.signature, reason, tx, ", ", bns_extra_string(nettype, bns_extra), VALUE_SPECIFIED_BUT_NOT_REQUESTED, "signature"))
       return false;
   }
 
@@ -1221,7 +1221,7 @@ bool name_system_db::validate_bns_tx(uint8_t hf_version, uint64_t blockchain_hei
     if (check_condition(bns_extra.version != 0, reason, tx, ", ", bns_extra_string(nettype, bns_extra), " unexpected version=", std::to_string(bns_extra.version), ", expected=0"))
       return false;
 
-    if (check_condition(!ons::mapping_type_allowed(hf_version, bns_extra.type), reason, tx, ", ", bns_extra_string(nettype, bns_extra), " specifying type=", bns_extra.type, " that is disallowed in hardfork ", hf_version))
+    if (check_condition(!bns::mapping_type_allowed(hf_version, bns_extra.type), reason, tx, ", ", bns_extra_string(nettype, bns_extra), " specifying type=", bns_extra.type, " that is disallowed in hardfork ", hf_version))
       return false;
 
     // -----------------------------------------------------------------------------------------------
@@ -1230,8 +1230,8 @@ bool name_system_db::validate_bns_tx(uint8_t hf_version, uint64_t blockchain_hei
     if (check_condition(!bns_extra.is_buying() && !bns_extra.is_updating() && !bns_extra.is_renewing(), reason, tx, ", ", bns_extra_string(nettype, bns_extra), " TX extra does not specify valid combination of bits for serialized fields=", std::bitset<sizeof(bns_extra.fields) * 8>(static_cast<size_t>(bns_extra.fields)).to_string()))
       return false;
 
-    if (check_condition(bns_extra.field_is_set(ons::extra_field::owner) &&
-                        bns_extra.field_is_set(ons::extra_field::backup_owner) &&
+    if (check_condition(bns_extra.field_is_set(bns::extra_field::owner) &&
+                        bns_extra.field_is_set(bns::extra_field::backup_owner) &&
                         bns_extra.owner == bns_extra.backup_owner,
                         reason, tx, ", ", bns_extra_string(nettype, bns_extra), " specifying owner the same as the backup owner=", bns_extra.backup_owner.to_string(nettype)))
     {
@@ -1246,7 +1246,7 @@ bool name_system_db::validate_bns_tx(uint8_t hf_version, uint64_t blockchain_hei
     if (check_condition((bns_extra.name_hash == null_name_hash || bns_extra.name_hash == crypto::null_hash), reason, tx, ", ", bns_extra_string(nettype, bns_extra), " specified the null name hash"))
         return false;
 
-    if (bns_extra.field_is_set(ons::extra_field::encrypted_value))
+    if (bns_extra.field_is_set(bns::extra_field::encrypted_value))
     {
       if (!mapping_value::validate_encrypted(bns_extra.type, bns_extra.encrypted_value, nullptr, reason))
         return false;
@@ -1282,32 +1282,32 @@ bool name_system_db::validate_bns_tx(uint8_t hf_version, uint64_t blockchain_hei
   return true;
 }
 
-bool validate_mapping_type(std::string_view mapping_type_str, uint8_t hf_version, bns_tx_type txtype, ons::mapping_type *mapping_type, std::string *reason)
+bool validate_mapping_type(std::string_view mapping_type_str, uint8_t hf_version, bns_tx_type txtype, bns::mapping_type *mapping_type, std::string *reason)
 {
   std::string mapping = tools::lowercase_ascii_string(mapping_type_str);
-  std::optional<ons::mapping_type> mapping_type_;
+  std::optional<bns::mapping_type> mapping_type_;
   if (txtype != bns_tx_type::renew && tools::string_iequal(mapping, "session"))
-    mapping_type_ = ons::mapping_type::session;
-  else if (hf_version >= cryptonote::network_version_16_pulse)
+    mapping_type_ = bns::mapping_type::session;
+  else if (hf_version >= cryptonote::network_version_17_pulse)
   {
     if (tools::string_iequal(mapping, "beldexnet"))
-      mapping_type_ = ons::mapping_type::beldexnet;
+      mapping_type_ = bns::mapping_type::beldexnet;
     else if (txtype == bns_tx_type::buy || txtype == bns_tx_type::renew)
     {
       if (tools::string_iequal_any(mapping, "beldexnet_1y", "beldexnet_1years")) // Can also specify "beldexnet"
-        mapping_type_ = ons::mapping_type::beldexnet;
+        mapping_type_ = bns::mapping_type::beldexnet;
       else if (tools::string_iequal_any(mapping, "beldexnet_2y", "beldexnet_2years"))
-        mapping_type_ = ons::mapping_type::beldexnet_2years;
+        mapping_type_ = bns::mapping_type::beldexnet_2years;
       else if (tools::string_iequal_any(mapping, "beldexnet_5y", "beldexnet_5years"))
-        mapping_type_ = ons::mapping_type::beldexnet_5years;
+        mapping_type_ = bns::mapping_type::beldexnet_5years;
       else if (tools::string_iequal_any(mapping, "beldexnet_10y", "beldexnet_10years"))
-        mapping_type_ = ons::mapping_type::beldexnet_10years;
+        mapping_type_ = bns::mapping_type::beldexnet_10years;
     }
   }
   if (hf_version >= cryptonote::network_version_18)
   {
     if (tools::string_iequal(mapping, "wallet"))
-      mapping_type_ = ons::mapping_type::wallet;
+      mapping_type_ = bns::mapping_type::wallet;
   }
 
   if (!mapping_type_)
@@ -1541,13 +1541,13 @@ std::optional<cryptonote::address_parse_info> mapping_value::get_wallet_address_
   std::memcpy(&addr_info.address.m_spend_public_key.data, bufpos, 32);
   bufpos += 32;
   std::memcpy(&addr_info.address.m_view_public_key.data, bufpos, 32);
-  if (buffer[0] == ONS_WALLET_TYPE_INTEGRATED) {
+  if (buffer[0] == BNS_WALLET_TYPE_INTEGRATED) {
     bufpos += 32;
     std::copy_n(bufpos,8,addr_info.payment_id.data);
     addr_info.has_payment_id = true;
-  } else if (buffer[0] == ONS_WALLET_TYPE_SUBADDRESS) {
+  } else if (buffer[0] == BNS_WALLET_TYPE_SUBADDRESS) {
     addr_info.is_subaddress = true;
-  } else assert(buffer[0] == ONS_WALLET_TYPE_PRIMARY);
+  } else assert(buffer[0] == BNS_WALLET_TYPE_PRIMARY);
   return addr_info;
 }
 
@@ -1937,7 +1937,7 @@ name_system_db::~name_system_db()
 
 namespace {
 
-std::optional<int64_t> add_or_get_owner_id(ons::name_system_db &bns_db, crypto::hash const &tx_hash, cryptonote::tx_extra_beldex_name_system const &entry, ons::generic_owner const &key)
+std::optional<int64_t> add_or_get_owner_id(bns::name_system_db &bns_db, crypto::hash const &tx_hash, cryptonote::tx_extra_beldex_name_system const &entry, bns::generic_owner const &key)
 {
   int64_t result = 0;
   if (owner_record owner = bns_db.get_owner_by_key(key)) result = owner.id;
@@ -1985,7 +1985,7 @@ SELECT                type, name_hash, ?,    ?)";
 
     sql += ", expiration_height";
 
-    if (entry.field_is_set(ons::extra_field::owner))
+    if (entry.field_is_set(bns::extra_field::owner))
     {
       auto opt_id = add_or_get_owner_id(bns_db, tx_hash, entry, entry.owner);
       if (!opt_id)
@@ -2000,7 +2000,7 @@ SELECT                type, name_hash, ?,    ?)";
     else
       sql += ", owner_id";
 
-    if (entry.field_is_set(ons::extra_field::backup_owner))
+    if (entry.field_is_set(bns::extra_field::backup_owner))
     {
       auto opt_id = add_or_get_owner_id(bns_db, tx_hash, entry, entry.backup_owner);
       if (!opt_id)
@@ -2016,7 +2016,7 @@ SELECT                type, name_hash, ?,    ?)";
     else
       sql += ", backup_owner_id";
 
-    if (entry.field_is_set(ons::extra_field::encrypted_value))
+    if (entry.field_is_set(bns::extra_field::encrypted_value))
     {
       sql += ", ?";
       bind.emplace_back(blob_view{entry.encrypted_value});
@@ -2032,7 +2032,7 @@ SELECT                type, name_hash, ?,    ?)";
   return result;
 }
 
-bool add_bns_entry(ons::name_system_db &bns_db, uint64_t height, cryptonote::tx_extra_beldex_name_system const &entry, crypto::hash const &tx_hash)
+bool add_bns_entry(bns::name_system_db &bns_db, uint64_t height, cryptonote::tx_extra_beldex_name_system const &entry, crypto::hash const &tx_hash)
 {
   // -----------------------------------------------------------------------------------------------
   // New Mapping Insert or Completely Replace
@@ -2108,7 +2108,7 @@ bool name_system_db::add_block(const cryptonote::block &block, const std::vector
    return false;
 
   bool bns_parsed_from_block = false;
-  if (block.major_version >= cryptonote::network_version_15_ons)
+  if (block.major_version >= cryptonote::network_version_16_bns)
   {
     for (cryptonote::transaction const &tx : txs)
     {
@@ -2154,13 +2154,13 @@ struct bns_update_history
 
 void bns_update_history::update(uint64_t height, cryptonote::tx_extra_beldex_name_system const &bns_extra)
 {
-  if (bns_extra.field_is_set(ons::extra_field::encrypted_value))
+  if (bns_extra.field_is_set(bns::extra_field::encrypted_value))
     value_last_update_height = height;
 
-  if (bns_extra.field_is_set(ons::extra_field::owner))
+  if (bns_extra.field_is_set(bns::extra_field::owner))
     owner_last_update_height = height;
 
-  if (bns_extra.field_is_set(ons::extra_field::backup_owner))
+  if (bns_extra.field_is_set(bns::extra_field::backup_owner))
     backup_owner_last_update_height = height;
 }
 
@@ -2182,7 +2182,7 @@ void name_system_db::block_detach(cryptonote::Blockchain const &blockchain, uint
   prune_db(new_blockchain_height);
 }
 
-bool name_system_db::save_owner(ons::generic_owner const &owner, int64_t *row_id)
+bool name_system_db::save_owner(bns::generic_owner const &owner, int64_t *row_id)
 {
   bool result = bind_and_run(bns_sql_type::save_owner, save_owner_sql, nullptr,
       blob_view{reinterpret_cast<const char*>(&owner), sizeof(owner)});
@@ -2231,7 +2231,7 @@ bool name_system_db::prune_db(uint64_t height)
   return true;
 }
 
-owner_record name_system_db::get_owner_by_key(ons::generic_owner const &owner)
+owner_record name_system_db::get_owner_by_key(bns::generic_owner const &owner)
 {
   owner_record result = {};
   result.loaded       = bind_and_run(bns_sql_type::get_owner, get_owner_by_key_sql, &result,
@@ -2250,7 +2250,7 @@ owner_record name_system_db::get_owner_by_id(int64_t owner_id)
 bool name_system_db::get_wallet_mapping(std::string str, uint64_t blockchain_height, cryptonote::address_parse_info& addr_info)
 {
   std::string name = tools::lowercase_ascii_string(std::move(str));
-  std::string b64_hashed_name = ons::name_to_base64_hash(name);
+  std::string b64_hashed_name = bns::name_to_base64_hash(name);
   if (auto record = name_system_db::resolve(mapping_type::wallet, b64_hashed_name, blockchain_height)){
     (*record).decrypt(name, mapping_type::wallet);
     std::optional<cryptonote::address_parse_info> addr = (*record).get_wallet_address_info();

@@ -44,11 +44,7 @@
 #include "epee/misc_language.h"
 #include "epee/int-util.h"
 #include "mnemonics/electrum-words.h"
-<<<<<<< .merge_file_2dSNa4
 #include "common/beldex.h"
-=======
-#include "common/oxen.h"
->>>>>>> .merge_file_J728o6
 #include <boost/crc.hpp>
 
 #include "chinese_simplified.h"
@@ -67,13 +63,8 @@
 #include "language_base.h"
 #include "singleton.h"
 
-<<<<<<< .merge_file_2dSNa4
 #undef BELDEX_DEFAULT_LOG_CATEGORY
 #define BELDEX_DEFAULT_LOG_CATEGORY "mnemonic"
-=======
-#undef OXEN_DEFAULT_LOG_CATEGORY
-#define OXEN_DEFAULT_LOG_CATEGORY "mnemonic"
->>>>>>> .merge_file_J728o6
 
 namespace crypto
 {
@@ -302,11 +293,7 @@ namespace crypto
       }
 
       std::vector<uint32_t> matched_indices;
-<<<<<<< .merge_file_2dSNa4
       BELDEX_DEFER { memwipe(matched_indices.data(), matched_indices.size() * sizeof(matched_indices[0])); };
-=======
-      OXEN_DEFER { memwipe(matched_indices.data(), matched_indices.size() * sizeof(matched_indices[0])); };
->>>>>>> .merge_file_J728o6
       Language::Base *language;
       if (!find_seed_language(seed, has_checksum, matched_indices, &language))
       {

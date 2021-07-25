@@ -354,10 +354,7 @@ namespace cryptonote
           MCLOG_RED(el::Level::Warning, "global", context << " peer claims higher version than we think (" <<
               (unsigned)hshd.top_version << " for " << (hshd.current_height - 1) << " instead of " << (unsigned)version <<
               ") - we may be forked from the network and a software upgrade may be needed");
-        MINFO("global" << context << " peer claims higher version that we think (" <<
-              (unsigned)hshd.top_version << " for " << (hshd.current_height - 1) << " instead of " << (unsigned)version <<
-              ") - we may be forked from the network and a software upgrade may be needed. ideal:" << (unsigned) m_core.get_ideal_hard_fork_version());
-		return false;
+	    	return false;
       }
     }
 

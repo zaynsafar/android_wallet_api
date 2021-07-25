@@ -28,7 +28,7 @@ Proof::Proof(
     public_ip{mn_public_ip},
     pubkey_ed25519{keys.pub_ed25519},
     qnet_port{quorumnet_port},
-    storage_https_port{smn_storage_https_port},
+    storage_https_port{mn_storage_https_port},
     storage_omq_port{mn_storage_omq_port},
     storage_server_version{ss_version},
     beldexnet_version{beldexnet_version}

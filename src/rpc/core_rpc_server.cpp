@@ -1,5 +1,5 @@
-// Copyright (c) 2014-2018, The Monero Project
-// Copyright (c)      2018, The Beldex Project
+// Copyright (c) 2018-2020, The Beldex Project
+// Copyright (c) 2014-2019, The Monero Project
 //
 // All rights reserved.
 //
@@ -1316,7 +1316,7 @@ namespace cryptonote { namespace rpc {
     const uint8_t major_version = m_core.get_blockchain_storage().get_network_version();
 
     res.pow_algorithm =
-        major_version >= network_version_12_checkpointing    ? "RandomX (BELDEX variant)"               :
+        major_version >= network_version_13_checkpointing    ? "RandomX (BELDEX variant)"               :
         major_version == network_version_11_infinite_staking ? "Cryptonight Turtle Light (Variant 2)" :
                                                                "Cryptonight Heavy (Variant 2)";
 
@@ -2343,8 +2343,8 @@ namespace cryptonote { namespace rpc {
     {
       res.master_node_state.master_node_pubkey  = std::move(get_master_node_key_res.master_node_pubkey);
       res.master_node_state.public_ip            = epee::string_tools::get_ip_string_from_int32(m_core.mn_public_ip());
-      res.master_node_state.storage_port         = m_core.storage_port();
-      res.master_node_state.storage_lmq_port     = m_core.m_storage_lmq_port;
+      res.master_node_state.storage_port         = m_core.storage_https_port();
+      res.master_node_state.storage_lmq_port     = m_core.storage_omq_port();
       res.master_node_state.quorumnet_port       = m_core.quorumnet_port();
       res.master_node_state.pubkey_ed25519       = std::move(get_master_node_key_res.master_node_ed25519_pubkey);
       res.master_node_state.pubkey_x25519        = std::move(get_master_node_key_res.master_node_x25519_pubkey);
@@ -2892,7 +2892,7 @@ namespace cryptonote { namespace rpc {
     }
 
     if (uint8_t hf_version; add_curr_pulse
-        && (hf_version = get_network_version(nettype(), curr_height)) >= network_version_16_pulse)
+        && (hf_version = get_network_version(nettype(), curr_height)) >= network_version_17_pulse)
     {
       cryptonote::Blockchain const &blockchain   = m_core.get_blockchain_storage();
       cryptonote::block_header const &top_header = blockchain.get_db().get_block_header_from_height(curr_height - 1);
@@ -3011,8 +3011,6 @@ namespace cryptonote { namespace rpc {
     }
     return res;
   }
-
-  static constexpr GET_MASTER_NODES::requested_fields_t all_fields{true};
   //------------------------------------------------------------------------------------------------------------------------------
   GET_MASTER_KEYS::response core_rpc_server::invoke(GET_MASTER_KEYS::request&& req, rpc_context context)
   {
@@ -3163,27 +3161,8 @@ namespace cryptonote { namespace rpc {
       }
     }
 
-    if (m_core.get_current_blockchain_height() <= max_height)
-      throw rpc_error{ERROR_TOO_BIG_HEIGHT, "Requested block height too big."};
-
-    uint64_t res_height = perform_blockchain_test_routine(m_core, max_height, seed);
-
-    res.status = STATUS_OK;
-    res.res_height = res_height;
-
-    return res;
-  }
-
-  namespace {
-    struct version_printer { const std::array<int, 3> &v; };
-    std::ostream &operator<<(std::ostream &o, const version_printer &vp) { return o << vp.v[0] << '.' << vp.v[1] << '.' << vp.v[2]; }
-
-    // Handles a ping.  Returns true if the ping was significant (i.e. first ping after startup, or
-    // after the ping had expired).  `Success` is a callback that is invoked with a single boolean
-    // argument: true if this ping should trigger an immediate proof send (i.e. first ping after
-    // startup or after a ping expiry), false for an ordinary ping.
-    template <typename RPC, typename Success>
-    auto handle_ping(std::array<int, 3> cur_version, std::array<int, 3> required, const char* name, std::atomic<std::time_t>& update, time_t lifetime, Success success)
+    std::vector<crypto::public_key> pubkeys(req.master_node_pubkeys.size());
+    for (size_t i = 0; i < req.master_node_pubkeys.size(); i++)
     {
       if (!tools::hex_to_type(req.master_node_pubkeys[i], pubkeys[i]))
         throw rpc_error{ERROR_WRONG_PARAM,
@@ -3224,7 +3203,6 @@ namespace cryptonote { namespace rpc {
 
       mn_infos.resize(limit);
     }
-  }
 
     res.master_node_states.reserve(mn_infos.size());
     res.fields = req.fields.value_or(all_fields);
@@ -3575,17 +3553,17 @@ namespace cryptonote { namespace rpc {
     for (size_t request_index = 0; request_index < req.entries.size(); request_index++)
     {
       std::string const &owner     = req.entries[request_index];
-      bns::generic_owner BNS_owner = {};
+      bns::generic_owner bns_owner = {};
       std::string errmsg;
-      if (!bns::parse_owner_to_generic_owner(m_core.get_nettype(), owner, BNS_owner, &errmsg))
+      if (!bns::parse_owner_to_generic_owner(m_core.get_nettype(), owner, bns_owner, &errmsg))
         throw rpc_error{ERROR_WRONG_PARAM, std::move(errmsg)};
 
       // TODO(beldex): We now serialize both owner and backup_owner, since if
       // we specify an owner that is backup owner, we don't show the (other)
       // owner. For RPC compatibility we keep the request_index around until the
       // next hard fork (16)
-      owners.push_back(BNS_owner);
-      owner_to_request_index[BNS_owner] = request_index;
+      owners.push_back(bns_owner);
+      owner_to_request_index[bns_owner] = request_index;
     }
 
     bns::name_system_db &db = m_core.get_blockchain_storage().name_system_db();
