@@ -3169,14 +3169,14 @@ Pending or Failed: "failed"|"pending",  "out", Lock, Checkpointed, Time, Amount*
                            tr(USAGE_BNS_ENCRYPT),
                            tr("Encrypts a BNS mapping value with a given name; primarily intended for use with external mapping update signing"));
 
-  m_cmd_binder.set_handler("bns_print_owners_to_names",
-                           [this](const auto& x) { return bns_print_owners_to_names(x); },
-                           tr(USAGE_BNS_PRINT_OWNERS_TO_NAMES),
-                           tr("Query the Beldex Name Master names that the keys have purchased. If no keys are specified, it defaults to the current wallet."));
+  m_cmd_binder.set_handler("bns_by_owner",
+                           [this](const auto& x) { return bns_by_owner(x); },
+                           tr(USAGE_BNS_BY_OWNER),
+                           tr("Query the Beldex Name Service names that the keys have purchased. If no keys are specified, it defaults to the current wallet."));
 
-  m_cmd_binder.set_handler("bns_print_name_to_owners",
-                           [this](const auto& x) { return bns_print_name_to_owners(x); },
-                           tr(USAGE_BNS_PRINT_NAME_TO_OWNERS),
+  m_cmd_binder.set_handler("bns_lookup",
+                           [this](const auto& x) { return bns_lookup(x); },
+                           tr(USAGE_BNS_LOOKUP),
                            tr("Query the ed25519 public keys that own the Beldex Name System names."));
 
   m_cmd_binder.set_handler("bns_make_update_mapping_signature",
@@ -5679,6 +5679,27 @@ void simple_wallet::check_for_inactivity_lock(bool user)
   }
 }
 //----------------------------------------------------------------------------------------------------
+std::string eat_named_argument(std::vector<std::string> &args, std::string_view prefix)
+{
+  std::string result = {};
+  for (auto it = args.begin(); it != args.end(); it++)
+  {
+    if (it->size() > prefix.size() && tools::starts_with(*it, prefix))
+    {
+      result = it->substr(prefix.size());
+      args.erase(it);
+      break;
+    }
+  }
+
+  return result;
+}
+template <typename... Prefixes>
+std::array<std::string, sizeof...(Prefixes)> eat_named_arguments(std::vector<std::string> &args, const Prefixes&... prefixes)
+{
+  return { eat_named_argument(args, prefixes)... };
+}
+//----------------------------------------------------------------------------------------------------
 bool simple_wallet::confirm_and_send_tx(std::vector<cryptonote::address_parse_info> const &dests, std::vector<tools::wallet2::pending_tx> &ptx_vector, bool blink, uint64_t lock_time_in_blocks, uint64_t unlock_block, bool called_by_mms)
 {
   if (ptx_vector.empty())
@@ -5857,16 +5878,6 @@ bool simple_wallet::transfer_main(Transfer transfer_type, const std::vector<std:
     return true;
   }
 
-  return true;
-}
-
-bool simple_wallet::transfer_main(Transfer transfer_type, const std::vector<std::string> &args_, bool called_by_mms)
-{
-//  "transfer [index=<N1>[,<N2>,...]] [<priority>] <address> <amount> [<payment_id>]"
-  if (!try_connect_to_daemon())
-    return false;
-
-  std::vector<std::string> local_args = args_;
   uint32_t priority = 0;
   std::set<uint32_t> subaddr_indices  = {};
   if (!parse_subaddr_indices_and_priority(*m_wallet, local_args, subaddr_indices, priority, m_current_subaddress_account)) return false;
@@ -6436,16 +6447,16 @@ bool simple_wallet::print_locked_stakes(const std::vector<std::string>& /*args*/
 }
 
 // Parse a user-provided typestring value; if not provided, guess from the provided name and value.
-static std::optional<ons::mapping_type> guess_bns_type(tools::wallet2& wallet, std::string_view typestr, std::string_view name, std::string_view value)
+static std::optional<bns::mapping_type> guess_bns_type(tools::wallet2& wallet, std::string_view typestr, std::string_view name, std::string_view value)
 {
   if (typestr.empty())
   {
     if (tools::ends_with(name, ".beldex") && (tools::ends_with(value, ".beldex") || value.empty()))
-      return ons::mapping_type::beldexnet;
-    if (!tools::ends_with(name, ".beldex") && tools::starts_with(value, "05") && value.length() == 2*ons::SESSION_PUBLIC_KEY_BINARY_LENGTH)
-      return ons::mapping_type::session;
+      return bns::mapping_type::beldexnet;
+    if (!tools::ends_with(name, ".beldex") && tools::starts_with(value, "05") && value.length() == 2*bns::SESSION_PUBLIC_KEY_BINARY_LENGTH)
+      return bns::mapping_type::session;
     if (cryptonote::is_valid_address(std::string{value}, wallet.nettype()))
-      return ons::mapping_type::wallet;
+      return bns::mapping_type::wallet;
 
     fail_msg_writer() << tr("Could not infer BNS type from name/value; trying using the type= argument or see `help' for more details");
     return std::nullopt;
@@ -6459,7 +6470,7 @@ static std::optional<ons::mapping_type> guess_bns_type(tools::wallet2& wallet, s
   }
 
   std::string reason;
-  if (ons::mapping_type type; ons::validate_mapping_type(typestr, *hf_version, ons::bns_tx_type::buy, &type, &reason))
+  if (bns::mapping_type type; bns::validate_mapping_type(typestr, *hf_version, bns::bns_tx_type::buy, &type, &reason))
     return type;
 
   fail_msg_writer() << reason;
@@ -6492,7 +6503,7 @@ bool simple_wallet::bns_buy_mapping(std::vector<std::string> args)
   std::string const &name  = args[0];
   std::string const &value = args[1];
 
-  std::optional<ons::mapping_type> type = guess_bns_type(*m_wallet, typestr, name, value);
+  std::optional<bns::mapping_type> type = guess_bns_type(*m_wallet, typestr, name, value);
   if (!type) return false;
 
   SCOPED_WALLET_UNLOCK();
@@ -6524,19 +6535,19 @@ bool simple_wallet::bns_buy_mapping(std::vector<std::string> args)
     dsts.push_back(info);
 
     std::cout << std::endl << tr("Buying Beldex Name System Record") << std::endl << std::endl;
-    if (*type == ons::mapping_type::session)
+    if (*type == bns::mapping_type::session)
       std::cout << boost::format(tr("Session Name: %s")) % name << std::endl;
-    else if (*type == ons::mapping_type::wallet)
+    else if (*type == bns::mapping_type::wallet)
       std::cout << boost::format(tr("Wallet Name:  %s")) % name << std::endl;
-    else if (ons::is_beldexnet_type(*type))
+    else if (bns::is_beldexnet_type(*type))
     {
       std::cout << boost::format(tr("Beldexnet Name: %s")) % name << std::endl;
       int years =
-          *type == ons::mapping_type::beldexnet_10years ? 10 :
-          *type == ons::mapping_type::beldexnet_5years ? 5 :
-          *type == ons::mapping_type::beldexnet_2years ? 2 :
+          *type == bns::mapping_type::beldexnet_10years ? 10 :
+          *type == bns::mapping_type::beldexnet_5years ? 5 :
+          *type == bns::mapping_type::beldexnet_2years ? 2 :
           1;
-      int blocks = BLOCKS_EXPECTED_IN_DAYS(years * ons::REGISTRATION_YEAR_DAYS);
+      int blocks = BLOCKS_EXPECTED_IN_DAYS(years * bns::REGISTRATION_YEAR_DAYS);
       std::cout << boost::format(tr("Registration: %d years (%d blocks)")) % years % blocks << "\n";
     }
     else
@@ -6554,7 +6565,7 @@ bool simple_wallet::bns_buy_mapping(std::vector<std::string> args)
 
 
     //Save the BNS record to the wallet cache
-    std::string name_hash_str = ons::name_to_base64_hash(name);
+    std::string name_hash_str = bns::name_to_base64_hash(name);
     tools::wallet2::bns_detail detail = {
       *type,
       name,
@@ -6590,7 +6601,7 @@ bool simple_wallet::bns_renew_mapping(std::vector<std::string> args)
   }
   std::string const &name = args[0];
 
-  ons::mapping_type type;
+  bns::mapping_type type;
   if (auto t = guess_bns_type(*m_wallet, typestr, name, ""))
     type = *t;
   else return false;
@@ -6622,16 +6633,16 @@ bool simple_wallet::bns_renew_mapping(std::vector<std::string> args)
     dsts.push_back(info);
 
     std::cout << "\n" << tr("Renew Beldex Name System Record") << "\n\n";
-    if (ons::is_beldexnet_type(type))
+    if (bns::is_beldexnet_type(type))
       std::cout << boost::format(tr("Beldexnet Name:  %s")) % name << "\n";
     else
       std::cout << boost::format(tr("Name:          %s")) % name << "\n";
 
     int years = 1;
-    if (type == ons::mapping_type::beldexnet_2years) years = 2;
-    else if (type == ons::mapping_type::beldexnet_5years) years = 5;
-    else if (type == ons::mapping_type::beldexnet_10years) years = 10;
-    int blocks = BLOCKS_EXPECTED_IN_DAYS(years * ons::REGISTRATION_YEAR_DAYS);
+    if (type == bns::mapping_type::beldexnet_2years) years = 2;
+    else if (type == bns::mapping_type::beldexnet_5years) years = 5;
+    else if (type == bns::mapping_type::beldexnet_10years) years = 10;
+    int blocks = BLOCKS_EXPECTED_IN_DAYS(years * bns::REGISTRATION_YEAR_DAYS);
     std::cout << boost::format(tr("Renewal years: %d (%d blocks)")) % years % blocks << "\n";
     std::cout << boost::format(tr("New expiry:    Block %d")) % (*response[0].expiration_height + blocks) << "\n";
     std::cout << std::flush;
@@ -6672,7 +6683,7 @@ bool simple_wallet::bns_update_mapping(std::vector<std::string> args)
   }
   std::string const &name = args[0];
 
-  ons::mapping_type type;
+  bns::mapping_type type;
   if (auto t = guess_bns_type(*m_wallet, typestr, name, value))
     type = *t;
   else return false;
@@ -6701,14 +6712,14 @@ bool simple_wallet::bns_update_mapping(std::vector<std::string> args)
     }
 
     auto& enc_hex = response[0].encrypted_value;
-    if (!oxenmq::is_hex(enc_hex) || enc_hex.size() % 2 != 0 || enc_hex.size() > 2*ons::mapping_value::BUFFER_SIZE)
+    if (!oxenmq::is_hex(enc_hex) || enc_hex.size() % 2 != 0 || enc_hex.size() > 2*bns::mapping_value::BUFFER_SIZE)
     {
       LOG_ERROR("invalid BNS data returned from beldexd");
       fail_msg_writer() << tr("invalid BNS data returned from beldexd");
       return true;
     }
 
-    ons::mapping_value mval{};
+    bns::mapping_value mval{};
     mval.len = enc_hex.size() / 2;
     mval.encrypted = true;
     oxenmq::from_hex(enc_hex.begin(), enc_hex.end(), mval.buffer.begin());
@@ -6726,11 +6737,11 @@ bool simple_wallet::bns_update_mapping(std::vector<std::string> args)
     dsts.push_back(info);
 
     std::cout << std::endl << tr("Updating Beldex Name System Record") << std::endl << std::endl;
-    if (type == ons::mapping_type::session)
+    if (type == bns::mapping_type::session)
       std::cout << boost::format(tr("Session Name:     %s")) % name << std::endl;
-    else if (ons::is_beldexnet_type(type))
+    else if (bns::is_beldexnet_type(type))
       std::cout << boost::format(tr("Beldexnet Name:     %s")) % name << std::endl;
-    else if (type == ons::mapping_type::wallet)
+    else if (type == bns::mapping_type::wallet)
       std::cout << boost::format(tr("Wallet Name:     %s")) % name << std::endl;
     else
       std::cout << boost::format(tr("Name:             %s")) % name << std::endl;
@@ -6759,7 +6770,7 @@ bool simple_wallet::bns_update_mapping(std::vector<std::string> args)
       return false;
 
     // Save the updated BNS record to the wallet cache
-    std::string name_hash_str = ons::name_to_base64_hash(name);
+    std::string name_hash_str = bns::name_to_base64_hash(name);
     m_wallet->delete_bns_cache_record(name_hash_str);
     tools::wallet2::bns_detail detail = {
       type,
@@ -6795,12 +6806,12 @@ bool simple_wallet::bns_encrypt(std::vector<std::string> args)
   const auto& name = args[0];
   const auto& value = args[1];
 
-  ons::mapping_type type;
+  bns::mapping_type type;
   if (auto t = guess_bns_type(*m_wallet, typestr, name, value))
     type = *t;
   else return false;
 
-  if (value.size() > ons::mapping_value::BUFFER_SIZE)
+  if (value.size() > bns::mapping_value::BUFFER_SIZE)
   {
     fail_msg_writer() << "BNS value '" << value << "' is too long";
     return false;
@@ -6814,20 +6825,20 @@ bool simple_wallet::bns_encrypt(std::vector<std::string> args)
     return false;
   }
 
-  if (!ons::validate_bns_name(type, name, &reason))
+  if (!bns::validate_bns_name(type, name, &reason))
   {
     tools::fail_msg_writer() << "Invalid BNS name '" << name << "': " << reason;
     return false;
   }
 
-  ons::mapping_value mval;
-  if (!ons::mapping_value::validate(m_wallet->nettype(), type, value, &mval, &reason))
+  bns::mapping_value mval;
+  if (!bns::mapping_value::validate(m_wallet->nettype(), type, value, &mval, &reason))
   {
     tools::fail_msg_writer() << "Invalid BNS value '" << value << "': " << reason;
     return false;
   }
 
-  bool old_argon2 = type == ons::mapping_type::session && *hf_version < cryptonote::network_version_16_pulse;
+  bool old_argon2 = type == bns::mapping_type::session && *hf_version < cryptonote::network_version_17_pulse;
   if (!mval.encrypt(name, nullptr, old_argon2))
   {
     tools::fail_msg_writer() << "Value encryption failed";
@@ -6854,9 +6865,9 @@ bool simple_wallet::bns_make_update_mapping_signature(std::vector<std::string> a
 
   std::string const &name = args[0];
   SCOPED_WALLET_UNLOCK();
-  ons::generic_signature signature_binary;
+  bns::generic_signature signature_binary;
   std::string reason;
-  if (m_wallet->bns_make_update_mapping_signature(ons::mapping_type::session,
+  if (m_wallet->bns_make_update_mapping_signature(bns::mapping_type::session,
                                                   name,
                                                   value.size() ? &value : nullptr,
                                                   owner.size() ? &owner : nullptr,
@@ -6896,14 +6907,14 @@ bool simple_wallet::bns_lookup(std::vector<std::string> args)
 
     for (auto type : tools::split(typestr, ","))
     {
-      ons::mapping_type mapping_type;
+      bns::mapping_type mapping_type;
       std::string reason;
-      if (!ons::validate_mapping_type(type, *hf_version, ons::bns_tx_type::lookup, &mapping_type, &reason))
+      if (!bns::validate_mapping_type(type, *hf_version, bns::bns_tx_type::lookup, &mapping_type, &reason))
       {
         fail_msg_writer() << reason;
         return false;
       }
-      requested_types.push_back(ons::db_mapping_type(mapping_type));
+      requested_types.push_back(bns::db_mapping_type(mapping_type));
     }
   }
 
@@ -6915,8 +6926,8 @@ bool simple_wallet::bns_lookup(std::vector<std::string> args)
       fail_msg_writer() << tools::ERR_MSG_NETWORK_VERSION_QUERY_FAILED;
       return false;
     }
-    auto all_types = ons::all_mapping_types(*hf_version);
-    std::transform(all_types.begin(), all_types.end(), std::back_inserter(requested_types), ons::db_mapping_type);
+    auto all_types = bns::all_mapping_types(*hf_version);
+    std::transform(all_types.begin(), all_types.end(), std::back_inserter(requested_types), bns::db_mapping_type);
   }
 
   if (args.empty())
@@ -6929,7 +6940,7 @@ bool simple_wallet::bns_lookup(std::vector<std::string> args)
   for (auto& name : args)
   {
     name = tools::lowercase_ascii_string(std::move(name));
-    request.entries.push_back({ons::name_to_base64_hash(name), requested_types});
+    request.entries.push_back({bns::name_to_base64_hash(name), requested_types});
   }
 
   auto [success, response] = m_wallet->bns_names_to_owners(request);
@@ -6943,7 +6954,7 @@ bool simple_wallet::bns_lookup(std::vector<std::string> args)
   for (auto const &mapping : response)
   {
     auto& enc_hex = mapping.encrypted_value;
-    if (mapping.entry_index >= args.size() || !oxenmq::is_hex(enc_hex) || enc_hex.size() % 2 != 0 || enc_hex.size() > 2*ons::mapping_value::BUFFER_SIZE)
+    if (mapping.entry_index >= args.size() || !oxenmq::is_hex(enc_hex) || enc_hex.size() % 2 != 0 || enc_hex.size() > 2*bns::mapping_value::BUFFER_SIZE)
     {
       fail_msg_writer() << "Received invalid BNS mapping data from beldexd";
       return false;
@@ -6955,7 +6966,7 @@ bool simple_wallet::bns_lookup(std::vector<std::string> args)
     last_index = mapping.entry_index;
 
     const auto& name = args[mapping.entry_index];
-    ons::mapping_value value{};
+    bns::mapping_value value{};
     value.len = enc_hex.size() / 2;
     value.encrypted = true;
     oxenmq::from_hex(enc_hex.begin(), enc_hex.end(), value.buffer.begin());
@@ -6969,7 +6980,7 @@ bool simple_wallet::bns_lookup(std::vector<std::string> args)
     auto writer = tools::msg_writer();
     writer
       << "Name: " << name
-      << "\n    Type: " << static_cast<ons::mapping_type>(mapping.type)
+      << "\n    Type: " << static_cast<bns::mapping_type>(mapping.type)
       << "\n    Value: " << value.to_readable_value(m_wallet->nettype(), mapping.type)
       << "\n    Owner: " << mapping.owner;
     if (mapping.backup_owner) writer
@@ -6985,7 +6996,7 @@ bool simple_wallet::bns_lookup(std::vector<std::string> args)
 
     tools::wallet2::bns_detail detail =
     {
-      static_cast<ons::mapping_type>(mapping.type),
+      static_cast<bns::mapping_type>(mapping.type),
       name,
       request.entries[0].name_hash};
     m_wallet->set_bns_cache_record(detail);

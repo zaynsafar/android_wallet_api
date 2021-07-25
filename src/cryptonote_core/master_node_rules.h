@@ -164,7 +164,6 @@ namespace master_nodes {
 #else
   constexpr size_t STATE_CHANGE_MIN_VOTES_TO_CHANGE_STATE = 7;
   constexpr size_t STATE_CHANGE_QUORUM_SIZE               = 10;
-  constexpr int    MIN_TIME_IN_S_BEFORE_VOTING            = UPTIME_PROOF_MAX_TIME_IN_SECONDS;
   constexpr size_t CHECKPOINT_QUORUM_SIZE                 = 20;
   constexpr size_t CHECKPOINT_MIN_VOTES                   = 13;
   constexpr int    BLINK_SUBQUORUM_SIZE                   = 10;
@@ -213,8 +212,8 @@ namespace master_nodes {
   // blocks out of sync and sending something that it thinks is legit.
   constexpr uint64_t VOTE_OR_TX_VERIFY_HEIGHT_BUFFER    = 5;
 
-  constexpr std::array<int, 3> MIN_STORAGE_SERVER_VERSION{{2, 0, 7}};
-  constexpr std::array<int, 3> MIN_BELDEXNET_VERSION{{0, 8, 0}};
+  constexpr std::array<uint16_t, 3> MIN_STORAGE_SERVER_VERSION{{2, 0, 7}};
+  constexpr std::array<uint16_t, 3> MIN_BELDEXNET_VERSION{{0, 8, 0}};
 
   // The minimum accepted version number, broadcasted by Master Nodes via uptime proofs for each hardfork
  struct proof_version
