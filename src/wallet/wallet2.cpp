@@ -7780,9 +7780,8 @@ uint64_t wallet2::get_fee_percent(uint32_t priority, txtype type) const
       THROW_WALLET_EXCEPTION(error::invalid_priority);
 
     uint64_t burn_pct = 0;
-   if (use_fork_rules(network_version_16_bns, 0))
-      burn_pct = BLINK_BURN_TX_FEE_PERCENT;
-    else if (use_fork_rules(network_version_15_blink, 0))
+
+    if (use_fork_rules(network_version_15_blink, 0))
       burn_pct = BLINK_BURN_TX_FEE_PERCENT_OLD;
     else
       THROW_WALLET_EXCEPTION(error::invalid_priority);
@@ -7842,7 +7841,7 @@ beldex_construct_tx_params wallet2::construct_params(uint8_t hf_version, txtype 
   else if (priority == tools::tx_priority_blink)
   {
     tx_params.burn_fixed   = BLINK_BURN_FIXED;
-    tx_params.burn_percent = BLINK_BURN_TX_FEE_PERCENT;
+    tx_params.burn_percent = BLINK_BURN_TX_FEE_PERCENT_OLD;
   }
   if (extra_burn)
       tx_params.burn_fixed += extra_burn;
