@@ -46,11 +46,11 @@ constexpr uint64_t BLINK_BURN_TX_FEE_PERCENT  = 150; // A percentage of the mini
 // FIXME: can remove this post-fork 15; the burned amount only matters for mempool acceptance and
 // blink quorum signing, but isn't part of the blockchain concensus rules (so we don't actually have
 // to keep it around in the code for syncing the chain).
-constexpr uint64_t BLINK_BURN_TX_FEE_PERCENT_OLD = 400; // A percentage of the minimum miner tx fee that the sender must burn.  (Adds to BLINK_BURN_FIXED)
+constexpr uint64_t BLINK_BURN_TX_FEE_PERCENT_OLD = 200; // A percentage of the minimum miner tx fee that the sender must burn.  (Adds to BLINK_BURN_FIXED)
 
 static_assert(BLINK_MINER_TX_FEE_PERCENT >= 100, "blink miner fee cannot be smaller than the base tx fee");
 static_assert(BLINK_BURN_FIXED >= 0, "fixed blink burn amount cannot be negative");
-static_assert(BLINK_BURN_TX_FEE_PERCENT >= 0, "blink burn tx percent cannot be negative");
+static_assert(BLINK_BURN_TX_FEE_PERCENT_OLD >= 0, "blink burn tx percent cannot be negative");
 
 // -------------------------------------------------------------------------------------------------
 //
