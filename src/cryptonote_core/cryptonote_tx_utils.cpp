@@ -240,7 +240,7 @@ namespace cryptonote
     keypair const gov_key = get_deterministic_keypair_from_height(height); // NOTE: Always need since we use same key for master node
 
     // NOTE: TX Extra
-    {
+    
       add_tx_extra<tx_extra_pub_key>(tx, txkey.pub);
       if(!extra_nonce.empty())
       {
@@ -253,23 +253,20 @@ namespace cryptonote
         add_tx_extra<tx_extra_pub_key>(tx, gov_key.pub);
 
       add_master_node_winner_to_tx_extra(tx.extra, miner_tx_context.block_leader.key);
-    }
+    
 
-    block_reward_parts reward_parts = {};
-    {
       beldex_block_reward_context block_reward_context = {};
       block_reward_context.fee                       = fee;
       block_reward_context.height                    = height;
       block_reward_context.block_leader_payouts      = miner_tx_context.block_leader.payouts;
       block_reward_context.batched_governance        = miner_tx_context.batched_governance;
 
-      if(!get_beldex_block_reward(median_weight, current_block_weight, already_generated_coins, hard_fork_version, reward_parts, block_reward_context))
-      {
-        LOG_PRINT_L0("Failed to calculate block reward");
-        return false;
-      }
+    block_reward_parts reward_parts{};
+    if(!get_beldex_block_reward(median_weight, current_block_weight, already_generated_coins, hard_fork_version, reward_parts, block_reward_context))
+    {
+      LOG_PRINT_L0("Failed to calculate block reward");
+      return false;
     }
-
     // TODO(doyle): Batching awards
     //
     // NOTE: Summarise rewards to payout (up to 9 payout entries/outputs)
@@ -329,27 +326,19 @@ namespace cryptonote
       {
         leader_reward += reward_parts.miner_fee;
       }
-      else
+      else if (reward_parts.miner_fee)
       {
-        // Alternative Block Producer (receives just miner fee)
+        // Alternative Block Producer (receives just miner fee, if there is one)
         master_nodes::payout const &producer = miner_tx_context.pulse_block_producer;
         std::vector<uint64_t> split_rewards   = distribute_reward_by_portions(producer.payouts, reward_parts.miner_fee, true /*distribute_remainder*/);
 
         for (size_t i = 0; i < producer.payouts.size(); i++)
-        {
-          auto const &payee = producer.payouts[i];
-          if (uint64_t amount = split_rewards[i]; amount)
-            rewards[rewards_length++] = {reward_type::mnode, payee.address, amount};
-        }
+          rewards[rewards_length++] = {reward_type::mnode, producer.payouts[i].address, split_rewards[i]};
       }
 
       std::vector<uint64_t> split_rewards = distribute_reward_by_portions(leader.payouts, leader_reward, true /*distribute_remainder*/);
       for (size_t i = 0; i < leader.payouts.size(); i++)
-      {
-        auto const &payee = leader.payouts[i];
-        if (uint64_t amount = split_rewards[i]; amount)
-          rewards[rewards_length++] = {reward_type::mnode, payee.address, amount};
-      }
+        rewards[rewards_length++] = {reward_type::mnode, leader.payouts[i].address, split_rewards[i]};
     }
     else
     {
@@ -366,11 +355,7 @@ namespace cryptonote
                                           reward_parts.master_node_total,
                                           hard_fork_version >= cryptonote::network_version_17_pulse /*distribute_remainder*/);
         for (size_t i = 0; i < leader.payouts.size(); i++)
-        {
-          auto const &payee = leader.payouts[i];
-          if (split_rewards[i])
-            rewards[rewards_length++] = {reward_type::mnode, payee.address, split_rewards[i]};
-        }
+          rewards[rewards_length++] = {reward_type::mnode, leader.payouts[i].address, split_rewards[i]};
       }
     }
 

@@ -45,7 +45,6 @@ add_executable(unit_tests
   epee_levin_protocol_handler_async.cpp
   epee_utils.cpp
   expect.cpp
- # json_serialization.cpp
   get_xtype_from_string.cpp
   hashchain.cpp
   hmac_keccak.cpp
@@ -67,6 +66,7 @@ add_executable(unit_tests
   notify.cpp
   output_distribution.cpp
   parse_amount.cpp
+  parse_address.cpp
   pruning.cpp
   random.cpp
   rolling_median.cpp
@@ -80,7 +80,6 @@ add_executable(unit_tests
   test_peerlist.cpp
   test_protocol_pack.cpp
   threadpool.cpp
-  hardfork.cpp
   unbound.cpp
   uri.cpp
   varint.cpp
@@ -100,7 +99,6 @@ target_link_libraries(unit_tests
     lmdb_lib
     rpc
     net
-   # serialization
     wallet
     p2p
     version

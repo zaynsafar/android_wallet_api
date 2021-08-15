@@ -378,7 +378,7 @@ namespace master_nodes
     return true;
   }
 
-  quorum_vote_t make_state_change_vote(uint64_t block_height, uint16_t validator_index, uint16_t worker_index, new_state state, const master_node_keys &keys)
+  quorum_vote_t make_state_change_vote(uint64_t block_height, uint16_t validator_index, uint16_t worker_index, new_state state, uint16_t reason, const master_node_keys &keys)
   {
     quorum_vote_t result             = {};
     result.type                      = quorum_type::obligations;
@@ -387,6 +387,7 @@ namespace master_nodes
     result.index_in_group            = validator_index;
     result.state_change.worker_index = worker_index;
     result.state_change.state        = state;
+    result.state_change.reason       = reason;
     result.signature                 = make_signature_from_vote(result, keys);
     return result;
   }

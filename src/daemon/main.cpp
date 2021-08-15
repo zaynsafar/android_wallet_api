@@ -58,8 +58,18 @@ namespace po = boost::program_options;
 
 using namespace std::literals;
 
+namespace {
+  // Some ANSI color sequences that we use here (before the log system is initialized):
+  constexpr auto RESET = "\033[0m";
+  constexpr auto RED = "\033[31;1m";
+  constexpr auto YELLOW = "\033[33;1m";
+  constexpr auto CYAN = "\033[36;1m";
+}
+
+
 int main(int argc, char const * argv[])
 {
+  bool logs_initialized = false;
   try {
     // TODO parse the debug options like set log level right here at start
 
@@ -156,13 +166,13 @@ int main(int argc, char const * argv[])
       if (command_line::get_arg(vm, cryptonote::arg_regtest_on))
         data_dir /= "regtest";
 
-      // We also have to worry about migrating loki.conf -> beldex.conf *and* about a potential
-      // ~/.loki -> ~/.beldex migration, so build a list of possible options along with whether we
+      // We also have to worry about migrating beldex.conf -> beldex.conf *and* about a potential
+      // ~/.beldex -> ~/.beldex migration, so build a list of possible options along with whether we
       // want to rename if we find one (the data-dir migration happens later):
       std::list<std::pair<fs::path, bool>> potential;
       if (std::error_code ec; fs::exists(data_dir, ec)) {
         potential.emplace_back(data_dir / CRYPTONOTE_NAME ".conf", false);
-        potential.emplace_back(data_dir / "loki.conf", true);
+        potential.emplace_back(data_dir / "beldex.conf", true);
       } else if (command_line::is_arg_defaulted(vm, cryptonote::arg_data_dir)) {
         // If we weren't given an explict command-line data-dir then we also need to check the
         // legacy data directory.  (We will rename it, later, but we have to check it *first*
@@ -176,7 +186,7 @@ int main(int argc, char const * argv[])
         else if (command_line::get_arg(vm, cryptonote::arg_regtest_on)) old_data_dir /= "regtest";
 
         potential.emplace_back(old_data_dir / CRYPTONOTE_NAME ".conf", false);
-        potential.emplace_back(old_data_dir / "loki.conf", true);
+        potential.emplace_back(old_data_dir / "beldex.conf", true);
       }
       for (auto& [conf, rename] : potential) {
         if (std::error_code ec; fs::exists(conf, ec)) {
@@ -255,7 +265,7 @@ int main(int argc, char const * argv[])
       data_dir /= "regtest";
 
     // Will check if the default data directory is used and if it exists. 
-    // Then will ensure that migration from the old data directory (.loki) has occurred if it exists.
+    // Then will ensure that migration from the old data directory (.beldex) has occurred if it exists.
     if (command_line::is_arg_defaulted(vm, cryptonote::arg_data_dir) && !fs::exists(data_dir)) {
       auto old_data_dir = tools::get_depreciated_default_data_dir();
       if (testnet) old_data_dir /= "testnet";
@@ -284,7 +294,7 @@ int main(int argc, char const * argv[])
     // Create the data directory; we have to do this before initializing the logs because the log
     // likely goes inside the data dir.
     if (std::error_code ec; !fs::create_directories(data_dir, ec) && ec)
-      MWARNING("Failed to create data directory " << data_dir << ": " << ec.message());
+      std::cerr << YELLOW << "Failed to create data directory " << data_dir << ": " << ec.message() << RESET << "\n";
 
     po::notify(vm);
 
@@ -297,7 +307,7 @@ int main(int argc, char const * argv[])
     if (!command_line::is_arg_defaulted(vm, daemon_args::arg_log_file))
       log_file_path = command_line::get_arg(vm, daemon_args::arg_log_file);
     if (log_file_path.is_relative())
-      log_file_path = fs::absolute(fs::relative(log_file_path, data_dir));
+      log_file_path = fs::absolute(data_dir / log_file_path);
     mlog_configure(log_file_path.string(), true, command_line::get_arg(vm, daemon_args::arg_max_log_file_size), command_line::get_arg(vm, daemon_args::arg_max_log_files));
 
     // Set log level
@@ -305,10 +315,7 @@ int main(int argc, char const * argv[])
     {
       mlog_set_log(command_line::get_arg(vm, daemon_args::arg_log_level).c_str());
     }
-
-#ifdef STACK_TRACE
-    tools::set_stack_trace_log(log_file_path.filename().string());
-#endif // STACK_TRACE
+    logs_initialized = true;
 
     if (!command_line::is_arg_defaulted(vm, daemon_args::arg_max_concurrency))
       tools::set_max_concurrency(command_line::get_arg(vm, daemon_args::arg_max_concurrency));
@@ -359,11 +366,17 @@ int main(int argc, char const * argv[])
   }
   catch (std::exception const & ex)
   {
-    LOG_ERROR("Exception in main! " << ex.what());
+    if (logs_initialized)
+      LOG_ERROR("Exception in main! " << ex.what());
+    else
+      std::cerr << RED << "Exception in main! " << ex.what() << RESET << "\n";
   }
   catch (...)
   {
-    LOG_ERROR("Exception in main!");
+    if (logs_initialized)
+      LOG_ERROR("Exception in main! (unknown exception type)");
+    else
+      std::cerr << RED << "Exception in main! (unknown exception type)" << RESET << "\n";
   }
   return 1;
 }

@@ -43,6 +43,7 @@
 #include <chrono>
 
 #include "cryptonote_basic/cryptonote_format_utils.h"
+#include "cryptonote_basic/hardfork.h"
 #include "cryptonote_basic/verification_context.h"
 #include "cryptonote_core/cryptonote_core.h"
 #include "cryptonote_core/tx_pool.h"
@@ -342,20 +343,18 @@ namespace cryptonote
     if(context.m_state == cryptonote_connection_context::state_synchronizing)
       return true;
 
-    // from v6, if the peer advertises a top block version, reject if it's not what it should be (will only work if no voting)
+    // if the peer advertises a top block version, reject if it's not what it should be
     if (hshd.current_height > 0)
     {
-      const uint8_t version = m_core.get_ideal_hard_fork_version(hshd.current_height - 1);
-      if (version >= 6 && version != hshd.top_version)
+      auto nettype = m_core.get_nettype();
+      const uint8_t version = get_network_version(nettype, hshd.current_height - 1);
+      if (version != hshd.top_version)
       {
-        if (version < hshd.top_version && version == m_core.get_ideal_hard_fork_version())
+        if (version < hshd.top_version && version == get_network_version(nettype, m_core.get_current_blockchain_height()))
           MCLOG_RED(el::Level::Warning, "global", context << " peer claims higher version than we think (" <<
               (unsigned)hshd.top_version << " for " << (hshd.current_height - 1) << " instead of " << (unsigned)version <<
               ") - we may be forked from the network and a software upgrade may be needed");
-        MINFO("global" << context << " peer claims higher version that we think (" <<
-              (unsigned)hshd.top_version << " for " << (hshd.current_height - 1) << " instead of " << (unsigned)version <<
-              ") - we may be forked from the network and a software upgrade may be needed. ideal:" << (unsigned) m_core.get_ideal_hard_fork_version());
-		return false;
+	    	return false;
       }
     }
 
@@ -388,7 +387,7 @@ namespace cryptonote
 
     context.m_need_blink_sync = false;
     // Check for any blink txes being advertised that we don't know about
-    if (m_core.get_blockchain_storage().get_current_hard_fork_version() >= HF_VERSION_BLINK)
+    if (is_hard_fork_at_least(m_core.get_nettype(), HF_VERSION_BLINK, curr_height))
     {
       if (hshd.blink_blocks.size() != hshd.blink_hash.size())
       {
@@ -530,7 +529,7 @@ namespace cryptonote
   bool t_cryptonote_protocol_handler<t_core>::get_payload_sync_data(CORE_SYNC_DATA& hshd)
   {
     m_core.get_blockchain_top(hshd.current_height, hshd.top_id);
-    hshd.top_version = m_core.get_ideal_hard_fork_version(hshd.current_height);
+    hshd.top_version = get_network_version(m_core.get_nettype(), hshd.current_height);
     hshd.cumulative_difficulty = m_core.get_block_cumulative_difficulty(hshd.current_height);
     hshd.current_height +=1;
     hshd.pruning_seed = m_core.get_blockchain_pruning_seed();
@@ -875,6 +874,39 @@ namespace cryptonote
         // empty context so we don't omit the source peer from the relay back.
         cryptonote_connection_context empty_context = {};
         relay_uptime_proof(arg, empty_context);
+      }
+    }
+    return 1;
+  }
+  //------------------------------------------------------------------------------------------------------------------------  
+  template<class t_core>
+  int t_cryptonote_protocol_handler<t_core>::handle_btencoded_uptime_proof(int command, NOTIFY_BTENCODED_UPTIME_PROOF::request& arg, cryptonote_connection_context& context)
+  {
+    MLOG_P2P_MESSAGE("Received NOTIFY_BTENCODED_UPTIME_PROOF");
+    // NOTE: Don't relay your own uptime proof, otherwise we have the following situation
+
+    // Node1 sends uptime ->
+    // Node2 receives uptime and relays it back to Node1 for acknowledgement ->
+    // Node1 receives it, handle_uptime_proof returns true to acknowledge, Node1 tries to resend to the same peers again
+
+    // Instead, if we receive our own uptime proof, then acknowledge but don't
+    // send on. If the we are missing an uptime proof it will have been
+    // submitted automatically by the daemon itself instead of
+    // using my own proof relayed by other nodes.
+
+    (void)context;
+    bool my_uptime_proof_confirmation = false;
+
+    if (m_core.handle_btencoded_uptime_proof(arg, my_uptime_proof_confirmation))
+    {
+      if (!my_uptime_proof_confirmation)
+      {
+        // NOTE: The default exclude context contains the peer who sent us this
+        // uptime proof, we want to ensure we relay it back so they know that the
+        // peer they relayed to received their uptime and confirm it, so send in an
+        // empty context so we don't omit the source peer from the relay back.
+        cryptonote_connection_context empty_context = {};
+        relay_btencoded_uptime_proof(arg, empty_context);
       }
     }
     return 1;
@@ -2529,6 +2561,13 @@ skip:
   }
   //------------------------------------------------------------------------------------------------------------------------
   template<class t_core>
+  bool t_cryptonote_protocol_handler<t_core>::relay_btencoded_uptime_proof(NOTIFY_BTENCODED_UPTIME_PROOF::request& arg, cryptonote_connection_context& exclude_context)
+  {
+    bool result = relay_to_synchronized_peers<NOTIFY_BTENCODED_UPTIME_PROOF>(arg, exclude_context);
+    return result;
+  }
+  //------------------------------------------------------------------------------------------------------------------------
+  template<class t_core>
   bool t_cryptonote_protocol_handler<t_core>::relay_master_node_votes(NOTIFY_NEW_MASTER_NODE_VOTE::request& arg, cryptonote_connection_context& exclude_context)
   {
     bool result = relay_to_synchronized_peers<NOTIFY_NEW_MASTER_NODE_VOTE>(arg, exclude_context);
@@ -2556,7 +2595,7 @@ skip:
     // blink data that got sent to us (we may have additional blink info, or may have rejected some
     // of the incoming blink data).
     arg.blinks.clear();
-    if (m_core.get_blockchain_storage().get_current_hard_fork_version() >= HF_VERSION_BLINK)
+    if (is_hard_fork_at_least(m_core.get_nettype(), HF_VERSION_BLINK, m_core.get_current_blockchain_height()))
     {
       auto &pool = m_core.get_pool();
       auto lock = pool.blink_shared_lock();

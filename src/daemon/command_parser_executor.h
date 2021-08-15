@@ -74,7 +74,7 @@ public:
 
   bool print_sr(const std::vector<std::string>& args);
 
-  bool prepare_registration();
+  bool prepare_registration(const std::vector<std::string>& args);
 
   bool print_mn(const std::vector<std::string>& args);
 
@@ -117,8 +117,6 @@ public:
   bool out_peers(const std::vector<std::string>& args);
 
   bool in_peers(const std::vector<std::string>& args);
-
-  bool hard_fork_info(const std::vector<std::string>& args);
 
   bool show_bans(const std::vector<std::string>& args);
 

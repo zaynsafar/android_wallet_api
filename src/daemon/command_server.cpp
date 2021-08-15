@@ -128,7 +128,7 @@ void command_server::init_commands(cryptonote::rpc::core_rpc_server* rpc_server)
     );
   m_command_lookup.set_handler(
       "prepare_registration"
-    , [this](const auto &) { return m_parser.prepare_registration(); }
+    , [this](const auto &x) { return m_parser.prepare_registration(x); }
     , "prepare_registration"
     , "Interactive prompt to prepare a master node registration command. The resulting registration command can be run in the command-line wallet to send the registration to the blockchain."
     );
@@ -261,11 +261,6 @@ void command_server::init_commands(cryptonote::rpc::core_rpc_server* rpc_server)
     , [this](const auto &x) { return m_parser.in_peers(x); }
     , "in_peers <max_number>"
     , "Set the <max_number> of in peers."
-    );
-    m_command_lookup.set_handler(
-      "hard_fork_info"
-    , [this](const auto &x) { return m_parser.hard_fork_info(x); }
-    , "Print the hard fork voting information."
     );
     m_command_lookup.set_handler(
       "bans"

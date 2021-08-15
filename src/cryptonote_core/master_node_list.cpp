@@ -29,7 +29,6 @@
 #include "cryptonote_config.h"
 #include "ringct/rctTypes.h"
 #include <functional>
-#include <random>
 #include <algorithm>
 #include <chrono>
 
@@ -44,6 +43,7 @@ extern "C" {
 #include "cryptonote_tx_utils.h"
 #include "cryptonote_basic/tx_extra.h"
 #include "cryptonote_basic/hardfork.h"
+#include "cryptonote_core/uptime_proof.h"
 #include "epee/int-util.h"
 #include "common/scoped_message_writer.h"
 #include "common/i18n.h"
@@ -57,6 +57,7 @@ extern "C" {
 
 #include "pulse.h"
 #include "master_node_list.h"
+#include "uptime_proof.h"
 #include "master_node_rules.h"
 #include "master_node_swarm.h"
 #include "version.h"
@@ -68,9 +69,9 @@ namespace master_nodes
 {
   size_t constexpr STORE_LONG_TERM_STATE_INTERVAL = 10000;
 
-  constexpr int X25519_MAP_PRUNING_INTERVAL = 5*60;
-  constexpr int X25519_MAP_PRUNING_LAG = 24*60*60;
-  static_assert(X25519_MAP_PRUNING_LAG > UPTIME_PROOF_MAX_TIME_IN_SECONDS, "x25519 map pruning lag is too short!");
+  constexpr auto X25519_MAP_PRUNING_INTERVAL = 5min;
+  constexpr auto X25519_MAP_PRUNING_LAG = 24h;
+  static_assert(X25519_MAP_PRUNING_LAG > config::UPTIME_PROOF_VALIDITY, "x25519 map pruning lag is too short!");
 
   static uint64_t short_term_state_cull_height(uint8_t hf_version, uint64_t block_height)
   {
@@ -92,7 +93,7 @@ namespace master_nodes
   void master_node_list::init()
   {
     std::lock_guard lock(m_mn_mutex);
-    if (m_blockchain.get_current_hard_fork_version() < 9)
+    if (m_blockchain.get_network_version() < cryptonote::network_version_9_master_nodes)
     {
       reset(true);
       return;
@@ -110,25 +111,25 @@ namespace master_nodes
   }
 
   template <typename UnaryPredicate>
-  static std::vector<master_nodes::pubkey_and_sninfo> sort_and_filter(const master_nodes_infos_t &sns_infos, UnaryPredicate p, bool reserve = true) {
-    std::vector<pubkey_and_sninfo> result;
-    if (reserve) result.reserve(sns_infos.size());
-    for (const auto& key_info : sns_infos)
+  static std::vector<master_nodes::pubkey_and_mninfo> sort_and_filter(const master_nodes_infos_t &mns_infos, UnaryPredicate p, bool reserve = true) {
+    std::vector<pubkey_and_mninfo> result;
+    if (reserve) result.reserve(mns_infos.size());
+    for (const auto& key_info : mns_infos)
       if (p(*key_info.second))
         result.push_back(key_info);
 
     std::sort(result.begin(), result.end(),
-      [](const pubkey_and_sninfo &a, const pubkey_and_sninfo &b) {
+      [](const pubkey_and_mninfo &a, const pubkey_and_mninfo &b) {
         return memcmp(reinterpret_cast<const void*>(&a), reinterpret_cast<const void*>(&b), sizeof(a)) < 0;
       });
     return result;
   }
 
-  std::vector<pubkey_and_sninfo> master_node_list::state_t::active_master_nodes_infos() const {
+  std::vector<pubkey_and_mninfo> master_node_list::state_t::active_master_nodes_infos() const {
     return sort_and_filter(master_nodes_infos, [](const master_node_info &info) { return info.is_active(); }, /*reserve=*/ true);
   }
 
-  std::vector<pubkey_and_sninfo> master_node_list::state_t::decommissioned_master_nodes_infos() const {
+  std::vector<pubkey_and_mninfo> master_node_list::state_t::decommissioned_master_nodes_infos() const {
     return sort_and_filter(master_nodes_infos, [](const master_node_info &info) { return info.is_decommissioned() && info.is_fully_funded(); }, /*reserve=*/ false);
   }
 
@@ -470,7 +471,7 @@ namespace master_nodes
     hw::device &hwdev         = hw::get_device("default");
     contribution->transferred = 0;
     bool stake_decoded        = true;
-    if (hf_version >= cryptonote::network_version_11_infinite_staking || hf_version == cryptonote::HardFork::INVALID_HF_VERSION)
+    if (hf_version >= cryptonote::network_version_11_infinite_staking)
     {
       // In Infinite Staking, we lock the key image that would be generated if
       // you tried to send your stake and prevent it from being transacted on
@@ -551,7 +552,7 @@ namespace master_nodes
       }
     }
 
-    if (hf_version < cryptonote::network_version_11_infinite_staking || (hf_version == cryptonote::HardFork::INVALID_HF_VERSION && !stake_decoded))
+    if (hf_version < cryptonote::network_version_11_infinite_staking)
     {
       // Pre Infinite Staking, we only need to prove the amount sent is
       // sufficient to become a contributor to the Master Node and that there
@@ -705,6 +706,8 @@ namespace master_nodes
 
         info.active_since_height = -info.active_since_height;
         info.last_decommission_height = block_height;
+        info.last_decommission_reason_consensus_all = state_change.reason_consensus_all;
+        info.last_decommission_reason_consensus_any = state_change.reason_consensus_any;
         info.decommission_count++;
 
         if (hf_version >= cryptonote::network_version_14_enforce_checkpoints) {
@@ -763,6 +766,8 @@ namespace master_nodes
           proof.effective_timestamp = block.timestamp;
           proof.checkpoint_participation.reset();
           proof.pulse_participation.reset();
+          proof.timestamp_participation.reset();
+          proof.timesync_status.reset();
         }
         return true;
       }
@@ -884,7 +889,7 @@ namespace master_nodes
 
     // check the initial contribution exists
 
-    uint64_t staking_requirement = get_staking_requirement(nettype, block_height, hf_version);
+    uint64_t staking_requirement = get_staking_requirement(nettype, block_height);
     cryptonote::account_public_address address;
 
     staking_components stake = {};
@@ -1604,7 +1609,7 @@ namespace master_nodes
         std::shared_ptr<const quorum> quorum = get_quorum(quorum_type::pulse, block_height, false, nullptr);
         if (!quorum || quorum->validators.empty())
         {
-          MERROR("Unexpected Pulse error " << (quorum ? " quorum was not generated" : " quorum was empty"));
+          MFATAL("Unexpected Pulse error " << (quorum ? " quorum was not generated" : " quorum was empty"));
           return false;
         }
 
@@ -1777,7 +1782,7 @@ namespace master_nodes
   master_nodes::quorum generate_pulse_quorum(cryptonote::network_type nettype,
                                               crypto::public_key const &block_leader,
                                               uint8_t hf_version,
-                                              std::vector<pubkey_and_sninfo> const &active_mnode_list,
+                                              std::vector<pubkey_and_mninfo> const &active_mnode_list,
                                               std::vector<crypto::hash> const &pulse_entropy,
                                               uint8_t pulse_round)
   {
@@ -1794,7 +1799,7 @@ namespace master_nodes
       return result;
     }
 
-    std::vector<pubkey_and_sninfo const *> pulse_candidates;
+    std::vector<pubkey_and_mninfo const *> pulse_candidates;
     pulse_candidates.reserve(active_mnode_list.size());
     for (auto &node : active_mnode_list)
     {
@@ -1804,7 +1809,7 @@ namespace master_nodes
 
     // NOTE: Sort ascending in height i.e. sort preferring the longest time since the validator was in a Pulse quorum.
     std::sort(
-        pulse_candidates.begin(), pulse_candidates.end(), [](pubkey_and_sninfo const *a, pubkey_and_sninfo const *b) {
+        pulse_candidates.begin(), pulse_candidates.end(), [](pubkey_and_mninfo const *a, pubkey_and_mninfo const *b) {
           if (a->second->pulse_sorter == b->second->pulse_sorter)
             return memcmp(reinterpret_cast<const void *>(&a->first), reinterpret_cast<const void *>(&b->first), sizeof(a->first)) < 0;
           return a->second->pulse_sorter < b->second->pulse_sorter;
@@ -1855,7 +1860,7 @@ namespace master_nodes
     return result;
   }
 
-  static void generate_other_quorums(master_node_list::state_t &state, std::vector<pubkey_and_sninfo> const &active_mnode_list, cryptonote::network_type nettype, uint8_t hf_version)
+  static void generate_other_quorums(master_node_list::state_t &state, std::vector<pubkey_and_mninfo> const &active_mnode_list, cryptonote::network_type nettype, uint8_t hf_version)
   {
     assert(state.block_hash != crypto::null_hash);
 
@@ -1863,7 +1868,7 @@ namespace master_nodes
     // state change *validators* want only active master nodes, but the state change *workers*
     // (i.e. the nodes to be tested) also include decommissioned master nodes.  (Prior to v12 there
     // are no decommissioned nodes, so this distinction is irrelevant for network concensus).
-    std::vector<pubkey_and_sninfo> decomm_mnode_list;
+    std::vector<pubkey_and_mninfo> decomm_mnode_list;
     if (hf_version >= cryptonote::network_version_13_checkpointing)
       decomm_mnode_list = state.decommissioned_master_nodes_infos();
 
@@ -1926,7 +1931,7 @@ namespace master_nodes
           uint64_t const active_until = state.height + BLINK_EXPIRY_BUFFER;
           for (size_t index = 0; index < active_mnode_list.size(); index++)
           {
-            pubkey_and_sninfo const &entry = active_mnode_list[index];
+            pubkey_and_mninfo const &entry = active_mnode_list[index];
             uint64_t requested_unlock_height = entry.second->requested_unlock_height;
             if (requested_unlock_height == KEY_IMAGE_AWAITING_UNLOCK_HEIGHT || requested_unlock_height > active_until)
               pub_keys_indexes.push_back(index);
@@ -2082,7 +2087,7 @@ namespace master_nodes
     }
 
     // Filtered pubkey-sorted vector of master nodes that are active (fully funded and *not* decommissioned).
-    std::vector<pubkey_and_sninfo> active_mnode_list = sort_and_filter(master_nodes_infos, [](const master_node_info &info) { return info.is_active(); });
+    std::vector<pubkey_and_mninfo> active_mnode_list = sort_and_filter(master_nodes_infos, [](const master_node_info &info) { return info.is_active(); });
 
     if (need_swarm_update)
     {
@@ -2288,14 +2293,14 @@ namespace master_nodes
       auto oldest_waiting = std::make_tuple(std::numeric_limits<uint64_t>::max(), std::numeric_limits<uint32_t>::max(), crypto::null_pkey);
       for (const auto &info_it : master_nodes_infos)
       {
-        const auto &sninfo = *info_it.second;
-        if (sninfo.is_active())
+        const auto &mninfo = *info_it.second;
+        if (mninfo.is_active())
         {
-          auto waiting_since = std::make_tuple(sninfo.last_reward_block_height, sninfo.last_reward_transaction_index, info_it.first);
+          auto waiting_since = std::make_tuple(mninfo.last_reward_block_height, mninfo.last_reward_transaction_index, info_it.first);
           if (waiting_since < oldest_waiting)
           {
             oldest_waiting = waiting_since;
-            info           = &sninfo;
+            info           = &mninfo;
           }
         }
       }
@@ -2661,7 +2666,7 @@ namespace master_nodes
     if (!m_blockchain.has_db())
         return false; // Haven't been initialized yet
 
-    uint8_t hf_version = m_blockchain.get_current_hard_fork_version();
+    uint8_t hf_version = m_blockchain.get_network_version();
     if (hf_version < cryptonote::network_version_9_master_nodes)
       return true;
 
@@ -2742,21 +2747,20 @@ namespace master_nodes
     return true;
   }
 
-  static crypto::hash hash_uptime_proof(const cryptonote::NOTIFY_UPTIME_PROOF::request &proof, uint8_t hf_version)
+  //TODO: remove after HF18, mnode revision 1
+  crypto::hash master_node_list::hash_uptime_proof(const cryptonote::NOTIFY_UPTIME_PROOF::request &proof) const
   {
-    auto buf = tools::memcpy_le(proof.pubkey.data, proof.timestamp, proof.public_ip, proof.storage_port, proof.pubkey_ed25519.data, proof.qnet_port, proof.storage_lmq_port);
-    size_t buf_size = buf.size();
-
-    if (hf_version < cryptonote::network_version_16_bns) // TODO - can be removed post-HF15
-      buf_size -= sizeof(proof.storage_lmq_port);
-
+    size_t buf_size;
     crypto::hash result;
+
+    auto buf = tools::memcpy_le(proof.pubkey.data, proof.timestamp, proof.public_ip, proof.storage_https_port, proof.pubkey_ed25519.data, proof.qnet_port, proof.storage_omq_port);
+    buf_size = buf.size();
     crypto::cn_fast_hash(buf.data(), buf_size, result);
     return result;
   }
 
   cryptonote::NOTIFY_UPTIME_PROOF::request master_node_list::generate_uptime_proof(
-      uint32_t public_ip, uint16_t storage_port, uint16_t storage_lmq_port, uint16_t quorumnet_port) const
+      uint32_t public_ip, uint16_t storage_https_port, uint16_t storage_omq_port, uint16_t quorumnet_port) const
   {
     assert(m_master_node_keys);
     const auto& keys = *m_master_node_keys;
@@ -2765,15 +2769,21 @@ namespace master_nodes
     result.timestamp                                = time(nullptr);
     result.pubkey                                   = keys.pub;
     result.public_ip                                = public_ip;
-    result.storage_port                             = storage_port;
-    result.storage_lmq_port                         = storage_lmq_port;
+    result.storage_https_port                       = storage_https_port;
+    result.storage_omq_port                         = storage_omq_port;
     result.qnet_port                                = quorumnet_port;
     result.pubkey_ed25519                           = keys.pub_ed25519;
 
-    crypto::hash hash = hash_uptime_proof(result, m_blockchain.get_current_hard_fork_version());
+    crypto::hash hash = hash_uptime_proof(result);
     crypto::generate_signature(hash, keys.pub, keys.key, result.sig);
     crypto_sign_detached(result.sig_ed25519.data, NULL, reinterpret_cast<unsigned char *>(hash.data), sizeof(hash.data), keys.key_ed25519.data);
     return result;
+  }
+
+  uptime_proof::Proof master_node_list::generate_uptime_proof(uint32_t public_ip, uint16_t storage_https_port, uint16_t storage_omq_port, std::array<uint16_t, 3> ss_version, uint16_t quorumnet_port, std::array<uint16_t, 3> beldexnet_version) const
+  {
+    const auto& keys = *m_master_node_keys;
+    return uptime_proof::Proof(public_ip, storage_https_port, storage_omq_port, ss_version, quorumnet_port, beldexnet_version, keys);
   }
 
 #ifdef __cpp_lib_erase_if // # (C++20)
@@ -2799,30 +2809,25 @@ namespace master_nodes
     return false;
   }
 
+  proof_info::proof_info()
+    : proof(std::make_unique<uptime_proof::Proof>()) {};
+
   void proof_info::store(const crypto::public_key &pubkey, cryptonote::Blockchain &blockchain)
   {
+    if (!proof) proof = std::unique_ptr<uptime_proof::Proof>(new uptime_proof::Proof());
     std::unique_lock lock{blockchain};
     auto &db = blockchain.get_db();
     db.set_master_node_proof(pubkey, *this);
   }
 
-  bool proof_info::update(uint64_t ts,
-                          uint32_t ip,
-                          uint16_t s_port,
-                          uint16_t s_lmq_port,
-                          uint16_t q_port,
-                          std::array<uint16_t, 3> ver,
-                          const crypto::ed25519_public_key& pk_ed,
-                          const crypto::x25519_public_key& pk_x2)
+  bool proof_info::update(uint64_t ts, std::unique_ptr<uptime_proof::Proof> new_proof, const crypto::x25519_public_key &pk_x2)
   {
     bool update_db = false;
+    if (!proof || *proof != *new_proof) {
+      update_db = true;
+      proof = std::move(new_proof);
+    }
     update_db |= update_val(timestamp, ts);
-    update_db |= update_val(public_ip, ip);
-    update_db |= update_val(storage_port, s_port);
-    update_db |= update_val(storage_lmq_port, s_lmq_port);
-    update_db |= update_val(quorumnet_port, q_port);
-    update_db |= update_val(version, ver);
-    update_db |= update_val(pubkey_ed25519, pk_ed);
     effective_timestamp = timestamp;
     pubkey_x25519 = pk_x2;
 
@@ -2831,45 +2836,92 @@ namespace master_nodes
     //
     // If we already know about the IP, update its timestamp:
     auto now = std::time(nullptr);
-    if (public_ips[0].first && public_ips[0].first == public_ip)
+    if (public_ips[0].first && public_ips[0].first == proof->public_ip)
       public_ips[0].second = now;
-    else if (public_ips[1].first && public_ips[1].first == public_ip)
+    else if (public_ips[1].first && public_ips[1].first == proof->public_ip)
       public_ips[1].second = now;
     // Otherwise replace whichever IP has the older timestamp
     else if (public_ips[0].second > public_ips[1].second)
-      public_ips[1] = {public_ip, now};
+      public_ips[1] = {proof->public_ip, now};
     else
-      public_ips[0] = {public_ip, now};
+      public_ips[0] = {proof->public_ip, now};
+
+    return update_db;
+  };
+
+
+  //TODO remove after HF18, mnode revision 1
+  bool proof_info::update(uint64_t ts,
+                          uint32_t ip,
+                          uint16_t s_https_port,
+                          uint16_t s_omq_port,
+                          uint16_t q_port,
+                          std::array<uint16_t, 3> ver,
+                          const crypto::ed25519_public_key& pk_ed,
+                          const crypto::x25519_public_key& pk_x2)
+  {
+    bool update_db = false;
+    if (!proof) proof = std::unique_ptr<uptime_proof::Proof>(new uptime_proof::Proof());
+    update_db |= update_val(timestamp, ts);
+    update_db |= update_val(proof->public_ip, ip);
+    update_db |= update_val(proof->storage_https_port, s_https_port);
+    update_db |= update_val(proof->storage_omq_port, s_omq_port);
+    update_db |= update_val(proof->qnet_port, q_port);
+    update_db |= update_val(proof->version, ver);
+    update_db |= update_val(proof->pubkey_ed25519, pk_ed);
+    effective_timestamp = timestamp;
+    pubkey_x25519 = pk_x2;
+
+    // Track an IP change (so that the obligations quorum can penalize for IP changes)
+    // We only keep the two most recent because all we really care about is whether it had more than one
+    //
+    // If we already know about the IP, update its timestamp:
+    auto now = std::time(nullptr);
+    if (public_ips[0].first && public_ips[0].first == proof->public_ip)
+      public_ips[0].second = now;
+    else if (public_ips[1].first && public_ips[1].first == proof->public_ip)
+      public_ips[1].second = now;
+    // Otherwise replace whichever IP has the older timestamp
+    else if (public_ips[0].second > public_ips[1].second)
+      public_ips[1] = {proof->public_ip, now};
+    else
+      public_ips[0] = {proof->public_ip, now};
 
     return update_db;
   };
 
   void proof_info::update_pubkey(const crypto::ed25519_public_key &pk) {
-    if (pk == pubkey_ed25519)
+    if (pk == proof->pubkey_ed25519)
       return;
     if (pk && 0 == crypto_sign_ed25519_pk_to_curve25519(pubkey_x25519.data, pk.data)) {
-      pubkey_ed25519 = pk;
+      proof->pubkey_ed25519 = pk;
     } else {
-      MWARNING("Failed to derive x25519 pubkey from ed25519 pubkey " << pubkey_ed25519);
+      MWARNING("Failed to derive x25519 pubkey from ed25519 pubkey " << proof->pubkey_ed25519);
       pubkey_x25519 = crypto::x25519_public_key::null();
-      pubkey_ed25519 = crypto::ed25519_public_key::null();
+      proof->pubkey_ed25519 = crypto::ed25519_public_key::null();
     }
   }
 
 #define REJECT_PROOF(log) do { LOG_PRINT_L2("Rejecting uptime proof from " << proof.pubkey << ": " log); return false; } while (0)
 
+  //TODO remove after HF18, mnode revision 1
   bool master_node_list::handle_uptime_proof(cryptonote::NOTIFY_UPTIME_PROOF::request const &proof, bool &my_uptime_proof_confirmation, crypto::x25519_public_key &x25519_pkey)
   {
-    uint8_t const hf_version = m_blockchain.get_current_hard_fork_version();
-    uint64_t const now       = time(nullptr);
+    auto vers = get_network_version_revision(m_blockchain.nettype(), m_blockchain.get_current_blockchain_height());
+    if (vers >= std::pair<uint8_t, uint8_t>{cryptonote::network_version_17_pulse, 1})
+      REJECT_PROOF("Old format (non-bt) proofs are not acceptable from v18+1 onwards");
+
+    auto& netconf = get_config(m_blockchain.nettype());
+    auto now = std::chrono::system_clock::now();
 
     // Validate proof version, timestamp range,
-    if ((proof.timestamp < now - UPTIME_PROOF_BUFFER_IN_SECONDS) || (proof.timestamp > now + UPTIME_PROOF_BUFFER_IN_SECONDS))
+    auto time_deviation = now - std::chrono::system_clock::from_time_t(proof.timestamp);
+    if (time_deviation > netconf.UPTIME_PROOF_TOLERANCE || time_deviation < -netconf.UPTIME_PROOF_TOLERANCE)
       REJECT_PROOF("timestamp is too far from now");
 
     for (auto const &min : MIN_UPTIME_PROOF_VERSIONS)
-      if (hf_version >= min.hardfork && proof.mnode_version < min.version)
-        REJECT_PROOF("v" << min.version[0] << "." << min.version[1] << "." << min.version[2] << "+ beldex version is required for v" << std::to_string(hf_version) << "+ network proofs");
+      if (vers >= min.hardfork_revision && proof.mnode_version < min.beldexd)
+        REJECT_PROOF("v" << tools::join(".", min.beldexd) << "+ beldexd version is required for v" << +vers.first << "." << +vers.second << "+ network proofs");
 
     if (!debug_allow_local_ips && !epee::net_utils::is_ip_public(proof.public_ip))
       REJECT_PROOF("public_ip is not actually public");
@@ -2877,7 +2929,8 @@ namespace master_nodes
     //
     // Validate proof signature
     //
-    crypto::hash hash = hash_uptime_proof(proof, hf_version);
+    crypto::hash hash = hash_uptime_proof(proof);
+
 
     if (!crypto::check_signature(hash, proof.pubkey, proof.sig))
       REJECT_PROOF("signature validation failed");
@@ -2903,7 +2956,8 @@ namespace master_nodes
 
     auto &iproof = proofs[proof.pubkey];
 
-    if (iproof.timestamp >= now - (UPTIME_PROOF_FREQUENCY_IN_SECONDS / 2))
+
+    if (now <= std::chrono::system_clock::from_time_t(iproof.timestamp) + std::chrono::seconds{netconf.UPTIME_PROOF_FREQUENCY} / 2)
       REJECT_PROOF("already received one uptime proof for this node recently");
 
     if (m_master_node_keys && proof.pubkey == m_master_node_keys->pub)
@@ -2922,12 +2976,112 @@ namespace master_nodes
     }
 
     auto old_x25519 = iproof.pubkey_x25519;
-    if (iproof.update(now, proof.public_ip, proof.storage_port, proof.storage_lmq_port, proof.qnet_port, proof.mnode_version, proof.pubkey_ed25519, derived_x25519_pubkey))
+    if (iproof.update(std::chrono::system_clock::to_time_t(now), proof.public_ip, proof.storage_https_port, proof.storage_omq_port, proof.qnet_port, proof.mnode_version, proof.pubkey_ed25519, derived_x25519_pubkey))
       iproof.store(proof.pubkey, m_blockchain);
 
-    if ((uint64_t) x25519_map_last_pruned + X25519_MAP_PRUNING_INTERVAL <= now)
+    if (now - x25519_map_last_pruned >= X25519_MAP_PRUNING_INTERVAL)
     {
-      time_t cutoff = now - X25519_MAP_PRUNING_LAG;
+      time_t cutoff = std::chrono::system_clock::to_time_t(now - X25519_MAP_PRUNING_LAG);
+      erase_if(x25519_to_pub, [&cutoff](auto &x) { return x.second.second < cutoff; });
+      x25519_map_last_pruned = now;
+    }
+
+    if (old_x25519 && old_x25519 != derived_x25519_pubkey)
+      x25519_to_pub.erase(old_x25519);
+
+    if (derived_x25519_pubkey)
+      x25519_to_pub[derived_x25519_pubkey] = {proof.pubkey, std::chrono::system_clock::to_time_t(now)};
+
+    if (derived_x25519_pubkey && (old_x25519 != derived_x25519_pubkey))
+      x25519_pkey = derived_x25519_pubkey;
+
+    return true;
+  }
+
+#undef REJECT_PROOF
+#define REJECT_PROOF(log) do { LOG_PRINT_L2("Rejecting uptime proof from " << proof->pubkey << ": " log); return false; } while (0)
+
+  bool master_node_list::handle_btencoded_uptime_proof(std::unique_ptr<uptime_proof::Proof> proof, bool &my_uptime_proof_confirmation, crypto::x25519_public_key &x25519_pkey)
+  {
+    auto vers = get_network_version_revision(m_blockchain.nettype(), m_blockchain.get_current_blockchain_height());
+    auto& netconf = get_config(m_blockchain.nettype());
+    auto now = std::chrono::system_clock::now();
+
+    // Validate proof version, timestamp range,
+    auto time_deviation = now - std::chrono::system_clock::from_time_t(proof->timestamp);
+    if (time_deviation > netconf.UPTIME_PROOF_TOLERANCE || time_deviation < -netconf.UPTIME_PROOF_TOLERANCE)
+      REJECT_PROOF("timestamp is too far from now");
+
+    for (auto const &min : MIN_UPTIME_PROOF_VERSIONS) {
+      if (vers >= min.hardfork_revision) {
+        if (proof->version < min.beldexd)
+          REJECT_PROOF("v" << tools::join(".", min.beldexd) << "+ beldexd version is required for v" << +vers.first << "." << +vers.second << "+ network proofs");
+        if (proof->beldexnet_version < min.beldexnet)
+          REJECT_PROOF("v" << tools::join(".", min.beldexnet) << "+ beldexnet version is required for v" << +vers.first << "." << +vers.second << "+ network proofs");
+        if (proof->storage_server_version < min.storage_server)
+          REJECT_PROOF("v" << tools::join(".", min.storage_server) << "+ storage server version is required for v" << +vers.first << "." << +vers.second << "+ network proofs");
+      }
+    }
+
+    if (!debug_allow_local_ips && !epee::net_utils::is_ip_public(proof->public_ip))
+      REJECT_PROOF("public_ip is not actually public");
+
+    //
+    // Validate proof signature
+    //
+    crypto::hash hash = proof->hash_uptime_proof();
+
+    if (!crypto::check_signature(hash, proof->pubkey, proof->sig))
+      REJECT_PROOF("signature validation failed");
+
+    crypto::x25519_public_key derived_x25519_pubkey = crypto::x25519_public_key::null();
+    if (!proof->pubkey_ed25519)
+      REJECT_PROOF("required ed25519 auxiliary pubkey " << proof->pubkey_ed25519 << " not included in proof");
+
+    if (0 != crypto_sign_verify_detached(proof->sig_ed25519.data, reinterpret_cast<unsigned char *>(hash.data), sizeof(hash.data), proof->pubkey_ed25519.data))
+      REJECT_PROOF("ed25519 signature validation failed");
+
+    if (0 != crypto_sign_ed25519_pk_to_curve25519(derived_x25519_pubkey.data, proof->pubkey_ed25519.data)
+        || !derived_x25519_pubkey)
+      REJECT_PROOF("invalid ed25519 pubkey included in proof (x25519 derivation failed)");
+
+    if (proof->qnet_port == 0)
+      REJECT_PROOF("invalid quorumnet port in uptime proof");
+
+    auto locks = tools::unique_locks(m_blockchain, m_mn_mutex, m_x25519_map_mutex);
+    auto it = m_state.master_nodes_infos.find(proof->pubkey);
+    if (it == m_state.master_nodes_infos.end())
+      REJECT_PROOF("no such master node is currently registered");
+
+    auto &iproof = proofs[proof->pubkey];
+
+    if (now <= std::chrono::system_clock::from_time_t(iproof.timestamp) + std::chrono::seconds{netconf.UPTIME_PROOF_FREQUENCY} / 2)
+      REJECT_PROOF("already received one uptime proof for this node recently");
+
+    if (m_master_node_keys && proof->pubkey == m_master_node_keys->pub)
+    {
+      my_uptime_proof_confirmation = true;
+      MGINFO("Received uptime-proof confirmation back from network for Master Node (yours): " << proof->pubkey);
+    }
+    else
+    {
+      my_uptime_proof_confirmation = false;
+      LOG_PRINT_L2("Accepted uptime proof from " << proof->pubkey);
+
+      if (m_master_node_keys && proof->pubkey_ed25519 == m_master_node_keys->pub_ed25519)
+        MGINFO_RED("Uptime proof from MN " << proof->pubkey << " is not us, but is using our ed/x25519 keys; "
+            "this is likely to lead to deregistration of one or both master nodes.");
+    }
+
+    auto old_x25519 = iproof.pubkey_x25519;
+    if (iproof.update(std::chrono::system_clock::to_time_t(now), std::move(proof), derived_x25519_pubkey))
+    {
+      iproof.store(iproof.proof->pubkey, m_blockchain);
+    }
+
+    if (now - x25519_map_last_pruned >= X25519_MAP_PRUNING_INTERVAL)
+    {
+      time_t cutoff = std::chrono::system_clock::to_time_t(now - X25519_MAP_PRUNING_LAG);
       erase_if(x25519_to_pub, [&cutoff](const decltype(x25519_to_pub)::value_type &x) { return x.second.second < cutoff; });
       x25519_map_last_pruned = now;
     }
@@ -2936,7 +3090,7 @@ namespace master_nodes
       x25519_to_pub.erase(old_x25519);
 
     if (derived_x25519_pubkey)
-      x25519_to_pub[derived_x25519_pubkey] = {proof.pubkey, now};
+      x25519_to_pub[derived_x25519_pubkey] = {iproof.proof->pubkey, std::chrono::system_clock::to_time_t(now)};
 
     if (derived_x25519_pubkey && (old_x25519 != derived_x25519_pubkey))
       x25519_pkey = derived_x25519_pubkey;
@@ -2976,6 +3130,16 @@ namespace master_nodes
     return crypto::null_pkey;
   }
 
+  crypto::public_key master_node_list::get_random_pubkey() {
+    std::lock_guard lock{m_mn_mutex};
+    auto it  = tools::select_randomly(m_state.master_nodes_infos.begin(), m_state.master_nodes_infos.end());
+    if(it != m_state.master_nodes_infos.end()) {
+      return it->first;
+    } else {
+      return m_state.master_nodes_infos.begin()->first;
+    }
+  }
+
   void master_node_list::initialize_x25519_map() {
     auto locks = tools::unique_locks(m_mn_mutex, m_x25519_map_mutex);
 
@@ -3007,8 +3171,8 @@ namespace master_nodes
     uint16_t port = 0;
     for_each_master_node_info_and_proof(&pubkey, &pubkey + 1, [&](auto&, auto&, auto& proof) {
         found = true;
-        ip = proof.public_ip;
-        port = proof.quorumnet_port;
+        ip = proof.proof->public_ip;
+        port = proof.proof->qnet_port;
     });
 
     if (!found) {
@@ -3053,24 +3217,88 @@ namespace master_nodes
     info.pulse_participation.add(entry);
   }
 
-  bool master_node_list::set_storage_server_peer_reachable(crypto::public_key const &pubkey, bool value)
+  void master_node_list::record_timestamp_participation(crypto::public_key const &pubkey, bool participated)
   {
     std::lock_guard lock(m_mn_mutex);
+    if (!m_state.master_nodes_infos.count(pubkey))
+      return;
+
+    timestamp_participation_entry entry  = {};
+    entry.participated                = participated;
+
+    auto &info = proofs[pubkey];
+    info.timestamp_participation.add(entry);
+  }
+
+  void master_node_list::record_timesync_status(crypto::public_key const &pubkey, bool synced)
+  {
+    std::lock_guard lock(m_mn_mutex);
+    if (!m_state.master_nodes_infos.count(pubkey))
+      return;
+
+    timesync_entry entry  = {};
+    entry.in_sync                = synced;
+
+    auto &info = proofs[pubkey];
+    info.timesync_status.add(entry);
+  }
+
+  std::optional<bool> proof_info::reachable_stats::reachable(const std::chrono::steady_clock::time_point& now) const {
+    if (last_reachable >= last_unreachable)
+      return true;
+    if (last_unreachable > now - config::REACHABLE_MAX_FAILURE_VALIDITY)
+      return false;
+    // Last result was a failure, but it was a while ago, so we don't know for sure that it isn't
+    // reachable now:
+    return std::nullopt;
+  }
+
+  bool proof_info::reachable_stats::unreachable_for(std::chrono::seconds threshold, const std::chrono::steady_clock::time_point& now) const {
+    if (auto maybe_reachable = reachable(now); !maybe_reachable /*stale*/ || *maybe_reachable /*good*/)
+      return false;
+    if (first_unreachable > now - threshold)
+      return false; // Unreachable, but for less than the grace time
+    return true;
+  }
+
+  bool master_node_list::set_peer_reachable(bool storage_server, const crypto::public_key& pubkey, bool reachable) {
+
+    // (See .h for overview description)
+
+    std::lock_guard lock(m_mn_mutex);
+
+    const auto type = storage_server ? "storage server"sv : "beldexnet"sv;
 
     if (!m_state.master_nodes_infos.count(pubkey)) {
-      LOG_PRINT_L2("No Master Node is known by this pubkey: " << pubkey);
+      MDEBUG("Dropping " << type << " reachable report: " << pubkey << " is not a registered MN pubkey");
       return false;
     }
 
-    proof_info &info = proofs[pubkey];
-    if (info.storage_server_reachable != value)
-    {
-      info.storage_server_reachable = value;
-      LOG_PRINT_L2("Setting reachability status for node " << pubkey << " as: " << (value ? "true" : "false"));
+    MDEBUG("Received " << type << (reachable ? " reachable" : " UNREACHABLE") << " report for MN " << pubkey);
+
+    const auto now = std::chrono::steady_clock::now();
+
+    auto& reach = storage_server ? proofs[pubkey].ss_reachable : proofs[pubkey].beldexnet_reachable;
+    if (reachable) {
+      reach.last_reachable = now;
+      reach.first_unreachable = NEVER;
+    } else {
+      reach.last_unreachable = now;
+      if (reach.first_unreachable == NEVER)
+        reach.first_unreachable = now;
     }
 
-    info.storage_server_reachable_timestamp = time(nullptr);
     return true;
+
+  }
+  bool master_node_list::set_storage_server_peer_reachable(crypto::public_key const &pubkey, bool reachable)
+  {
+      return set_peer_reachable(true, pubkey, reachable);
+  }
+
+  bool master_node_list::set_beldexnet_peer_reachable(crypto::public_key const &pubkey, bool reachable)
+  {
+      return set_peer_reachable(false, pubkey, reachable);
   }
 
   static quorum_manager quorum_for_serialization_to_quorum_manager(master_node_list::quorum_for_serialization const &source)
@@ -3104,7 +3332,7 @@ namespace master_nodes
       if (info.version < version_t::v1_add_registration_hf_version)
       {
         info.version = version_t::v1_add_registration_hf_version;
-        info.registration_hf_version = mn_list->m_blockchain.get_hard_fork_version(pubkey_info.info->registration_height);
+        info.registration_hf_version = mn_list->m_blockchain.get_network_version(pubkey_info.info->registration_height);
       }
       if (info.version < version_t::v4_noproofs)
       {
@@ -3129,6 +3357,11 @@ namespace master_nodes
       {
         info.pulse_sorter = {};
         info.version      = version_t::v6_reassign_sort_keys;
+      }
+      if (info.version < version_t::v7_decommission_reason)
+      {
+        // Nothing to do here (leave consensus reasons as 0s)
+        info.version = version_t::v7_decommission_reason;
       }
       // Make sure we handled any future state version upgrades:
       assert(info.version == tools::enum_top<decltype(info.version)>);
@@ -3329,13 +3562,7 @@ namespace master_nodes
       m_blockchain.get_db().clear_master_node_data();
     }
 
-    uint64_t hardfork_9_from_height = 0;
-    {
-      uint32_t window, votes, threshold;
-      uint8_t voting;
-      m_blockchain.get_hard_fork_voting_info(9, window, votes, threshold, hardfork_9_from_height, voting);
-    }
-    m_state.height = hardfork_9_from_height - 1;
+    m_state.height = hard_fork_begins(m_blockchain.nettype(), cryptonote::network_version_9_master_nodes).value_or(1) - 1;
   }
 
   size_t master_node_info::total_num_locked_contributions() const
@@ -3596,7 +3823,7 @@ namespace master_nodes
       }
     }
 
-    MTRACE("SN vote at height " << height << " is valid.");
+    MTRACE("MN vote at height " << height << " is valid.");
     return true;
   }
 
@@ -3615,7 +3842,7 @@ namespace master_nodes
         }
       } else if (proposed_state == new_state::ip_change_penalty) {
         if (height <= last_ip_change_height) {
-          MDEBUG("SN ip change penality invalid: vote height (" << height << ") <= last_ip_change_height (" << last_ip_change_height << ")");
+          MDEBUG("MN ip change penality invalid: vote height (" << height << ") <= last_ip_change_height (" << last_ip_change_height << ")");
           return false;
         }
       }
@@ -3641,7 +3868,7 @@ namespace master_nodes
       MDEBUG("MN recommission invalid: not recommissioned");
       return false;
     }
-    MTRACE("SN state change is valid");
+    MTRACE("MN state change is valid");
     return true;
   }
 

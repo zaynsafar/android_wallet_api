@@ -39,6 +39,7 @@
 #include <boost/program_options/variables_map.hpp>
 #include <oxenmq/oxenmq.h>
 
+#include "cryptonote_basic/hardfork.h"
 #include "cryptonote_protocol/cryptonote_protocol_handler_common.h"
 #include "epee/storages/portable_storage_template_helper.h"
 #include "common/command_line.h"
@@ -60,7 +61,7 @@ DISABLE_VS_WARNINGS(4355)
 namespace cryptonote
 {
    struct test_options {
-     std::vector<std::pair<uint8_t, uint64_t>> hard_forks;
+     std::vector<hard_fork> hard_forks;
      size_t long_term_block_weight_window;
    };
 
@@ -158,6 +159,15 @@ namespace cryptonote
       * @return true if we haven't seen it before and thus need to relay.
       */
      bool handle_uptime_proof(const NOTIFY_UPTIME_PROOF::request &proof, bool &my_uptime_proof_confirmation);
+
+     /**
+      * @brief handles an incoming uptime proof that is encoded using B-encoding
+      *
+      * Parses an incoming uptime proof
+      *
+      * @return true if we haven't seen it before and thus need to relay.
+      */
+     bool handle_btencoded_uptime_proof(const NOTIFY_BTENCODED_UPTIME_PROOF::request &proof, bool &my_uptime_proof_confirmation);
 
      /**
       * @brief handles an incoming transaction
@@ -341,7 +351,7 @@ namespace cryptonote
 
      /// Called (from master_node_quorum_cop) to tell quorumnet that it need to refresh its list of
      /// active MNs.
-     void update_lmq_sns();
+     void update_omq_mns();
 
      /**
       * @brief get the cryptonote protocol instance
@@ -564,6 +574,12 @@ namespace cryptonote
       */
      size_t get_alternative_blocks_count() const;
 
+     // Returns a bool on whether the master node is currently active
+     bool is_active_mn() const;
+
+     // Returns the master nodes info
+     std::shared_ptr<const master_nodes::master_node_info> get_my_mn_info() const;
+
      /**
       * Returns a short daemon status summary string.  Used when built with systemd support and
       * running as a Type=notify daemon.
@@ -683,8 +699,8 @@ namespace cryptonote
      tx_memory_pool &get_pool() { return m_mempool; }
 
      /// Returns a reference to the OxenMQ object.  Must not be called before init(), and should not
-     /// be used for any lmq communication until after start_oxenmq() has been called.
-     oxenmq::OxenMQ& get_lmq() { return *m_lmq; }
+     /// be used for any omq communication until after start_oxenmq() has been called.
+     oxenmq::OxenMQ& get_omq() { return *m_omq; }
 
      /**
       * @copydoc miner::on_synchronized
@@ -713,34 +729,6 @@ namespace cryptonote
       * @param target_blockchain_height the target height
       */
      uint64_t get_target_blockchain_height() const;
-
-     /**
-      * @brief returns the newest hardfork version known to the blockchain
-      *
-      * @return the version
-      */
-     uint8_t get_ideal_hard_fork_version() const;
-
-     /**
-      * @brief return the ideal hard fork version for a given block height
-      *
-      * @return what it says above
-      */
-     uint8_t get_ideal_hard_fork_version(uint64_t height) const;
-
-     /**
-      * @brief return the hard fork version for a given block height
-      *
-      * @return what it says above
-      */
-     uint8_t get_hard_fork_version(uint64_t height) const;
-
-     /**
-      * @brief return the earliest block a given version may activate
-      *
-      * @return what it says above
-      */
-     uint64_t get_earliest_ideal_height_for_version(uint8_t version) const;
 
      /**
       * @brief gets start_time
@@ -835,6 +823,11 @@ namespace cryptonote
       * @return which network are we on?
       */
      network_type get_nettype() const { return m_nettype; };
+
+     /**
+      * Returns the config settings for the network we are on.
+      */
+     constexpr const network_config& get_net_config() const { return get_config(m_nettype); }
 
      /**
       * @brief get whether transaction relay should be padded
@@ -997,17 +990,13 @@ namespace cryptonote
       */
      void flush_invalid_blocks();
 
-     /**
-      * @brief Record the reachability status of node's storage server
-      */
-     bool set_storage_server_peer_reachable(crypto::public_key const &pubkey, bool value);
-
      /// Time point at which the storage server and beldexnet last pinged us
      std::atomic<time_t> m_last_storage_server_ping, m_last_beldexnet_ping;
-     std::atomic<uint16_t> m_storage_lmq_port;
+     std::atomic<uint16_t> m_storage_https_port, m_storage_omq_port;
 
      uint32_t mn_public_ip() const { return m_mn_public_ip; }
-     uint16_t storage_port() const { return m_storage_port; }
+     uint16_t storage_https_port() const { return m_storage_https_port; }
+     uint16_t storage_omq_port() const { return m_storage_omq_port; }
      uint16_t quorumnet_port() const { return m_quorumnet_port; }
 
      /**
@@ -1048,6 +1037,7 @@ namespace cryptonote
       * @return true if all the checks pass, otherwise false
       */
      bool check_tx_semantic(const transaction& tx, bool kept_by_block) const;
+     bool check_master_node_time();
      void set_semantics_failed(const crypto::hash &tx_hash);
 
      void parse_incoming_tx_pre(tx_verification_batch_info &tx_info);
@@ -1091,18 +1081,6 @@ namespace cryptonote
      bool check_tx_inputs_keyimages_domain(const transaction& tx) const;
 
      /**
-      * @brief checks HardFork status and prints messages about it
-      *
-      * Checks the status of HardFork and logs/prints if an update to
-      * the daemon is necessary.
-      *
-      * @note see Blockchain::get_hard_fork_state and HardFork::State
-      *
-      * @return true
-      */
-     bool check_fork_time();
-
-     /**
       * @brief checks free disk space
       *
       * @return true on success, false otherwise
@@ -1123,7 +1101,7 @@ namespace cryptonote
       * Checks the given x25519 pubkey against the configured access lists and, if allowed, returns
       * the access level; otherwise returns `denied`.
       */
-     oxenmq::AuthLevel lmq_check_access(const crypto::x25519_public_key& pubkey) const;
+     oxenmq::AuthLevel omq_check_access(const crypto::x25519_public_key& pubkey) const;
 
      /**
       * @brief Initializes OxenMQ object, called during init().
@@ -1145,7 +1123,7 @@ namespace cryptonote
      /**
       * Returns whether to allow the connection and, if so, at what authentication level.
       */
-     oxenmq::AuthLevel lmq_allow(std::string_view ip, std::string_view x25519_pubkey, oxenmq::AuthLevel default_auth);
+     oxenmq::AuthLevel omq_allow(std::string_view ip, std::string_view x25519_pubkey, oxenmq::AuthLevel default_auth);
 
      /**
       * @brief Internal use only!
@@ -1153,8 +1131,12 @@ namespace cryptonote
       * This returns a mutable reference to the internal auth level map that OxenMQ uses, for
       * internal use only.
       */
-     std::unordered_map<crypto::x25519_public_key, oxenmq::AuthLevel>& _lmq_auth_level_map() { return m_lmq_auth; }
+     std::unordered_map<crypto::x25519_public_key, oxenmq::AuthLevel>& _omq_auth_level_map() { return m_omq_auth; }
      oxenmq::TaggedThreadID const &pulse_thread_id() const { return *m_pulse_thread_id; }
+
+     /// Master Node's storage server and beldexnet version
+     std::array<uint16_t, 3> ss_version;
+     std::array<uint16_t, 3> beldexnet_version;
 
  private:
 
@@ -1190,12 +1172,13 @@ namespace cryptonote
 
      fs::path m_config_folder; //!< folder to look in for configs and other files
 
+     //m_mn_times keeps track of the masters nodes timestamp checks to with other masters nodes. If too many of these are out of sync we can assume our master node time is not in sync. lock m_mn_timestamp_mutex when accessing m_mn_times
+     std::mutex m_mn_timestamp_mutex;
+     master_nodes::participation_history<master_nodes::timesync_entry, 30> m_mn_times;
 
-     tools::periodic_task m_store_blockchain_interval{12h, false}; //!< interval for manual storing of Blockchain, if enabled
-     tools::periodic_task m_fork_moaner{2h}; //!< interval for checking HardFork status
      tools::periodic_task m_txpool_auto_relayer{2min, false}; //!< interval for checking re-relaying txpool transactions
      tools::periodic_task m_check_disk_space_interval{10min}; //!< interval for checking for disk space
-     tools::periodic_task m_check_uptime_proof_interval{std::chrono::seconds{UPTIME_PROOF_TIMER_SECONDS}}; //!< interval for checking our own uptime proof
+     tools::periodic_task m_check_uptime_proof_interval{30s}; //!< interval for checking our own uptime proof (will be set to get_net_config().UPTIME_PROOF_CHECK_INTERVAL after init)
      tools::periodic_task m_block_rate_interval{90s, false}; //!< interval for checking block rate
      tools::periodic_task m_blockchain_pruning_interval{5h}; //!< interval for incremental blockchain pruning
      tools::periodic_task m_master_node_vote_relayer{2min, false};
@@ -1214,15 +1197,14 @@ namespace cryptonote
      std::atomic_flag m_checkpoints_updating; //!< set if checkpoints are currently updating to avoid multiple threads attempting to update at once
 
      bool m_master_node; // True if running in master node mode
-     master_keys m_master_keys; // Always set, even for non-MN mode -- these can be used for public lokimq rpc
+     master_keys m_master_keys; // Always set, even for non-MN mode -- these can be used for public oxenmq rpc
 
-     /// Master Node's public IP and storage server port (http and lokimq)
+     /// Master Node's public IP and qnet ports
      uint32_t m_mn_public_ip;
-     uint16_t m_storage_port;
      uint16_t m_quorumnet_port;
 
      /// OxenMQ main object.  Gets created during init().
-     std::unique_ptr<oxenmq::OxenMQ> m_lmq;
+     std::unique_ptr<oxenmq::OxenMQ> m_omq;
 
      // Internal opaque data object managed by cryptonote_protocol/quorumnet.cpp.  void pointer to
      // avoid linking issues (protocol does not link against core).
@@ -1230,7 +1212,7 @@ namespace cryptonote
 
      /// Stores x25519 -> access level for LMQ authentication.
      /// Not to be modified after the LMQ listener starts.
-     std::unordered_map<crypto::x25519_public_key, oxenmq::AuthLevel> m_lmq_auth;
+     std::unordered_map<crypto::x25519_public_key, oxenmq::AuthLevel> m_omq_auth;
 
      size_t block_sync_size;
 

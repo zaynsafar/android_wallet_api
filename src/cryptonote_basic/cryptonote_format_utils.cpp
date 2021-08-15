@@ -709,23 +709,23 @@ namespace cryptonote
     CHECK_AND_NO_ASSERT_MES_L1(result, false, "failed to serialize tx extra tx key image unlock");
     return result;
   }
-    crypto::hash make_security_hash_from(size_t block_height, block& b )
+    crypto::hash make_security_hash_from(size_t block_height, const block& b )
     {
         int needed_size=0;
-        for(crypto::hash &cur_hash: b.tx_hashes) {
+        for(const crypto::hash &cur_hash: b.tx_hashes) {
             needed_size+=sizeof(cur_hash);
         }
         char txhashbuf[needed_size];
         char *txpointer=reinterpret_cast<char *>(&txhashbuf[0]);
-        for(crypto::hash &cur_hash: b.tx_hashes) {
-            LOG_PRINT_L0("TX hash added for signature:" << cur_hash);
-            memcpy(txpointer, reinterpret_cast<void *>(&cur_hash), sizeof(cur_hash));
+        for(const crypto::hash &cur_hash: b.tx_hashes) {
+            //LOG_PRINT_L0("TX hash added for signature:" << cur_hash);
+            memcpy(txpointer, reinterpret_cast<const void *>(&cur_hash), sizeof(cur_hash));
             txpointer+=sizeof(cur_hash);
         }
 
         const int buf_size = sizeof(block_height) + sizeof(b.prev_id) + sizeof(txhashbuf)+sizeof(b.timestamp) ;
         char buf[buf_size];
-        LOG_PRINT_L0("hash buffer size:" << buf_size);
+        //LOG_PRINT_L0("hash buffer size:" << buf_size);
 
         memcpy(buf, reinterpret_cast<void *>(&block_height), sizeof(block_height));
         memcpy(buf + sizeof(block_height), reinterpret_cast<const char *>(&b.prev_id), sizeof(b.prev_id));
@@ -826,7 +826,8 @@ namespace cryptonote
       return false;
 
     state_change = tx_extra_master_node_state_change{
-      master_nodes::new_state::deregister, dereg.block_height, dereg.master_node_index, dereg.votes.begin(), dereg.votes.end()};
+      tx_extra_master_node_state_change::version_t::v0,
+      master_nodes::new_state::deregister, dereg.block_height, dereg.master_node_index, 0, 0, {dereg.votes.begin(), dereg.votes.end()}};
     return true;
   }
   //---------------------------------------------------------------
@@ -1157,7 +1158,7 @@ namespace cryptonote
     if (tvc.m_fee_too_low)               os << "Fee too low, ";
     if (tvc.m_invalid_version)           os << "TX has invalid version, ";
     if (tvc.m_invalid_type)              os << "TX has invalid type, ";
-    if (tvc.m_key_image_locked_by_snode) os << "Key image is locked by master node, ";
+    if (tvc.m_key_image_locked_by_mnode) os << "Key image is locked by master node, ";
     if (tvc.m_key_image_blacklisted)     os << "Key image is blacklisted on the master node network, ";
 
     if (tx)
@@ -1203,6 +1204,22 @@ namespace cryptonote
       buf.resize(buf.size() - 2);
 
     return buf;
+  }
+  //---------------------------------------------------------------
+  bool is_valid_address(const std::string address, cryptonote::network_type nettype, bool allow_subaddress, bool allow_integrated)
+  {
+    cryptonote::address_parse_info addr_info;
+    bool valid = false;
+    if(get_account_address_from_str(addr_info, nettype, address))
+    {
+      if (addr_info.is_subaddress)
+        valid = allow_subaddress;
+      else if (addr_info.has_payment_id)
+        valid = allow_integrated;
+      else
+        valid = true;
+    }
+    return valid;
   }
   //---------------------------------------------------------------
   crypto::hash get_blob_hash(const std::string_view blob)

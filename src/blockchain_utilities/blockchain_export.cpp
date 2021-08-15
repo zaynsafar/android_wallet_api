@@ -33,6 +33,7 @@
 #include "cryptonote_core/cryptonote_core.h"
 #include "blockchain_objects.h"
 #include "version.h"
+#include "cryptonote_core/uptime_proof.h"
 
 #undef BELDEX_DEFAULT_LOG_CATEGORY
 #define BELDEX_DEFAULT_LOG_CATEGORY "bcutil"

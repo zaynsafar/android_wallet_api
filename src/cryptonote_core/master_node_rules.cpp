@@ -12,7 +12,7 @@
 namespace master_nodes {
 
 // TODO(beldex): Move to beldex_economy, this will also need access to beldex::exp2
-uint64_t get_staking_requirement(cryptonote::network_type m_nettype, uint64_t height, uint8_t hf_version)
+uint64_t get_staking_requirement(cryptonote::network_type m_nettype, uint64_t height)
 {
   uint64_t result = COIN * 100000;
   if(height>=56500) result = COIN * 10000;

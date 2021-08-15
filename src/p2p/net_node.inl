@@ -1,5 +1,5 @@
-// Copyright (c) 2014-2018, The Monero Project
-// Copyright (c)      2018, The Beldex Project
+// Copyright (c) 2014-2019, The Monero Project
+// Copyright (c) 2018-2019, The Beldex Project
 //
 // All rights reserved.
 //
@@ -372,7 +372,7 @@ namespace nodetool
     }
     else if (sigd == "delayed")
     {
-      if (has_no_igd && !command_line::is_arg_defaulted(vm, arg_igd))
+      if (has_no_igd)
       {
         MFATAL("Cannot have both --" << arg_no_igd.name << " and --" << arg_igd.name << " delayed");
         return false;

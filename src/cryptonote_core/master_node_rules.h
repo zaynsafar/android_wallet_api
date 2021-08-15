@@ -135,6 +135,8 @@ namespace master_nodes {
   constexpr int16_t QUORUM_VOTE_CHECK_COUNT       = 8;
   constexpr int16_t PULSE_MAX_MISSABLE_VOTES      = 4;
   constexpr int16_t CHECKPOINT_MAX_MISSABLE_VOTES = 4;
+  constexpr int16_t TIMESTAMP_MAX_MISSABLE_VOTES  = 4;
+  constexpr int16_t TIMESYNC_MAX_UNSYNCED_VOTES   = 4;
   static_assert(CHECKPOINT_MAX_MISSABLE_VOTES < QUORUM_VOTE_CHECK_COUNT,
                 "The maximum number of votes a master node can miss cannot be greater than the amount of checkpoint "
                 "quorums they must participate in before we check if they should be deregistered or not.");
@@ -162,7 +164,6 @@ namespace master_nodes {
 #else
   constexpr size_t STATE_CHANGE_MIN_VOTES_TO_CHANGE_STATE = 7;
   constexpr size_t STATE_CHANGE_QUORUM_SIZE               = 10;
-  constexpr int    MIN_TIME_IN_S_BEFORE_VOTING            = UPTIME_PROOF_MAX_TIME_IN_SECONDS;
   constexpr size_t CHECKPOINT_QUORUM_SIZE                 = 20;
   constexpr size_t CHECKPOINT_MIN_VOTES                   = 13;
   constexpr int    BLINK_SUBQUORUM_SIZE                   = 10;
@@ -182,8 +183,8 @@ namespace master_nodes {
   static_assert(REORG_SAFETY_BUFFER_BLOCKS_POST_HF12 < VOTE_LIFETIME, "Safety buffer should always be less than the vote lifetime");
   static_assert(REORG_SAFETY_BUFFER_BLOCKS_PRE_HF12  < VOTE_LIFETIME, "Safety buffer should always be less than the vote lifetime");
 
-  constexpr uint64_t  IP_CHANGE_WINDOW_IN_SECONDS     = 24*60*60; // How far back an obligations quorum looks for multiple IPs (unless the following buffer is more recent)
-  constexpr uint64_t  IP_CHANGE_BUFFER_IN_SECONDS     = 2*60*60; // After we bump a MN for an IP change we don't bump again for changes within this time period
+  constexpr auto IP_CHANGE_WINDOW = 24h; // How far back an obligations quorum looks for multiple IPs (unless the following buffer is more recent)
+  constexpr auto IP_CHANGE_BUFFER = 2h; // After we bump a MN for an IP change we don't bump again for changes within this time period
 
   constexpr size_t   MAX_SWARM_SIZE                   = 10;
   // We never create a new swarm unless there are SWARM_BUFFER extra nodes
@@ -211,22 +212,24 @@ namespace master_nodes {
   // blocks out of sync and sending something that it thinks is legit.
   constexpr uint64_t VOTE_OR_TX_VERIFY_HEIGHT_BUFFER    = 5;
 
-  constexpr std::array<int, 3> MIN_STORAGE_SERVER_VERSION{{2, 0, 7}};
-  constexpr std::array<int, 3> MIN_BELDEXNET_VERSION{{0, 8, 0}};
+  constexpr std::array<uint16_t, 3> MIN_STORAGE_SERVER_VERSION{{2, 0, 7}};
+  constexpr std::array<uint16_t, 3> MIN_BELDEXNET_VERSION{{0, 8, 0}};
 
   // The minimum accepted version number, broadcasted by Master Nodes via uptime proofs for each hardfork
-  struct proof_version
+ struct proof_version
   {
-    uint8_t hardfork;
-    std::array<uint16_t, 3> version;
+    std::pair<uint8_t, uint8_t> hardfork_revision;
+    std::array<uint16_t, 3> beldexd;
+    std::array<uint16_t, 3> beldexnet;
+    std::array<uint16_t, 3> storage_server;
   };
 
   constexpr proof_version MIN_UPTIME_PROOF_VERSIONS[] = {
-    {cryptonote::network_version_17_pulse,                {8,1,0}},
-    {cryptonote::network_version_16_bns,                  {7,1,2}},
-    {cryptonote::network_version_15_blink,                {6,1,0}},
-    {cryptonote::network_version_14_enforce_checkpoints,  {5,1,0}},
-    {cryptonote::network_version_13_checkpointing,        {4,0,3}},
+    proof_version{{cryptonote::network_version_17_pulse, 0}, {4,0,0}, {0,9,5}, {2,2,0}},
+    proof_version{{cryptonote::network_version_16_bns, 0}, {4,0,0}, {0,9,5}, {2,2,0}},
+    proof_version{{cryptonote::network_version_15_blink, 0}, {4,0,0}, {0,9,5}, {2,2,0}},
+    proof_version{{cryptonote::network_version_14_enforce_checkpoints, 0}, {4,0,0}, {0,9,5}, {2,2,0}},
+    proof_version{{cryptonote::network_version_13_checkpointing, 0}, {4,0,0}, {0,9,5}, {2,2,0}},
   };
 
   using swarm_id_t                         = uint64_t;
@@ -259,6 +262,12 @@ namespace master_nodes {
     }
   }
 
+//If a nodes timestamp varies by this amount of seconds they will be considered out of sync
+  constexpr uint8_t THRESHOLD_SECONDS_OUT_OF_SYNC = 30;
+
+  //If the below percentage of service nodes are out of sync we will consider our clock out of sync
+  constexpr uint8_t MAXIMUM_EXTERNAL_OUT_OF_SYNC = 80;
+
 static_assert(STAKING_PORTIONS != UINT64_MAX, "UINT64_MAX is used as the invalid value for failing to calculate the min_node_contribution");
 // return: UINT64_MAX if (num_contributions > the max number of contributions), otherwise the amount in beldex atomic units
 uint64_t get_min_node_contribution            (uint8_t version, uint64_t staking_requirement, uint64_t total_reserved, size_t num_contributions);
@@ -273,7 +282,7 @@ uint64_t get_min_node_contribution_in_portions(uint8_t version, uint64_t staking
 // available contribution room, which allows slight overstaking but disallows larger overstakes.
 uint64_t get_max_node_contribution(uint8_t version, uint64_t staking_requirement, uint64_t total_reserved);
 
-uint64_t get_staking_requirement(cryptonote::network_type nettype, uint64_t height, uint8_t hf_version);
+uint64_t get_staking_requirement(cryptonote::network_type nettype, uint64_t height);
 
 uint64_t portions_to_amount(uint64_t portions, uint64_t staking_requirement);
 

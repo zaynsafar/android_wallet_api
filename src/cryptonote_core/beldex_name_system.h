@@ -17,6 +17,7 @@ namespace cryptonote
 {
 struct checkpoint_t;
 struct block;
+struct address_parse_info;
 class transaction;
 struct account_address;
 struct tx_extra_beldex_name_system;
@@ -26,10 +27,11 @@ class Blockchain;
 namespace bns
 {
 
-constexpr size_t WALLET_NAME_MAX                  = 97; // mainnet addresses are 95 but testnet/devnet are 97
-constexpr size_t WALLET_ACCOUNT_BINARY_LENGTH     = 2 * sizeof(crypto::public_key);
-constexpr size_t BELDEXNET_DOMAIN_NAME_MAX          = 63 + 5; // DNS components name must be at most 63 (+ 5 for .loki); this limit applies if there is at least one hyphen (and thus includes punycode)
-constexpr size_t BELDEXNET_DOMAIN_NAME_MAX_NOHYPHEN = 32 + 5; // If the name does not contain a - then we restrict it to 32 characters so that it cannot be (and is obviously not) an encoded .loki address (52 characters)
+constexpr size_t WALLET_NAME_MAX                  = 64;
+constexpr size_t WALLET_ACCOUNT_BINARY_LENGTH_INC_PAYMENT_ID     = 73;  // Wallet will encrypt an identifier (1 byte) a public spend and view key (2x 32 bytes) = 65 bytes plus an additional item for payment id (8 bytes) if necessary. The identifier 0 -> No Subaddress or Payment ID, 1 -> Has Subaddress, 2-> Has Payment ID
+constexpr size_t WALLET_ACCOUNT_BINARY_LENGTH_NO_PAYMENT_ID     = 65;
+constexpr size_t BELDEXNET_DOMAIN_NAME_MAX          = 63 + 5; // DNS components name must be at most 63 (+ 5 for .beldex); this limit applies if there is at least one hyphen (and thus includes punycode)
+constexpr size_t BELDEXNET_DOMAIN_NAME_MAX_NOHYPHEN = 32 + 5; // If the name does not contain a - then we restrict it to 32 characters so that it cannot be (and is obviously not) an encoded .beldex address (52 characters)
 constexpr size_t BELDEXNET_ADDRESS_BINARY_LENGTH    = sizeof(crypto::ed25519_public_key);
 constexpr size_t SESSION_DISPLAY_NAME_MAX         = 64;
 constexpr size_t SESSION_PUBLIC_KEY_BINARY_LENGTH = 1 + sizeof(crypto::ed25519_public_key); // Session keys at prefixed with 0x05 + ed25519 key
@@ -40,9 +42,13 @@ constexpr size_t NAME_HASH_SIZE_B64_MAX = (NAME_HASH_SIZE + 2) / 3 * 4; // With 
 
 constexpr size_t SODIUM_ENCRYPTION_EXTRA_BYTES = 40; // crypto_aead_xchacha20poly1305_ietf_ABYTES (16) + crypto_aead_xchacha20poly1305_ietf_NPUBBYTES (24), but we don't include sodium here
 
+constexpr char BNS_WALLET_TYPE_PRIMARY = 0x00;
+constexpr char BNS_WALLET_TYPE_SUBADDRESS = 0x01;
+constexpr char BNS_WALLET_TYPE_INTEGRATED = 0x02;
+
 struct mapping_value
 {
-  static size_t constexpr BUFFER_SIZE = std::max({WALLET_ACCOUNT_BINARY_LENGTH, BELDEXNET_ADDRESS_BINARY_LENGTH, SESSION_PUBLIC_KEY_BINARY_LENGTH}) + SODIUM_ENCRYPTION_EXTRA_BYTES;
+  static size_t constexpr BUFFER_SIZE = std::max({WALLET_ACCOUNT_BINARY_LENGTH_INC_PAYMENT_ID, BELDEXNET_ADDRESS_BINARY_LENGTH, SESSION_PUBLIC_KEY_BINARY_LENGTH}) + SODIUM_ENCRYPTION_EXTRA_BYTES;
   std::array<uint8_t, BUFFER_SIZE> buffer;
   bool encrypted;
   size_t len;
@@ -94,15 +100,20 @@ struct mapping_value
   // leaves `*this` encrypted and instead returns an decrypted copy.
   mapping_value make_decrypted(std::string_view name, const crypto::hash* name_hash = nullptr) const;
 
+  std::optional<cryptonote::address_parse_info> get_wallet_address_info() const;
+
   // Validate a human readable mapping value representation in 'value' and write the binary form into 'blob'.
   // value: if type is session, 66 character hex string of an ed25519 public key (with 05 prefix)
-  //                   beldexnet, 52 character base32z string of an ed25519 public key
+  //                   BELDEXnet, 52 character base32z string of an ed25519 public key
   //                   wallet,  the wallet public address string
   // blob: (optional) if function returns true, validate will load the binary data into blob (ready for encryption via encrypt())
   static bool validate(cryptonote::network_type nettype, mapping_type type, std::string_view value, mapping_value *blob = nullptr, std::string *reason = nullptr);
   // blob: (optional) if function returns true then the value will be loaded into the given
   // mapping_value, ready for decryption via decrypt().
   static bool validate_encrypted(mapping_type type, std::string_view value, mapping_value *blob = nullptr, std::string *reason = nullptr);
+
+  mapping_value();
+  mapping_value(std::string encrypted_value, std::string nonce);
 };
 inline std::ostream &operator<<(std::ostream &os, mapping_value const &v) { return os << oxenmq::to_hex(v.to_view()); }
 
@@ -161,6 +172,8 @@ std::string name_hash_bytes_to_base64(std::string_view bytes);
 std::optional<std::string> name_hash_input_to_base64(std::string_view input);
 
 bool validate_bns_name(mapping_type type, std::string name, std::string *reason = nullptr);
+
+std::optional<cryptonote::address_parse_info> encrypted_wallet_value_to_info(std::string name, std::string encrypted_value, std::string nonce);
 
 generic_signature  make_ed25519_signature(crypto::hash const &hash, crypto::ed25519_secret_key const &skey);
 generic_owner      make_monero_owner(cryptonote::account_public_address const &owner, bool is_subaddress);
@@ -280,6 +293,8 @@ struct name_system_db
 
   owner_record                get_owner_by_key      (generic_owner const &owner);
   owner_record                get_owner_by_id       (int64_t owner_id);
+  // Returns a wallet address from the passed BNS name in "str"
+  bool  get_wallet_mapping    (std::string str, uint64_t blockchain_height, cryptonote::address_parse_info& addr_info);
   // The get_mapping* methods can return any mapping, or only active mappings: for only active
   // mappings, pass in the blockchain height.  If you omit it (or explicitly pass std::nullopt) then
   // you will get the latest mappingsvalues regardless of whether expired or not they are expired.
@@ -288,6 +303,9 @@ struct name_system_db
   std::vector<mapping_record> get_mappings_by_owner (generic_owner const &key, std::optional<uint64_t> blockchain_height = std::nullopt);
   std::vector<mapping_record> get_mappings_by_owners(std::vector<generic_owner> const &keys, std::optional<uint64_t> blockchain_height = std::nullopt);
   settings_record             get_settings          ();
+
+  // Returns the count of each type of BNS registration that is currently active.
+  std::map<mapping_type, int> get_mapping_counts(uint64_t blockchain_height);
 
   // Resolves a mapping of the given type and name hash. Returns a null optional if the value was
   // not found or expired, otherwise returns the encrypted value.
@@ -317,6 +335,7 @@ private:
   sql_compiled_statement prune_mappings_sql{*this};
   sql_compiled_statement prune_owners_sql{*this};
   sql_compiled_statement get_mappings_by_owner_sql{*this};
+  sql_compiled_statement get_mapping_counts_sql{*this};
   sql_compiled_statement get_mappings_on_height_and_newer_sql{*this};
 };
 

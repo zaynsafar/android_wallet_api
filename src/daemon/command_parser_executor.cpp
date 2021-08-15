@@ -305,10 +305,16 @@ bool command_parser_executor::print_sr(const std::vector<std::string>& args)
   return result;
 }
 
-bool command_parser_executor::prepare_registration()
+bool command_parser_executor::prepare_registration(const std::vector<std::string>& args)
 {
-  bool result = m_executor.prepare_registration();
-  return result;
+  bool force_registration = false;
+  for (auto& arg : args)
+  {
+    if (arg == "+force")
+      force_registration = true;
+  }
+
+  return m_executor.prepare_registration(force_registration);
 }
 
 bool command_parser_executor::print_mn(const std::vector<std::string>& args)
@@ -678,28 +684,6 @@ bool command_parser_executor::in_peers(const std::vector<std::string>& args)
 	}
 
 	return m_executor.in_peers(set, limit);
-}
-
-bool command_parser_executor::hard_fork_info(const std::vector<std::string>& args)
-{
-  int version;
-  if (args.size() == 0) {
-    version = 0;
-  }
-  else if (args.size() == 1) {
-    try {
-      version = std::stoi(args[0]);
-    }
-    catch(const std::exception& ex) {
-        return false;
-    }
-    if (version <= 0 || version > 255)
-      return false;
-  }
-  else {
-    return false;
-  }
-  return m_executor.hard_fork_info(version);
 }
 
 bool command_parser_executor::show_bans(const std::vector<std::string>& args)

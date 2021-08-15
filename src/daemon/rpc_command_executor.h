@@ -163,8 +163,6 @@ public:
 
   bool in_peers(bool set, uint32_t limit);
 
-  bool hard_fork_info(uint8_t version);
-
   bool print_bans();
 
   bool ban(const std::string &address, time_t seconds, bool clear_ban = false);
@@ -195,7 +193,7 @@ public:
 
   bool print_sr(uint64_t height);
 
-  bool prepare_registration();
+  bool prepare_registration(bool force_registration=false);
 
   bool print_mn(const std::vector<std::string> &args);
 

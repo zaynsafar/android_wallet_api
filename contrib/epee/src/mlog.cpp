@@ -50,6 +50,14 @@ namespace fs { using namespace std::filesystem; }
 namespace fs = ghc::filesystem;
 #endif
 
+#ifndef USE_GHC_FILESYSTEM
+#include <filesystem>
+namespace fs { using namespace std::filesystem; }
+#else
+#include <ghc/filesystem.hpp>
+namespace fs = ghc::filesystem;
+#endif
+
 #undef BELDEX_DEFAULT_LOG_CATEGORY
 #define BELDEX_DEFAULT_LOG_CATEGORY "logging"
 

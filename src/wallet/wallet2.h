@@ -787,6 +787,7 @@ private:
       bool in = false;
       bool out = false;
       bool stake = false;
+      bool bns = false;
       bool pending = false;
       bool failed = false;
       bool pool = false;
@@ -806,6 +807,7 @@ private:
       uint64_t min_height, uint64_t max_height = (uint64_t)-1, const std::optional<uint32_t>& subaddr_account = std::nullopt, const std::set<uint32_t>& subaddr_indices = {}) const;
     void get_unconfirmed_payments_out(std::list<std::pair<crypto::hash,wallet2::unconfirmed_transfer_details>>& unconfirmed_payments, const std::optional<uint32_t>& subaddr_account = std::nullopt, const std::set<uint32_t>& subaddr_indices = {}) const;
     void get_unconfirmed_payments(std::list<std::pair<crypto::hash,wallet2::pool_payment_details>>& unconfirmed_payments, const std::optional<uint32_t>& subaddr_account = std::nullopt, const std::set<uint32_t>& subaddr_indices = {}) const;
+    std::optional<std::string> resolve_address(std::string address, uint64_t height = 0);
 
     // These return pairs where .first == true if the request was successful, and .second is a
     // vector of the requested entries.
@@ -817,6 +819,7 @@ private:
     std::vector<cryptonote::rpc::GET_MASTER_NODES::response::entry> list_current_stakes();
     auto bns_owners_to_names(cryptonote::rpc::BNS_OWNERS_TO_NAMES::request const &request) const { return m_node_rpc_proxy.bns_owners_to_names(request); }
     auto bns_names_to_owners(cryptonote::rpc::BNS_NAMES_TO_OWNERS::request const &request) const { return m_node_rpc_proxy.bns_names_to_owners(request); }
+    auto resolve(cryptonote::rpc::BNS_RESOLVE::request const &request) const { return m_node_rpc_proxy.bns_resolve(request); }
 
     struct bns_detail
     {
@@ -1223,7 +1226,7 @@ private:
 
     // params constructor, accumulates the burn amounts if the priority is
     // a blink and, or a bns tx. If it is a blink TX, bns_burn_type is ignored.
-    static cryptonote::beldex_construct_tx_params construct_params(uint8_t hf_version, cryptonote::txtype tx_type, uint32_t priority, bns::mapping_type bns_burn_type = static_cast<bns::mapping_type>(0));
+    static cryptonote::beldex_construct_tx_params construct_params(uint8_t hf_version, cryptonote::txtype tx_type, uint32_t priority, uint64_t extra_burn = 0, bns::mapping_type bns_burn_type = static_cast<bns::mapping_type>(0));
 
     bool is_unattended() const { return m_unattended; }
 
@@ -1659,7 +1662,7 @@ private:
     bool m_light_wallet; /* sends view key to daemon for scanning */
     uint64_t m_light_wallet_scanned_block_height;
     uint64_t m_light_wallet_blockchain_height;
-    uint64_t m_light_wallet_per_kb_fee = FEE_PER_KB;
+    uint64_t m_light_wallet_per_kb_fee = FEE_PER_BYTE_V12 * 1024;
     bool m_light_wallet_connected;
     uint64_t m_light_wallet_balance;
     uint64_t m_light_wallet_unlocked_balance;

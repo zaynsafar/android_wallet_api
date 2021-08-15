@@ -138,6 +138,7 @@ local android_build_steps(android_abi, android_platform=21, jobs=6, cmake_extra=
         '-DCMAKE_TOOLCHAIN_FILE=/usr/lib/android-sdk/ndk-bundle/build/cmake/android.toolchain.cmake ' +
         '-DANDROID_PLATFORM=' + android_platform + ' -DANDROID_ABI=' + android_abi + ' ' +
         '-DMONERO_SLOW_HASH=ON ' +
+        '-DLOCAL_MIRROR=https://builds.beldexnet.dev/deps ' +
         '-DBUILD_STATIC_DEPS=ON -DSTATIC=ON -G Ninja ' + cmake_extra,
     'ninja -j' + jobs + ' -v wallet_merged',
     'cd ..',
@@ -243,7 +244,7 @@ local gui_wallet_step_darwin = {
                     + android_build_steps('arm64-v8a', cmake_extra='-DARCH=armv8-a -DARCH_ID=arm64')
                     + android_build_steps('x86_64', cmake_extra='-DARCH="x86-64 -msse4.2 -mpopcnt" -DARCH_ID=x86-64')
                     + [
-                    './utils/build_scripts/drone-android-static-upload.sh armeabi-v7a arm64-v8a x86_64 x86'
+                    './utils/build_scripts/drone-android-static-upload.sh armeabi-v7a arm64-v8a x86_64'
                 ]
             }
         ]

@@ -1,5 +1,5 @@
-// Copyright (c) 2014-2018, The Monero Project
-// Copyright (c)      2018, The Beldex Project
+// Copyright (c) 2018-2020, The Beldex Project
+// Copyright (c) 2014-2019, The Monero Project
 //
 // All rights reserved.
 //
@@ -40,6 +40,7 @@
 #include <variant>
 #include <oxenmq/base64.h>
 #include "crypto/crypto.h"
+#include "cryptonote_basic/hardfork.h"
 #include "cryptonote_basic/tx_extra.h"
 #include "cryptonote_core/beldex_name_system.h"
 #include "cryptonote_core/pulse.h"
@@ -56,6 +57,7 @@
 #include "cryptonote_basic/account.h"
 #include "cryptonote_basic/cryptonote_basic_impl.h"
 #include "cryptonote_core/tx_sanity_check.h"
+#include "cryptonote_core/uptime_proof.h"
 #include "epee/misc_language.h"
 #include "net/parse.h"
 #include "crypto/hash.h"
@@ -129,7 +131,7 @@ namespace cryptonote { namespace rpc {
     template <typename RPC>
     struct reg_helper<RPC, std::enable_if_t<std::is_base_of<BINARY, RPC>::value>> {
       using Request = typename RPC::request;
-      Request load(rpc_request& request) { 
+      Request load(rpc_request& request) {
         Request req{};
         std::string_view data;
         if (auto body = request.body_view())
@@ -221,6 +223,7 @@ namespace cryptonote { namespace rpc {
     )
     : m_core(cr)
     , m_p2p(p2p)
+    , m_should_use_bootstrap_daemon(false)
     , m_was_bootstrap_ever_used(false)
   {}
   bool core_rpc_server::set_bootstrap_daemon(const std::string &address, std::string_view username_password)
@@ -415,6 +418,13 @@ namespace cryptonote { namespace rpc {
 
     res.block_size_limit = res.block_weight_limit = m_core.get_blockchain_storage().get_current_cumulative_block_weight_limit();
     res.block_size_median = res.block_weight_median = m_core.get_blockchain_storage().get_current_cumulative_block_weight_median();
+
+    auto bns_counts = m_core.get_blockchain_storage().name_system_db().get_mapping_counts(res.height);
+    res.bns_counts = {
+      bns_counts[bns::mapping_type::session],
+      bns_counts[bns::mapping_type::wallet],
+      bns_counts[bns::mapping_type::beldexnet]};
+
     if (context.admin)
     {
       res.master_node = m_core.master_node();
@@ -752,6 +762,11 @@ namespace cryptonote { namespace rpc {
       }
       void operator()(const tx_extra_master_node_state_change& x) {
         auto& sc = _state_change(x);
+        if (x.reason_consensus_all)
+          sc.reasons = cryptonote::coded_reasons(x.reason_consensus_all);
+        // If `any` has reasons not included in all then list the extra ones separately:
+        if (uint16_t reasons_maybe = x.reason_consensus_any & ~x.reason_consensus_all)
+          sc.reasons_maybe = cryptonote::coded_reasons(reasons_maybe);
         switch (x.state)
         {
           case master_nodes::new_state::decommission: sc.type = "decom"; break;
@@ -1011,7 +1026,7 @@ namespace cryptonote { namespace rpc {
       }
 
       if (req.stake_info) {
-        auto hf_version = m_core.get_hard_fork_version(e.in_pool ? m_core.get_current_blockchain_height() : e.block_height);
+        auto hf_version = get_network_version(nettype(), e.in_pool ? m_core.get_current_blockchain_height() : e.block_height);
         master_nodes::staking_components sc;
         if (master_nodes::tx_get_staking_components_and_amounts(nettype(), hf_version, t, e.block_height, &sc)
             && sc.transferred > 0)
@@ -1298,10 +1313,10 @@ namespace cryptonote { namespace rpc {
     const account_public_address& lMiningAdr = lMiner.get_mining_address();
     if (lMiner.is_mining())
       res.address = get_account_address_as_str(nettype(), false, lMiningAdr);
-    const uint8_t major_version = m_core.get_blockchain_storage().get_current_hard_fork_version();
+    const uint8_t major_version = m_core.get_blockchain_storage().get_network_version();
 
     res.pow_algorithm =
-        major_version >= network_version_13_checkpointing    ? "RandomX (Beldex variant)"               :
+        major_version >= network_version_13_checkpointing    ? "RandomX (BELDEX variant)"               :
         major_version == network_version_11_infinite_staking ? "Cryptonight Turtle Light (Variant 2)" :
                                                                "Cryptonight Heavy (Variant 2)";
 
@@ -1452,14 +1467,14 @@ namespace cryptonote { namespace rpc {
 
     std::function<void(const transaction& tx, tx_info& txi)> load_extra;
     if (req.tx_extra || req.stake_info)
-        load_extra = [this, &req](const transaction& tx, tx_info& txi) {
+        load_extra = [this, &req, net=nettype()](const transaction& tx, tx_info& txi) {
             if (req.tx_extra)
-                load_tx_extra_data(txi.extra.emplace(), tx, nettype());
+                load_tx_extra_data(txi.extra.emplace(), tx, net);
             if (req.stake_info) {
                 auto height = m_core.get_current_blockchain_height();
-                auto hf_version = m_core.get_hard_fork_version(height);
+                auto hf_version = get_network_version(net, height);
                 master_nodes::staking_components sc;
-                if (master_nodes::tx_get_staking_components_and_amounts(nettype(), hf_version, tx, height, &sc)
+                if (master_nodes::tx_get_staking_components_and_amounts(net, hf_version, tx, height, &sc)
                         && sc.transferred > 0)
                     txi.stake_amount = sc.transferred;
             }
@@ -1982,7 +1997,7 @@ namespace cryptonote { namespace rpc {
       block blk;
       bool have_block = m_core.get_block_by_height(h, blk);
       if (!have_block)
-        throw rpc_error{ERROR_INTERNAL, 
+        throw rpc_error{ERROR_INTERNAL,
           "Internal error: can't get block by height. Height = " + std::to_string(h) + "."};
       if (blk.miner_tx.vin.size() != 1 || !std::holds_alternative<txin_gen>(blk.miner_tx.vin.front()))
         throw rpc_error{ERROR_INTERNAL, "Internal error: coinbase transaction in the block has the wrong type"};
@@ -2090,10 +2105,15 @@ namespace cryptonote { namespace rpc {
       return res;
 
     const Blockchain &blockchain = m_core.get_blockchain_storage();
-    uint8_t version = req.version > 0 ? req.version : blockchain.get_next_hard_fork_version();
-    res.version = blockchain.get_current_hard_fork_version();
-    res.enabled = blockchain.get_hard_fork_voting_info(version, res.window, res.votes, res.threshold, res.earliest_height, res.voting);
-    res.state = blockchain.get_hard_fork_state();
+    uint8_t version =
+      req.version > 0 ? req.version :
+      req.height > 0 ? blockchain.get_network_version(req.height) :
+      blockchain.get_network_version();
+    res.version = version;
+    res.enabled = blockchain.get_network_version() >= version;
+    auto heights = get_hard_fork_heights(m_core.get_nettype(), version);
+    res.earliest_height = heights.first;
+    res.last_height = heights.second;
     res.status = STATUS_OK;
     return res;
   }
@@ -2323,8 +2343,8 @@ namespace cryptonote { namespace rpc {
     {
       res.master_node_state.master_node_pubkey  = std::move(get_master_node_key_res.master_node_pubkey);
       res.master_node_state.public_ip            = epee::string_tools::get_ip_string_from_int32(m_core.mn_public_ip());
-      res.master_node_state.storage_port         = m_core.storage_port();
-      res.master_node_state.storage_lmq_port     = m_core.m_storage_lmq_port;
+      res.master_node_state.storage_port         = m_core.storage_https_port();
+      res.master_node_state.storage_lmq_port     = m_core.storage_omq_port();
       res.master_node_state.quorumnet_port       = m_core.quorumnet_port();
       res.master_node_state.pubkey_ed25519       = std::move(get_master_node_key_res.master_node_ed25519_pubkey);
       res.master_node_state.pubkey_x25519        = std::move(get_master_node_key_res.master_node_x25519_pubkey);
@@ -2369,7 +2389,7 @@ namespace cryptonote { namespace rpc {
     res.fee_per_byte = fees.first;
     res.fee_per_output = fees.second;
     res.blink_fee_fixed = BLINK_BURN_FIXED;
-    constexpr auto blink_percent = BLINK_MINER_TX_FEE_PERCENT + BLINK_BURN_TX_FEE_PERCENT;
+    constexpr auto blink_percent = BLINK_MINER_TX_FEE_PERCENT + BLINK_BURN_TX_FEE_PERCENT_OLD;
     res.blink_fee_per_byte = res.fee_per_byte * blink_percent / 100;
     res.blink_fee_per_output = res.fee_per_output * blink_percent / 100;
     res.quantization_mask = Blockchain::get_fee_quantization_mask();
@@ -2830,10 +2850,10 @@ namespace cryptonote { namespace rpc {
 
     bool at_least_one_succeeded = false;
     res.quorums.reserve(std::min((uint64_t)16, count));
+    auto net = nettype();
     for (size_t height = start; height != end;)
     {
-      uint8_t hf_version = m_core.get_hard_fork_version(height);
-      if (hf_version != HardFork::INVALID_HF_VERSION)
+      uint8_t hf_version = get_network_version(net, height);
       {
         auto start_quorum_iterator = static_cast<master_nodes::quorum_type>(0);
         auto end_quorum_iterator   = master_nodes::max_quorum_type_for_hf(hf_version);
@@ -2872,7 +2892,7 @@ namespace cryptonote { namespace rpc {
     }
 
     if (uint8_t hf_version; add_curr_pulse
-        && (hf_version = m_core.get_hard_fork_version(curr_height)) >= network_version_17_pulse)
+        && (hf_version = get_network_version(nettype(), curr_height)) >= network_version_17_pulse)
     {
       cryptonote::Blockchain const &blockchain   = m_core.get_blockchain_storage();
       cryptonote::block_header const &top_header = blockchain.get_db().get_block_header_from_height(curr_height - 1);
@@ -2926,7 +2946,7 @@ namespace cryptonote { namespace rpc {
     if (!m_core.master_node())
       throw rpc_error{ERROR_WRONG_PARAM, "Daemon has not been started in master node mode, please relaunch with --master-node flag."};
 
-    uint8_t hf_version = m_core.get_hard_fork_version(m_core.get_current_blockchain_height());
+    uint8_t hf_version = get_network_version(nettype(), m_core.get_current_blockchain_height());
     if (!master_nodes::make_registration_cmd(m_core.get_nettype(), hf_version, req.staking_requirement, req.args, m_core.get_master_keys(), res.registration_cmd, req.make_friendly))
       throw rpc_error{ERROR_INTERNAL, "Failed to make registration command"};
 
@@ -2943,7 +2963,7 @@ namespace cryptonote { namespace rpc {
     std::vector<std::string> args;
 
     uint64_t const curr_height   = m_core.get_current_blockchain_height();
-    uint64_t staking_requirement = master_nodes::get_staking_requirement(m_core.get_nettype(), curr_height, m_core.get_hard_fork_version(curr_height));
+    uint64_t staking_requirement = master_nodes::get_staking_requirement(nettype(), curr_height);
 
     {
       uint64_t portions_cut;
@@ -3021,6 +3041,18 @@ namespace cryptonote { namespace rpc {
     res.status = STATUS_OK;
     return res;
   }
+
+  static time_t reachable_to_time_t(
+      std::chrono::steady_clock::time_point t,
+      std::chrono::system_clock::time_point system_now,
+      std::chrono::steady_clock::time_point steady_now) {
+    if (t == master_nodes::NEVER)
+      return 0;
+    return std::chrono::system_clock::to_time_t(
+            std::chrono::time_point_cast<std::chrono::system_clock::duration>(
+                system_now + (t - steady_now)));
+  }
+
   //------------------------------------------------------------------------------------------------------------------------------
   void core_rpc_server::fill_mn_response_entry(GET_MASTER_NODES::response::entry& entry, const master_nodes::master_node_pubkey_info &mn_info, uint64_t current_height) {
 
@@ -3036,26 +3068,42 @@ namespace cryptonote { namespace rpc {
         ? (info.is_decommissioned() ? info.last_decommission_height : info.active_since_height) : info.last_reward_block_height;
     entry.earned_downtime_blocks        = master_nodes::quorum_cop::calculate_decommission_credit(info, current_height);
     entry.decommission_count            = info.decommission_count;
+    entry.last_decommission_reason_consensus_all      = info.last_decommission_reason_consensus_all;
+    entry.last_decommission_reason_consensus_any      = info.last_decommission_reason_consensus_any;
 
-    m_core.get_master_node_list().access_proof(mn_info.pubkey, [&entry](const auto &proof) {
-        entry.master_node_version     = proof.version;
-        entry.public_ip                = epee::string_tools::get_ip_string_from_int32(proof.public_ip);
-        entry.storage_port             = proof.storage_port;
-        entry.storage_lmq_port         = proof.storage_lmq_port;
-        entry.storage_server_reachable = proof.storage_server_reachable;
-        entry.pubkey_ed25519           = proof.pubkey_ed25519 ? tools::type_to_hex(proof.pubkey_ed25519) : "";
+    auto& netconf = m_core.get_net_config();
+    m_core.get_master_node_list().access_proof(mn_info.pubkey, [&entry, &netconf](const auto &proof) {
+        entry.master_node_version     = proof.proof->version;
+        entry.beldexnet_version          = proof.proof->beldexnet_version;
+        entry.storage_server_version   = proof.proof->storage_server_version;
+        entry.public_ip                = epee::string_tools::get_ip_string_from_int32(proof.proof->public_ip);
+        entry.storage_port             = proof.proof->storage_https_port;
+        entry.storage_lmq_port         = proof.proof->storage_omq_port;
+        entry.pubkey_ed25519           = proof.proof->pubkey_ed25519 ? tools::type_to_hex(proof.proof->pubkey_ed25519) : "";
         entry.pubkey_x25519            = proof.pubkey_x25519 ? tools::type_to_hex(proof.pubkey_x25519) : "";
-        entry.quorumnet_port           = proof.quorumnet_port;
+        entry.quorumnet_port           = proof.proof->qnet_port;
 
         // NOTE: Master Node Testing
         entry.last_uptime_proof                  = proof.timestamp;
-        entry.storage_server_reachable           = proof.storage_server_reachable;
-        entry.storage_server_reachable_timestamp = proof.storage_server_reachable_timestamp;
+        auto system_now = std::chrono::system_clock::now();
+        auto steady_now = std::chrono::steady_clock::now();
+        entry.storage_server_reachable = !proof.ss_reachable.unreachable_for(netconf.UPTIME_PROOF_VALIDITY - netconf.UPTIME_PROOF_FREQUENCY, steady_now);
+        entry.storage_server_first_unreachable = reachable_to_time_t(proof.ss_reachable.first_unreachable, system_now, steady_now);
+        entry.storage_server_last_unreachable = reachable_to_time_t(proof.ss_reachable.last_unreachable, system_now, steady_now);
+        entry.storage_server_last_reachable = reachable_to_time_t(proof.ss_reachable.last_reachable, system_now, steady_now);
+        entry.beldexnet_reachable = !proof.beldexnet_reachable.unreachable_for(netconf.UPTIME_PROOF_VALIDITY - netconf.UPTIME_PROOF_FREQUENCY, steady_now);
+        entry.beldexnet_first_unreachable = reachable_to_time_t(proof.beldexnet_reachable.first_unreachable, system_now, steady_now);
+        entry.beldexnet_last_unreachable = reachable_to_time_t(proof.beldexnet_reachable.last_unreachable, system_now, steady_now);
+        entry.beldexnet_last_reachable = reachable_to_time_t(proof.beldexnet_reachable.last_reachable, system_now, steady_now);
 
-        master_nodes::participation_history const &checkpoint_participation = proof.checkpoint_participation;
-        master_nodes::participation_history const &pulse_participation      = proof.pulse_participation;
+        master_nodes::participation_history<master_nodes::participation_entry> const &checkpoint_participation = proof.checkpoint_participation;
+        master_nodes::participation_history<master_nodes::participation_entry> const &pulse_participation      = proof.pulse_participation;
+        master_nodes::participation_history<master_nodes::timestamp_participation_entry> const &timestamp_participation      = proof.timestamp_participation;
+        master_nodes::participation_history<master_nodes::timesync_entry> const &timesync_status      = proof.timesync_status;
         entry.checkpoint_participation = std::vector<master_nodes::participation_entry>(checkpoint_participation.begin(), checkpoint_participation.end());
         entry.pulse_participation      = std::vector<master_nodes::participation_entry>(pulse_participation.begin(),      pulse_participation.end());
+        entry.timestamp_participation  = std::vector<master_nodes::timestamp_participation_entry>(timestamp_participation.begin(),      timestamp_participation.end());
+        entry.timesync_status          = std::vector<master_nodes::timesync_entry>(timesync_status.begin(),      timesync_status.end());
     });
 
     entry.contributors.reserve(info.contributors.size());
@@ -3100,7 +3148,9 @@ namespace cryptonote { namespace rpc {
     res.height = m_core.get_current_blockchain_height() - 1;
     res.target_height = m_core.get_target_blockchain_height();
     res.block_hash = tools::type_to_hex(m_core.get_block_id_by_height(res.height));
-    res.hardfork = m_core.get_hard_fork_version(res.height);
+    auto [hf, mnode_rev] = get_network_version_revision(nettype(), res.height);
+    res.hardfork = hf;
+    res.mnode_revision = mnode_rev;
 
     if (!req.poll_block_hash.empty()) {
       res.polling_mode = true;
@@ -3172,98 +3222,9 @@ namespace cryptonote { namespace rpc {
 
     return res;
   }
-  //------------------------------------------------------------------------------------------------------------------------------
-  /// Start with seed and perform a series of computation arriving at the answer
-  static uint64_t perform_blockchain_test_routine(const cryptonote::core& core,
-                                                  uint64_t max_height,
-                                                  uint64_t seed)
-  {
-    /// Should be sufficiently large to make it impractical
-    /// to query remote nodes
-    constexpr size_t NUM_ITERATIONS = 1000;
-
-    std::mt19937_64 mt(seed);
-
-    crypto::hash hash;
-
-    uint64_t height = seed;
-
-    for (auto i = 0u; i < NUM_ITERATIONS; ++i)
-    {
-      height = height % (max_height + 1);
-
-      hash = core.get_block_id_by_height(height);
-
-      using blob_t = cryptonote::blobdata;
-      using block_pair_t = std::pair<blob_t, block>;
-
-      /// pick a random byte from the block blob
-      std::vector<block_pair_t> blocks;
-      std::vector<blob_t> txs;
-      if (!core.get_blockchain_storage().get_blocks(height, 1, blocks, txs)) {
-        MERROR("Could not query block at requested height: " << height);
-        return 0;
-      }
-      const blob_t &blob = blocks.at(0).first;
-      const uint64_t byte_idx = tools::uniform_distribution_portable(mt, blob.size());
-      uint8_t byte = blob[byte_idx];
-
-      /// pick a random byte from a random transaction blob if found
-      if (!txs.empty()) {
-        const uint64_t tx_idx = tools::uniform_distribution_portable(mt, txs.size());
-        const blob_t &tx_blob = txs[tx_idx];
-
-        /// not sure if this can be empty, so check to be safe
-        if (!tx_blob.empty()) {
-          const uint64_t byte_idx = tools::uniform_distribution_portable(mt, tx_blob.size());
-          const uint8_t tx_byte = tx_blob[byte_idx];
-          byte ^= tx_byte;
-        }
-
-      }
-
-      {
-        /// reduce hash down to 8 bytes
-        uint64_t n[4];
-        std::memcpy(n, hash.data, sizeof(n));
-        for (auto &ni : n) {
-          boost::endian::little_to_native_inplace(ni);
-        }
-
-        /// Note that byte (obviously) only affects the lower byte
-        /// of height, but that should be sufficient in this case
-        height = n[0] ^ n[1] ^ n[2] ^ n[3] ^ byte;
-      }
-
-    }
-
-    return height;
-  }
-
-  //------------------------------------------------------------------------------------------------------------------------------
-  PERFORM_BLOCKCHAIN_TEST::response core_rpc_server::invoke(PERFORM_BLOCKCHAIN_TEST::request&& req, rpc_context context)
-  {
-    PERFORM_BLOCKCHAIN_TEST::response res{};
-
-    PERF_TIMER(on_perform_blockchain_test);
-
-
-    uint64_t max_height = req.max_height;
-    uint64_t seed = req.seed;
-
-    if (m_core.get_current_blockchain_height() <= max_height)
-      throw rpc_error{ERROR_TOO_BIG_HEIGHT, "Requested block height too big."};
-
-    uint64_t res_height = perform_blockchain_test_routine(m_core, max_height, seed);
-
-    res.status = STATUS_OK;
-    res.res_height = res_height;
-
-    return res;
-  }
 
   namespace {
-    struct version_printer { const std::array<int, 3> &v; };
+    struct version_printer { const std::array<uint16_t, 3> &v; };
     std::ostream &operator<<(std::ostream &o, const version_printer &vp) { return o << vp.v[0] << '.' << vp.v[1] << '.' << vp.v[2]; }
 
     // Handles a ping.  Returns true if the ping was significant (i.e. first ping after startup, or
@@ -3271,7 +3232,13 @@ namespace cryptonote { namespace rpc {
     // argument: true if this ping should trigger an immediate proof send (i.e. first ping after
     // startup or after a ping expiry), false for an ordinary ping.
     template <typename RPC, typename Success>
-    auto handle_ping(std::array<int, 3> cur_version, std::array<int, 3> required, const char* name, std::atomic<std::time_t>& update, time_t lifetime, Success success)
+    auto handle_ping(
+            std::array<uint16_t, 3> cur_version,
+            std::array<uint16_t, 3> required,
+            std::string_view name,
+            std::atomic<std::time_t>& update,
+            std::chrono::seconds lifetime,
+            Success success)
     {
       typename RPC::response res{};
       if (cur_version < required) {
@@ -3282,7 +3249,7 @@ namespace cryptonote { namespace rpc {
       } else {
         auto now = std::time(nullptr);
         auto old = update.exchange(now);
-        bool significant = old + lifetime < now; // Print loudly for the first ping after startup/expiry
+        bool significant = std::chrono::seconds{now - old} > lifetime; // Print loudly for the first ping after startup/expiry
         if (significant)
           MGINFO_GREEN("Received ping from " << name << " " << version_printer{cur_version});
         else
@@ -3297,11 +3264,13 @@ namespace cryptonote { namespace rpc {
   //------------------------------------------------------------------------------------------------------------------------------
   STORAGE_SERVER_PING::response core_rpc_server::invoke(STORAGE_SERVER_PING::request&& req, rpc_context context)
   {
+    m_core.ss_version = req.version;
     return handle_ping<STORAGE_SERVER_PING>(
-      {req.version_major, req.version_minor, req.version_patch}, master_nodes::MIN_STORAGE_SERVER_VERSION,
-      "Storage Server", m_core.m_last_storage_server_ping, STORAGE_SERVER_PING_LIFETIME,
+      req.version, master_nodes::MIN_STORAGE_SERVER_VERSION,
+      "Storage Server", m_core.m_last_storage_server_ping, m_core.get_net_config().UPTIME_PROOF_FREQUENCY,
       [this, &req](bool significant) {
-        m_core.m_storage_lmq_port = req.storage_lmq_port;
+        m_core.m_storage_https_port = req.https_port;
+        m_core.m_storage_omq_port = req.omq_port;
         if (significant)
           m_core.reset_proof_interval();
       });
@@ -3309,9 +3278,10 @@ namespace cryptonote { namespace rpc {
   //------------------------------------------------------------------------------------------------------------------------------
   BELDEXNET_PING::response core_rpc_server::invoke(BELDEXNET_PING::request&& req, rpc_context context)
   {
+    m_core.beldexnet_version = req.version;
     return handle_ping<BELDEXNET_PING>(
         req.version, master_nodes::MIN_BELDEXNET_VERSION,
-        "Beldexnet", m_core.m_last_beldexnet_ping, BELDEXNET_PING_LIFETIME,
+        "Beldexnet", m_core.m_last_beldexnet_ping, m_core.get_net_config().UPTIME_PROOF_FREQUENCY,
         [this](bool significant) { if (significant) m_core.reset_proof_interval(); });
   }
   //------------------------------------------------------------------------------------------------------------------------------
@@ -3322,7 +3292,7 @@ namespace cryptonote { namespace rpc {
     PERF_TIMER(on_get_staking_requirement);
     res.height = req.height > 0 ? req.height : m_core.get_current_blockchain_height();
 
-    res.staking_requirement = master_nodes::get_staking_requirement(m_core.get_nettype(), res.height, m_core.get_hard_fork_version(res.height));
+    res.staking_requirement = master_nodes::get_staking_requirement(nettype(), res.height);
     res.status = STATUS_OK;
     return res;
   }
@@ -3470,9 +3440,9 @@ namespace cryptonote { namespace rpc {
     return res;
   }
   //------------------------------------------------------------------------------------------------------------------------------
-  REPORT_PEER_SS_STATUS::response core_rpc_server::invoke(REPORT_PEER_SS_STATUS::request&& req, rpc_context context)
+  REPORT_PEER_STATUS::response core_rpc_server::invoke(REPORT_PEER_STATUS::request&& req, rpc_context context)
   {
-    REPORT_PEER_SS_STATUS::response res{};
+    REPORT_PEER_STATUS::response res{};
 
     crypto::public_key pubkey;
     if (!tools::hex_to_type(req.pubkey, pubkey)) {
@@ -3480,9 +3450,14 @@ namespace cryptonote { namespace rpc {
       throw rpc_error{ERROR_WRONG_PARAM, "Could not parse public key"};
     }
 
-    if (req.type != "reachability")
+    bool success = false;
+    if (req.type == "beldexnet")
+      success = m_core.get_master_node_list().set_beldexnet_peer_reachable(pubkey, req.passed);
+    else if (req.type == "storage" || req.type == "reachability" /* TODO: old name, can be removed once SS no longer uses it */)
+      success = m_core.get_master_node_list().set_storage_server_peer_reachable(pubkey, req.passed);
+    else
       throw rpc_error{ERROR_WRONG_PARAM, "Unknown status type"};
-    if (!m_core.set_storage_server_peer_reachable(pubkey, req.passed))
+    if (!success)
       throw rpc_error{ERROR_WRONG_PARAM, "Pubkey not found"};
 
     res.status = STATUS_OK;
@@ -3516,7 +3491,7 @@ namespace cryptonote { namespace rpc {
       check_quantity_limit(req.entries.size(), BNS_NAMES_TO_OWNERS::MAX_REQUEST_ENTRIES);
 
     std::optional<uint64_t> height = m_core.get_current_blockchain_height();
-    uint8_t hf_version = m_core.get_hard_fork_version(*height);
+    uint8_t hf_version = get_network_version(nettype(), *height);
     if (req.include_expired) height = std::nullopt;
 
     std::vector<bns::mapping_type> types;
@@ -3598,13 +3573,18 @@ namespace cryptonote { namespace rpc {
     std::vector<bns::mapping_record> records = db.get_mappings_by_owners(owners, height);
     for (auto &record : records)
     {
-      auto& entry = res.entries.emplace_back();
-
-      auto it = owner_to_request_index.find(record.owner);
+      auto it = owner_to_request_index.end();
+      if (record.owner)
+          it = owner_to_request_index.find(record.owner);
+      if (it == owner_to_request_index.end() && record.backup_owner)
+          it = owner_to_request_index.find(record.backup_owner);
       if (it == owner_to_request_index.end())
-        throw rpc_error{ERROR_INTERNAL, "Owner=" + record.owner.to_string(nettype()) +
-          ", could not be mapped back a index in the request 'entries' array"};
+        throw rpc_error{ERROR_INTERNAL,
+            (record.owner ? ("Owner=" + record.owner.to_string(nettype()) + " ") : ""s) +
+            (record.backup_owner ? ("BackupOwner=" + record.backup_owner.to_string(nettype()) + " ") : ""s) +
+            " could not be mapped back a index in the request 'entries' array"};
 
+      auto& entry = res.entries.emplace_back();
       entry.request_index   = it->second;
       entry.type            = record.type;
       entry.name_hash       = std::move(record.name_hash);
@@ -3632,7 +3612,8 @@ namespace cryptonote { namespace rpc {
     if (!name_hash)
       throw rpc_error{ERROR_WRONG_PARAM, "Unable to resolve BNS address: invalid 'name_hash' value '" + req.name_hash + "'"};
 
-    uint8_t hf_version = m_core.get_hard_fork_version(m_core.get_current_blockchain_height());
+
+    uint8_t hf_version = m_core.get_blockchain_storage().get_network_version();
     auto type = static_cast<bns::mapping_type>(req.type);
     if (!bns::mapping_type_allowed(hf_version, type))
       throw rpc_error{ERROR_WRONG_PARAM, "Invalid beldexnet type '" + std::to_string(req.type) + "'"};

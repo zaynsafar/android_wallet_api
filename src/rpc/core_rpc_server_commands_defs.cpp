@@ -108,6 +108,8 @@ KV_SERIALIZE_MAP_CODE_BEGIN(GET_TRANSACTIONS::extra_entry::state_change)
   KV_SERIALIZE(height)
   KV_SERIALIZE(index)
   KV_SERIALIZE(voters)
+  KV_SERIALIZE(reasons);
+  KV_SERIALIZE(reasons_maybe);
 KV_SERIALIZE_MAP_CODE_END()
 KV_SERIALIZE_MAP_CODE_BEGIN(GET_TRANSACTIONS::extra_entry::bns_details)
   KV_SERIALIZE(buy)
@@ -312,9 +314,10 @@ KV_SERIALIZE_MAP_CODE_BEGIN(GET_INFO::response)
   KV_SERIALIZE(immutable_block_hash)
   KV_SERIALIZE(cumulative_difficulty)
   KV_SERIALIZE(block_size_limit)
-  KV_SERIALIZE_OPT(block_weight_limit, (uint64_t)0)
+  KV_SERIALIZE(block_weight_limit)
   KV_SERIALIZE(block_size_median)
-  KV_SERIALIZE_OPT(block_weight_median, (uint64_t)0)
+  KV_SERIALIZE(block_weight_median)
+  KV_SERIALIZE(bns_counts)
   KV_SERIALIZE(start_time)
   KV_SERIALIZE(master_node)
   KV_SERIALIZE(last_storage_server_ping)
@@ -724,18 +727,15 @@ KV_SERIALIZE_MAP_CODE_END()
 
 KV_SERIALIZE_MAP_CODE_BEGIN(HARD_FORK_INFO::request)
   KV_SERIALIZE(version)
+  KV_SERIALIZE(height)
 KV_SERIALIZE_MAP_CODE_END()
 
 
 KV_SERIALIZE_MAP_CODE_BEGIN(HARD_FORK_INFO::response)
   KV_SERIALIZE(version)
   KV_SERIALIZE(enabled)
-  KV_SERIALIZE(window)
-  KV_SERIALIZE(votes)
-  KV_SERIALIZE(threshold)
-  KV_SERIALIZE(voting)
-  KV_SERIALIZE(state)
   KV_SERIALIZE(earliest_height)
+  KV_SERIALIZE(last_height)
   KV_SERIALIZE(status)
   KV_SERIALIZE(untrusted)
 KV_SERIALIZE_MAP_CODE_END()
@@ -1063,18 +1063,6 @@ KV_SERIALIZE_MAP_CODE_BEGIN(GET_MASTER_PRIVKEYS::response)
 KV_SERIALIZE_MAP_CODE_END()
 
 
-KV_SERIALIZE_MAP_CODE_BEGIN(PERFORM_BLOCKCHAIN_TEST::request)
-  KV_SERIALIZE(max_height)
-  KV_SERIALIZE(seed)
-KV_SERIALIZE_MAP_CODE_END()
-
-
-KV_SERIALIZE_MAP_CODE_BEGIN(PERFORM_BLOCKCHAIN_TEST::response)
-  KV_SERIALIZE(status)
-  KV_SERIALIZE(res_height)
-KV_SERIALIZE_MAP_CODE_END()
-
-
 KV_SERIALIZE_MAP_CODE_BEGIN(master_node_contribution)
   KV_SERIALIZE(key_image)
   KV_SERIALIZE(key_image_pub_key)
@@ -1106,6 +1094,8 @@ KV_SERIALIZE_MAP_CODE_BEGIN(GET_MASTER_NODES::requested_fields_t)
     KV_SERIALIZE(decommission_count)
     KV_SERIALIZE(earned_downtime_blocks)
     KV_SERIALIZE(master_node_version)
+    KV_SERIALIZE(beldexnet_version)
+    KV_SERIALIZE(storage_server_version)
     KV_SERIALIZE(contributors)
     KV_SERIALIZE(total_contributed)
     KV_SERIALIZE(total_reserved)
@@ -1123,12 +1113,21 @@ KV_SERIALIZE_MAP_CODE_BEGIN(GET_MASTER_NODES::requested_fields_t)
     KV_SERIALIZE(height)
     KV_SERIALIZE(target_height)
     KV_SERIALIZE(hardfork)
+    KV_SERIALIZE(mnode_revision)
 
     KV_SERIALIZE(last_uptime_proof)
     KV_SERIALIZE(storage_server_reachable)
-    KV_SERIALIZE(storage_server_reachable_timestamp)
+    KV_SERIALIZE(storage_server_first_unreachable)
+    KV_SERIALIZE(storage_server_last_unreachable)
+    KV_SERIALIZE(storage_server_last_reachable)
+    KV_SERIALIZE(beldexnet_reachable)
+    KV_SERIALIZE(beldexnet_first_unreachable)
+    KV_SERIALIZE(beldexnet_last_unreachable)
+    KV_SERIALIZE(beldexnet_last_reachable)
     KV_SERIALIZE(checkpoint_participation)
     KV_SERIALIZE(pulse_participation)
+    KV_SERIALIZE(timestamp_participation)
+    KV_SERIALIZE(timesync_status)
   }
 KV_SERIALIZE_MAP_CODE_END()
 
@@ -1161,6 +1160,8 @@ KV_SERIALIZE_MAP_CODE_BEGIN(GET_MASTER_NODES::response::entry)
   KV_SERIALIZE_ENTRY_FIELD_IF_REQUESTED(decommission_count);
   KV_SERIALIZE_ENTRY_FIELD_IF_REQUESTED(earned_downtime_blocks);
   KV_SERIALIZE_ENTRY_FIELD_IF_REQUESTED(master_node_version);
+  KV_SERIALIZE_ENTRY_FIELD_IF_REQUESTED(beldexnet_version)
+  KV_SERIALIZE_ENTRY_FIELD_IF_REQUESTED(storage_server_version)
   KV_SERIALIZE_ENTRY_FIELD_IF_REQUESTED(contributors);
   KV_SERIALIZE_ENTRY_FIELD_IF_REQUESTED(total_contributed);
   KV_SERIALIZE_ENTRY_FIELD_IF_REQUESTED(total_reserved);
@@ -1176,9 +1177,17 @@ KV_SERIALIZE_MAP_CODE_BEGIN(GET_MASTER_NODES::response::entry)
   KV_SERIALIZE_ENTRY_FIELD_IF_REQUESTED(pubkey_x25519);
   KV_SERIALIZE_ENTRY_FIELD_IF_REQUESTED(last_uptime_proof);
   KV_SERIALIZE_ENTRY_FIELD_IF_REQUESTED(storage_server_reachable);
-  KV_SERIALIZE_ENTRY_FIELD_IF_REQUESTED(storage_server_reachable_timestamp);
+  KV_SERIALIZE_ENTRY_FIELD_IF_REQUESTED(storage_server_first_unreachable)
+  KV_SERIALIZE_ENTRY_FIELD_IF_REQUESTED(storage_server_last_unreachable)
+  KV_SERIALIZE_ENTRY_FIELD_IF_REQUESTED(storage_server_last_reachable)
+  KV_SERIALIZE_ENTRY_FIELD_IF_REQUESTED(beldexnet_reachable);
+  KV_SERIALIZE_ENTRY_FIELD_IF_REQUESTED(beldexnet_first_unreachable)
+  KV_SERIALIZE_ENTRY_FIELD_IF_REQUESTED(beldexnet_last_unreachable)
+  KV_SERIALIZE_ENTRY_FIELD_IF_REQUESTED(beldexnet_last_reachable)
   KV_SERIALIZE_ENTRY_FIELD_IF_REQUESTED(checkpoint_participation);
   KV_SERIALIZE_ENTRY_FIELD_IF_REQUESTED(pulse_participation);
+  KV_SERIALIZE_ENTRY_FIELD_IF_REQUESTED(timestamp_participation);
+  KV_SERIALIZE_ENTRY_FIELD_IF_REQUESTED(timesync_status);
 KV_SERIALIZE_MAP_CODE_END()
 
 
@@ -1189,6 +1198,7 @@ KV_SERIALIZE_MAP_CODE_BEGIN(GET_MASTER_NODES::response)
   if (fields.target_height || fields.all) KV_SERIALIZE(target_height)
   if (fields.block_hash || fields.all || (polling_mode && !unchanged)) KV_SERIALIZE(block_hash)
   if (fields.hardfork || fields.all) KV_SERIALIZE(hardfork)
+  if (fields.mnode_revision || fields.all) KV_SERIALIZE(mnode_revision)
   if (!as_json.empty()) KV_SERIALIZE(as_json)
   if (polling_mode) KV_SERIALIZE(unchanged);
 KV_SERIALIZE_MAP_CODE_END()
@@ -1209,10 +1219,9 @@ KV_SERIALIZE_MAP_CODE_END()
 
 
 KV_SERIALIZE_MAP_CODE_BEGIN(STORAGE_SERVER_PING::request)
-  KV_SERIALIZE(version_major);
-  KV_SERIALIZE(version_minor);
-  KV_SERIALIZE(version_patch);
-  KV_SERIALIZE(storage_lmq_port);
+  KV_SERIALIZE(version);
+  KV_SERIALIZE(https_port);
+  KV_SERIALIZE(omq_port);
 KV_SERIALIZE_MAP_CODE_END()
 
 
@@ -1301,7 +1310,7 @@ KV_SERIALIZE_MAP_CODE_BEGIN(GET_MN_STATE_CHANGES::response)
 KV_SERIALIZE_MAP_CODE_END()
 
 
-KV_SERIALIZE_MAP_CODE_BEGIN(REPORT_PEER_SS_STATUS::request)
+KV_SERIALIZE_MAP_CODE_BEGIN(REPORT_PEER_STATUS::request)
   KV_SERIALIZE(type)
   KV_SERIALIZE(pubkey)
   KV_SERIALIZE(passed)
@@ -1337,7 +1346,6 @@ KV_SERIALIZE_MAP_CODE_BEGIN(BNS_NAMES_TO_OWNERS::response)
   KV_SERIALIZE(entries)
   KV_SERIALIZE(status)
 KV_SERIALIZE_MAP_CODE_END()
-
 
 KV_SERIALIZE_MAP_CODE_BEGIN(BNS_OWNERS_TO_NAMES::request)
   KV_SERIALIZE(entries)
