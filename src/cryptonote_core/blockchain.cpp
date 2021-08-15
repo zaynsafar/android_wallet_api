@@ -3990,19 +3990,7 @@ Blockchain::block_pow_verified Blockchain::verify_block_pow(cryptonote::block co
   crypto::hash const blk_hash = cryptonote::get_block_hash(blk);
   uint64_t const blk_height   = cryptonote::get_block_height(blk);
 
-  // There is a difficulty bug in beldexd that caused a network disagreement at height 526483 where
-  // somewhere around half the network had a slightly-too-high difficulty value and accepted the
-  // block while nodes with the correct difficulty value rejected it.  However this not-quite-enough
-  // difficulty chain had enough of the network following it that it got checkpointed several times
-  // and so cannot be rolled back.
-  //
-  // Hence this hack: starting at that block until the next hard fork, we allow a slight grace
-  // (0.2%) on the required difficulty (but we don't *change* the actual difficulty value used for
-  // diff calculation).
-  if (cryptonote::get_block_height(blk) >= 526483 && get_network_version() < network_version_17_pulse)
-    difficulty = (difficulty * 998) / 1000;
 
-  CHECK_AND_ASSERT_MES(difficulty, result, "!!!!!!!!! difficulty overhead !!!!!!!!!");
   if (alt_block)
   {
     randomx_longhash_context randomx_context = {};
@@ -4643,7 +4631,34 @@ bool Blockchain::add_new_block(const block& bl, block_verification_context& bvc,
     return false;
   }
 
-  if (checkpoint)
+    const int hf_version = get_network_version();
+    if (hf_version >= network_version_12_security_signature){
+        crypto::signature security_signature;
+        const bool has_security_signature = cryptonote::get_security_signature_from_tx_extra(bl.miner_tx.extra,
+                                                                                             security_signature);
+        if (has_security_signature) {
+            uint64_t height = cryptonote::get_block_height(bl);
+            const std::string pkey_string = "96069fc5b64e6d1b017f533f8189b8f198dfef5bf436b7b34877fef27c434b1b";
+            crypto::public_key pkey;
+            tools::hex_to_type(pkey_string,pkey);
+            crypto::hash hash = cryptonote::make_security_hash_from(height,
+                                                                    bl); //in security_signature we need height currentblock weight miner_address
+            if (!crypto::check_signature(hash, pkey, security_signature)) {
+                MGINFO_YELLOW(
+                        "height: " << height << " prev_id:" << bl.prev_id << " hash:" << hash << " security_signature:"
+                                   << security_signature << " pkey:" << pkey);
+                return false;
+            } else {
+                LOG_PRINT_L1("correct signature ");
+            }
+        } else {
+            MGINFO_YELLOW("NO signature in miner_tx ");
+            return false;
+        }
+    }
+
+
+    if (checkpoint)
   {
     checkpoint_t existing_checkpoint;
     uint64_t block_height = get_block_height(bl);
