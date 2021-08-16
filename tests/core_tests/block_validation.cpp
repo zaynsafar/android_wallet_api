@@ -571,7 +571,7 @@ bool gen_block_is_too_big::generate(std::vector<test_event_entry>& events) const
 bool gen_block_invalid_binary_format::generate(std::vector<test_event_entry>& events) const
 {
 #if 1
-  auto hard_forks = beldex_generate_hard_fork_table();
+  std::vector<cryptonote::hard_fork> hard_forks = beldex_generate_hard_fork_table();
   beldex_chain_generator gen(events, hard_forks);
 
   gen.add_blocks_until_version(hard_forks.back().version);

@@ -261,7 +261,7 @@ TYPED_TEST(BlockchainDBTest, AddBlock)
 
   db_wtxn_guard guard(this->m_db);
 
-  db_wtxn_guard guard(this->m_db);
+  // db_wtxn_guard guard(this->m_db);
 
   // adding a block with no parent in the blockchain should throw.
   // note: this shouldn't be possible, but is a good (and cheap) failsafe.
@@ -310,7 +310,7 @@ TYPED_TEST(BlockchainDBTest, RetrieveBlockData)
 
   db_wtxn_guard guard(this->m_db);
 
-  db_wtxn_guard guard(this->m_db);
+  // db_wtxn_guard guard(this->m_db);
 
   ASSERT_NO_THROW(this->m_db->add_block(this->m_blocks[0], t_sizes[0], t_sizes[0],  t_diffs[0], t_coins[0], this->m_txs[0]));
 

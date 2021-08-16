@@ -21,7 +21,7 @@
 // MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL
 // THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
 // SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
-// PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+// PROCUREMENT OF SUBSTITUTE GOODS OR masterS; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
 // INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
 // STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
 // THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
@@ -61,8 +61,8 @@
 
 #include "blockchain_db/testdb.h"
 
-#undef BELDEX_DEFAULT_LOG_CATEGORY
-#define BELDEX_DEFAULT_LOG_CATEGORY "tests.core"
+#undef LOKI_DEFAULT_LOG_CATEGORY
+#define LOKI_DEFAULT_LOG_CATEGORY "tests.core"
 
 #define TESTS_DEFAULT_FEE ((uint64_t)200000000) // 2 * pow(10, 8)
 #define TEST_DEFAULT_DIFFICULTY 1
@@ -204,11 +204,10 @@ private:
   }
 };
 
-typedef std::vector<std::pair<uint8_t, uint64_t>> v_hardforks_t;
 struct event_replay_settings
 {
   event_replay_settings() = default;
-  std::optional<v_hardforks_t> hard_forks;
+  std::optional<std::vector<cryptonote::hard_fork>> hard_forks;
 
 private:
   friend class boost::serialization::access;
@@ -219,6 +218,7 @@ private:
     ar & hard_forks;
   }
 };
+
 
 BINARY_VARIANT_TAG(callback_entry, 0xcb);
 BINARY_VARIANT_TAG(cryptonote::account_base, 0xcc);
@@ -588,7 +588,7 @@ uint64_t get_amount(const cryptonote::account_base& account, const cryptonote::t
 uint64_t get_balance(const cryptonote::account_base& addr, const std::vector<cryptonote::block>& blockchain, const map_hash2tx_t& mtx);
 uint64_t get_unlocked_balance(const cryptonote::account_base& addr, const std::vector<cryptonote::block>& blockchain, const map_hash2tx_t& mtx);
 
-bool extract_hard_forks(const std::vector<test_event_entry>& events, v_hardforks_t& hard_forks);
+bool extract_hard_forks(const std::vector<test_event_entry>& events, std::vector<cryptonote::hard_fork>& hard_forks);
 /************************************************************************/
 /*                                                                      */
 /************************************************************************/
@@ -755,7 +755,7 @@ public:
   }
 
   //
-  // NOTE: beldex
+  // NOTE: Loki
   //
   bool operator()(const beldex_blockchain_addable<cryptonote::checkpoint_t> &entry) const
   {
@@ -843,13 +843,15 @@ public:
   {
     log_event("beldex_blockchain_addable<beldex_transaction>");
     cryptonote::tx_verification_context tvc = {};
-    size_t pool_size                        = m_c.get_pool().get_transactions_count();
+    size_t pool_size = m_c.get_pool().get_transactions_count();
     cryptonote::tx_pool_options opts;
     opts.kept_by_block = entry.data.kept_by_block;
     m_c.handle_incoming_tx(t_serializable_object_to_blob(entry.data.tx), tvc, opts);
 
     bool added = (pool_size + 1) == m_c.get_pool().get_transactions_count();
-    CHECK_AND_NO_ASSERT_MES(added == entry.can_be_added_to_blockchain, false, (entry.fail_msg.size() ? entry.fail_msg : "Failed to add transaction (no reason given)"));
+
+    CHECK_AND_NO_ASSERT_MES(added == entry.can_be_added_to_blockchain, false, (entry.fail_msg.size() ? entry.fail_msg :
+                entry.can_be_added_to_blockchain ? "Failed to add transaction that should have been accepted" : "TX adding should have failed, but didn't"));
     return true;
   }
 
@@ -945,7 +947,7 @@ inline bool do_replay_events_get_core(std::vector<test_event_entry>& events, cry
   // events should be passed a testing context which should have this specific
   // testing situation
   // Hardforks can be specified in events.
-  v_hardforks_t derived_hardforks;
+  std::vector<cryptonote::hard_fork> derived_hardforks;
   bool use_derived_hardforks = extract_hard_forks(events, derived_hardforks);
   const cryptonote::test_options derived_test_options =
   {
@@ -1038,9 +1040,9 @@ inline bool do_replay_file(const std::string& filename)
   generator.construct_block(BLK_NAME, PREV_BLOCK, MINER_ACC);                         \
   VEC_EVENTS.push_back(BLK_NAME);
 
-#define MAKE_NEXT_BLOCK_V2(VEC_EVENTS, BLK_NAME, PREV_BLOCK, MINER_ACC, WINNER, MN_INFO)            \
+#define MAKE_NEXT_BLOCK_V2(VEC_EVENTS, BLK_NAME, PREV_BLOCK, MINER_ACC, WINNER, SN_INFO)            \
   cryptonote::block BLK_NAME;                                                           \
-  generator.construct_block(BLK_NAME, PREV_BLOCK, MINER_ACC, {}, WINNER, MN_INFO);                   \
+  generator.construct_block(BLK_NAME, PREV_BLOCK, MINER_ACC, {}, WINNER, SN_INFO);                   \
   VEC_EVENTS.push_back(BLK_NAME);
 
 #define MAKE_NEXT_BLOCK_TX1(VEC_EVENTS, BLK_NAME, PREV_BLOCK, MINER_ACC, TX1)         \
@@ -1069,13 +1071,13 @@ inline bool do_replay_file(const std::string& filename)
     BLK_NAME = blk_last;                                                              \
   }
 
-#define REWIND_BLOCKS_N_V2(VEC_EVENTS, BLK_NAME, PREV_BLOCK, MINER_ACC, COUNT, WINNER, MN_INFO) \
+#define REWIND_BLOCKS_N_V2(VEC_EVENTS, BLK_NAME, PREV_BLOCK, MINER_ACC, COUNT, WINNER, SN_INFO) \
   cryptonote::block BLK_NAME;                                                           \
   {                                                                                   \
     cryptonote::block blk_last = PREV_BLOCK;                                            \
     for (size_t i = 0; i < COUNT; ++i)                                                \
     {                                                                                 \
-      MAKE_NEXT_BLOCK_V2(VEC_EVENTS, blk, blk_last, MINER_ACC, WINNER, MN_INFO);      \
+      MAKE_NEXT_BLOCK_V2(VEC_EVENTS, blk, blk_last, MINER_ACC, WINNER, SN_INFO);      \
       blk_last = blk;                                                                 \
     }                                                                                 \
     BLK_NAME = blk_last;                                                              \
@@ -1091,7 +1093,7 @@ inline bool do_replay_file(const std::string& filename)
 
 #define MAKE_TX_MIX_RCT(VEC_EVENTS, TX_NAME, FROM, TO, AMOUNT, NMIX, HEAD)                       \
   cryptonote::transaction TX_NAME;                                                             \
-  construct_tx_to_key(VEC_EVENTS, TX_NAME, HEAD, FROM, TO, AMOUNT, TESTS_DEFAULT_FEE, NMIX, rct::RangeProofPaddedBulletproof); \
+  construct_tx_to_key(VEC_EVENTS, TX_NAME, HEAD, FROM, TO, AMOUNT, TESTS_DEFAULT_FEE, NMIX, rct::RangeProofType::PaddedBulletproof); \
   VEC_EVENTS.push_back(TX_NAME);
 
 #define MAKE_TX(VEC_EVENTS, TX_NAME, FROM, TO, AMOUNT, HEAD) MAKE_TX_MIX(VEC_EVENTS, TX_NAME, FROM, TO, AMOUNT, 9, HEAD)
@@ -1106,7 +1108,7 @@ inline bool do_replay_file(const std::string& filename)
 
 
 #define MAKE_TX_MIX_LIST_RCT(VEC_EVENTS, SET_NAME, FROM, TO, AMOUNT, NMIX, HEAD) \
-        MAKE_TX_MIX_LIST_RCT_EX(VEC_EVENTS, SET_NAME, FROM, TO, AMOUNT, NMIX, HEAD, rct::RangeProofPaddedBulletproof, 1)
+        MAKE_TX_MIX_LIST_RCT_EX(VEC_EVENTS, SET_NAME, FROM, TO, AMOUNT, NMIX, HEAD, rct::RangeProofType::PaddedBulletproof, 1)
 #define MAKE_TX_MIX_LIST_RCT_EX(VEC_EVENTS, SET_NAME, FROM, TO, AMOUNT, NMIX, HEAD, RCT_TYPE, BP_VER)  \
   {                                                                                      \
     cryptonote::transaction t;                                                           \
@@ -1116,7 +1118,7 @@ inline bool do_replay_file(const std::string& filename)
   }
 
 #define MAKE_TX_MIX_DEST_LIST_RCT(VEC_EVENTS, SET_NAME, FROM, TO, NMIX, HEAD)            \
-        MAKE_TX_MIX_DEST_LIST_RCT_EX(VEC_EVENTS, SET_NAME, FROM, TO, NMIX, HEAD, rct::RangeProofPaddedBulletproof, 1)
+        MAKE_TX_MIX_DEST_LIST_RCT_EX(VEC_EVENTS, SET_NAME, FROM, TO, NMIX, HEAD, rct::RangeProofType::PaddedBulletproof, 1)
 #define MAKE_TX_MIX_DEST_LIST_RCT_EX(VEC_EVENTS, SET_NAME, FROM, TO, NMIX, HEAD, RCT_TYPE, BP_VER)  \
   {                                                                                      \
     cryptonote::transaction t;                                                           \
@@ -1149,18 +1151,6 @@ inline bool do_replay_file(const std::string& filename)
     MAKE_TX_MIX_LIST_RCT(VEC_EVENTS, SET_NAME, FROM, TO, AMOUNT, NMIX, HEAD);
 
 #define SET_EVENT_VISITOR_SETT(VEC_EVENTS, SETT, VAL) VEC_EVENTS.push_back(event_visitor_settings(SETT, VAL));
-
-#define GENERATE(filename, generator_class) \
-    { \
-        std::vector<test_event_entry> events; \
-        generator_class g; \
-        g.generate(events); \
-        if (!tools::serialize_obj_to_file(events, filename)) \
-        { \
-            MERROR("Failed to serialize data to file: " << filename); \
-            throw std::runtime_error("Failed to serialize data to file"); \
-        } \
-    }
 
 
 #define PLAY(filename, generator_class) \
@@ -1240,43 +1230,6 @@ inline bool do_replay_file(const std::string& filename)
     CATCH_GENERATE_REPLAY_CORE(generator_class, generator_class_instance, CORE);                                       \
   }
 
-#define CATCH_GENERATE_REPLAY(generator_class, generator_class_instance)                                               \
-  CATCH_REPLAY(generator_class);                                                                                       \
-  REPLAY_CORE(generator_class, generator_class_instance);
-
-#define CATCH_GENERATE_REPLAY_CORE(generator_class, generator_class_instance, CORE)                                    \
-  CATCH_REPLAY(generator_class);                                                                                       \
-  REPLAY_WITH_CORE(generator_class, generator_class_instance, CORE);
-
-#define GENERATE_AND_PLAY(generator_class)                                                                             \
-  if (list_tests)                                                                                                      \
-    std::cout << #generator_class << std::endl;                                                                        \
-  else if (std::cmatch m; filter.empty() || std::regex_match(#generator_class, m, std::regex(filter)))                 \
-  {                                                                                                                    \
-    std::vector<test_event_entry> events;                                                                              \
-    ++tests_count;                                                                                                     \
-    bool generated = false;                                                                                            \
-    generator_class generator_class_instance;                                                                          \
-    try                                                                                                                \
-    {                                                                                                                  \
-      generated = generator_class_instance.generate(events);                                                           \
-    }                                                                                                                  \
-    CATCH_GENERATE_REPLAY(generator_class, generator_class_instance);                                                  \
-  }
-
-#define GENERATE_AND_PLAY_INSTANCE(generator_class, generator_class_instance, CORE)                                    \
-  if (std::cmatch m; filter.empty() || std::regex_match(#generator_class, m, std::regex(filter)))                      \
-  {                                                                                                                    \
-    std::vector<test_event_entry> events;                                                                              \
-    ++tests_count;                                                                                                     \
-    bool generated = false;                                                                                            \
-    try                                                                                                                \
-    {                                                                                                                  \
-      generated = ins.generate(events);                                                                                \
-    }                                                                                                                  \
-    CATCH_GENERATE_REPLAY_CORE(generator_class, generator_class_instance, CORE);                                       \
-  }
-
 #define QUOTEME(x) #x
 #define DEFINE_TESTS_ERROR_CONTEXT(text) const char* perr_context = text;
 #define CHECK_TEST_CONDITION(cond) CHECK_AND_ASSERT_MES(cond, false, "[" << perr_context << "] failed: \"" << QUOTEME(cond) << "\"")
@@ -1285,8 +1238,18 @@ inline bool do_replay_file(const std::string& filename)
 #define CHECK_NOT_EQ(v1, v2) CHECK_AND_ASSERT_MES(!(v1 == v2), false, "[" << perr_context << "] failed: \"" << QUOTEME(v1) << " != " << QUOTEME(v2) << "\", " << v1 << " == " << v2)
 #define MK_COINS(amount) (UINT64_C(amount) * COIN)
 
+inline std::string make_junk() {
+  std::string junk;
+  junk.reserve(1024);
+  for (size_t i = 0; i < 256; i++)
+    junk += (char) i;
+  junk += junk;
+  junk += junk;
+  return junk;
+}
+
 //
-// NOTE: beldex
+// NOTE: Beldex
 //
 class beldex_tx_builder {
 
@@ -1300,6 +1263,7 @@ class beldex_tx_builder {
   uint64_t m_amount;
   uint64_t m_fee;
   uint64_t m_unlock_time;
+  uint64_t m_junk_size = 0;
   std::vector<uint8_t> m_extra;
   cryptonote::beldex_construct_tx_params m_tx_params;
 
@@ -1346,12 +1310,19 @@ public:
     return std::move(*this);
   }
 
+  beldex_tx_builder&& with_junk(size_t size) {
+    m_junk_size = size;
+    return std::move(*this);
+  }
+
   ~beldex_tx_builder() {
     if (!m_finished) {
       std::cerr << "Tx building not finished\n";
       abort();
     }
   }
+
+  inline static const std::string junk1k = make_junk();
 
   bool build()
   {
@@ -1374,6 +1345,20 @@ public:
         m_events, m_head, m_from, m_to, m_amount, m_fee, nmix, sources, destinations, &change_amount);
     }
 
+    if (m_junk_size > 0) {
+      std::string junk;
+      junk.reserve(m_junk_size + 10);
+      tools::write_varint(std::back_inserter(junk), m_junk_size);
+      m_junk_size += junk.size(); // we just added some bytes for the varint
+      std::string_view junk_piece{junk1k};
+      while (junk.size() < m_junk_size) {
+        if (junk.size() + junk_piece.size() > m_junk_size)
+          junk_piece = junk_piece.substr(0, m_junk_size - junk.size());
+        junk += junk_piece;
+      }
+      cryptonote::add_tagged_data_to_tx_extra(m_extra, cryptonote::TX_EXTRA_MYSTERIOUS_MINERGATE_TAG, junk);
+    }
+
     cryptonote::tx_destination_entry change_addr{ change_amount, m_from.get_keys().m_account_address, false /*is_subaddr*/ };
     bool result = cryptonote::construct_tx(
       m_from.get_keys(), sources, destinations, change_addr, m_extra, m_tx, m_unlock_time, m_tx_params);
@@ -1383,7 +1368,7 @@ public:
 
 void                                      fill_nonce_with_beldex_generator          (struct beldex_chain_generator const *generator, cryptonote::block& blk, const cryptonote::difficulty_type& diffic, uint64_t height);
 void                                      beldex_register_callback                  (std::vector<test_event_entry> &events, std::string const &callback_name, beldex_callback callback);
-std::vector<std::pair<uint8_t, uint64_t>> beldex_generate_sequential_hard_fork_table(uint8_t max_hf_version = cryptonote::network_version_count - 1, uint64_t pos_delay = 60);
+std::vector<cryptonote::hard_fork> beldex_generate_hard_fork_table(uint8_t max_hf_version = cryptonote::network_version_count - 1, uint64_t pos_delay = 60);
 
 struct beldex_blockchain_entry
 {
@@ -1450,10 +1435,10 @@ struct beldex_chain_generator
   beldex_chain_generator_db                                            db_;
   uint8_t                                                            hf_version_ = cryptonote::network_version_7;
   std::vector<test_event_entry>&                                     events_;
-  const std::vector<std::pair<uint8_t, uint64_t>>                    hard_forks_;
+  const std::vector<cryptonote::hard_fork>                          hard_forks_;
   cryptonote::account_base                                           first_miner_;
 
-  beldex_chain_generator(std::vector<test_event_entry> &events, const std::vector<std::pair<uint8_t, uint64_t>> &hard_forks);
+  beldex_chain_generator(std::vector<test_event_entry> &events, const std::vector<cryptonote::hard_fork> &hard_forks);
 
   uint64_t                                             height()       const { return cryptonote::get_block_height(db_.blocks.back().block); }
   uint64_t                                             chain_height() const { return height() + 1; }
@@ -1473,7 +1458,7 @@ struct beldex_chain_generator
   void                                                 add_n_blocks(int n);
   bool                                                 add_blocks_until_next_checkpointable_height();
   void                                                 add_master_node_checkpoint(uint64_t block_height, size_t num_votes);
-  void                                                 add_mined_money_unlock_blocks(); // NOTE: Unlock all beldex generated from mining prior to this call i.e. CRYPTONOTE_MINED_MONEY_UNLOCK_WINDOW
+  void                                                 add_mined_money_unlock_blocks(); // NOTE: Unlock all Loki generated from mining prior to this call i.e. CRYPTONOTE_MINED_MONEY_UNLOCK_WINDOW
   void                                                 add_transfer_unlock_blocks(); // Unlock funds from (standard) transfers prior to this call, i.e. CRYPTONOTE_DEFAULT_TX_SPENDABLE_AGE
 
   // NOTE: Add an event that is just a user specified message to signify progress in the test
@@ -1488,10 +1473,12 @@ struct beldex_chain_generator
   cryptonote::transaction                              create_and_add_beldex_name_system_tx_update(cryptonote::account_base const &src, uint8_t hf_version, bns::mapping_type type, std::string const &name, bns::mapping_value const *value, bns::generic_owner const *owner = nullptr, bns::generic_owner const *backup_owner = nullptr, bns::generic_signature *signature = nullptr, bool kept_by_block = false);
   cryptonote::transaction                              create_and_add_beldex_name_system_tx_renew(cryptonote::account_base const &src, uint8_t hf_version, bns::mapping_type type, std::string const &name, bool kept_by_block = false);
   cryptonote::transaction                              create_and_add_tx                 (const cryptonote::account_base& src, const cryptonote::account_public_address& dest, uint64_t amount, uint64_t fee = TESTS_DEFAULT_FEE, bool kept_by_block = false);
-  cryptonote::transaction                              create_and_add_state_change_tx(master_nodes::new_state state, const crypto::public_key& pub_key, uint64_t height = -1, const std::vector<uint64_t>& voters = {}, uint64_t fee = 0, bool kept_by_block = false);
-  cryptonote::transaction                              create_and_add_registration_tx(const cryptonote::account_base& src, const cryptonote::keypair& mn_keys = cryptonote::keypair{hw::get_device("default")}, bool kept_by_block = false);
+  cryptonote::transaction                              create_and_add_state_change_tx(master_nodes::new_state state, const crypto::public_key& pub_key, uint16_t reasons_all, uint16_t reasons_any, uint64_t height = -1, const std::vector<uint64_t>& voters = {}, uint64_t fee = 0, bool kept_by_block = false);
+  cryptonote::transaction                              create_and_add_registration_tx(const cryptonote::account_base& src, const cryptonote::keypair& sn_keys = cryptonote::keypair{hw::get_device("default")}, bool kept_by_block = false);
   cryptonote::transaction                              create_and_add_staking_tx     (const crypto::public_key &pub_key, const cryptonote::account_base &src, uint64_t amount, bool kept_by_block = false);
   beldex_blockchain_entry                               &create_and_add_next_block     (const std::vector<cryptonote::transaction>& txs = {}, cryptonote::checkpoint_t const *checkpoint = nullptr, bool can_be_added_to_blockchain = true, std::string const &fail_msg = {});
+  // Same as create_and_add_tx, but also adds 95kB of junk into tx_extra to bloat up the tx size.
+  cryptonote::transaction create_and_add_big_tx(const cryptonote::account_base& src, const cryptonote::account_public_address& dest, uint64_t amount, uint64_t junk_size = 95000, uint64_t fee = TESTS_DEFAULT_FEE, bool kept_by_block = false);
 
   // NOTE: Create transactions but don't add to events_
   cryptonote::transaction                              create_tx(const cryptonote::account_base &src, const cryptonote::account_public_address &dest, uint64_t amount, uint64_t fee) const;
@@ -1502,14 +1489,14 @@ struct beldex_chain_generator
                                                                               std::array<beldex_master_node_contribution, 3> const &contributors = {},
                                                                               int num_contributors = 0) const;
   cryptonote::transaction                              create_staking_tx     (const crypto::public_key& pub_key, const cryptonote::account_base &src, uint64_t amount) const;
-  cryptonote::transaction                              create_state_change_tx(master_nodes::new_state state, const crypto::public_key& pub_key, uint64_t height = -1, const std::vector<uint64_t>& voters = {}, uint64_t fee = 0) const;
+  cryptonote::transaction                              create_state_change_tx(master_nodes::new_state state, const crypto::public_key& pub_key, uint16_t reasons_all, uint16_t reasons_any, uint64_t height = -1, const std::vector<uint64_t>& voters = {}, uint64_t fee = 0) const;
   cryptonote::checkpoint_t                             create_master_node_checkpoint(uint64_t block_height, size_t num_votes) const;
 
   // value: Takes the binary value NOT the human readable version, of the name->value mapping
-  static const uint64_t BNS_AUTO_BURN = static_cast<uint64_t>(-1);
+  static const uint64_t ONS_AUTO_BURN = static_cast<uint64_t>(-1);
   cryptonote::transaction                              create_beldex_name_system_tx(cryptonote::account_base const &src, uint8_t hf_version, bns::mapping_type type, std::string const &name, bns::mapping_value const &value, bns::generic_owner const *owner = nullptr, bns::generic_owner const *backup_owner = nullptr, std::optional<uint64_t> burn_override = std::nullopt) const;
   cryptonote::transaction                              create_beldex_name_system_tx_update(cryptonote::account_base const &src, uint8_t hf_version, bns::mapping_type type, std::string const &name, bns::mapping_value const *value, bns::generic_owner const *owner = nullptr, bns::generic_owner const *backup_owner = nullptr, bns::generic_signature *signature = nullptr, bool use_asserts = false) const;
-  cryptonote::transaction                              create_beldex_name_system_tx_update_w_extra(cryptonote::account_base const &src, uint8_t hf_version, cryptonote::tx_extra_beldex_name_system const &bns_extra) const;
+  cryptonote::transaction                              create_beldex_name_system_tx_update_w_extra(cryptonote::account_base const &src, uint8_t hf_version, cryptonote::tx_extra_beldex_name_system const &ons_extra) const;
   cryptonote::transaction                              create_beldex_name_system_tx_renew(cryptonote::account_base const &src, uint8_t hf_version, bns::mapping_type type, std::string const &name, std::optional<uint64_t> burn_override = std::nullopt) const;
 
   beldex_blockchain_entry                                create_genesis_block(const cryptonote::account_base &miner, uint64_t timestamp);

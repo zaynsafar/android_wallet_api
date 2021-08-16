@@ -35,6 +35,7 @@
 #include "cryptonote_config.h"
 #include "cryptonote_core/beldex_name_system.h"
 #include "cryptonote_core/master_node_list.h"
+#include "cryptonote_core/uptime_proof.h"
 #include "beldex_economy.h"
 #include "common/random.h"
 
@@ -68,10 +69,10 @@ static void add_master_nodes(beldex_chain_generator &gen, size_t count)
 // code path" again
 bool beldex_checkpointing_alt_chain_handle_alt_blocks_at_tip::generate(std::vector<test_event_entry>& events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = beldex_generate_sequential_hard_fork_table();
+  std::vector<cryptonote::hard_fork> hard_forks = beldex_generate_hard_fork_table();
   beldex_chain_generator gen(events, hard_forks);
 
-  gen.add_blocks_until_version(hard_forks.back().first);
+  gen.add_blocks_until_version(hard_forks.back().version);
   gen.add_mined_money_unlock_blocks();
   add_master_nodes(gen, master_nodes::CHECKPOINT_QUORUM_SIZE);
 
@@ -127,10 +128,10 @@ bool beldex_checkpointing_alt_chain_handle_alt_blocks_at_tip::generate(std::vect
 // NOTE: - Checks that a chain with a checkpoint but less PoW is preferred over a chain that is longer with more PoW but no checkpoints
 bool beldex_checkpointing_alt_chain_more_master_node_checkpoints_less_pow_overtakes::generate(std::vector<test_event_entry>& events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = beldex_generate_sequential_hard_fork_table();
+  std::vector<cryptonote::hard_fork> hard_forks = beldex_generate_hard_fork_table();
   beldex_chain_generator gen(events, hard_forks);
 
-  gen.add_blocks_until_version(hard_forks.back().first);
+  gen.add_blocks_until_version(hard_forks.back().version);
   gen.add_mined_money_unlock_blocks();
 
   int constexpr NUM_MASTER_NODES = master_nodes::CHECKPOINT_QUORUM_SIZE;
@@ -164,10 +165,10 @@ bool beldex_checkpointing_alt_chain_more_master_node_checkpoints_less_pow_overta
 // NOTE: - A chain that receives checkpointing votes sufficient to form a checkpoint should reorg back accordingly
 bool beldex_checkpointing_alt_chain_receive_checkpoint_votes_should_reorg_back::generate(std::vector<test_event_entry>& events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = beldex_generate_sequential_hard_fork_table();
+  std::vector<cryptonote::hard_fork> hard_forks = beldex_generate_hard_fork_table();
   beldex_chain_generator gen(events, hard_forks);
 
-  gen.add_blocks_until_version(hard_forks.back().first);
+  gen.add_blocks_until_version(hard_forks.back().version);
   gen.add_mined_money_unlock_blocks();
 
   int constexpr NUM_MASTER_NODES = master_nodes::CHECKPOINT_QUORUM_SIZE;
@@ -231,9 +232,9 @@ bool beldex_checkpointing_alt_chain_receive_checkpoint_votes_should_reorg_back::
 
 bool beldex_checkpointing_alt_chain_too_old_should_be_dropped::generate(std::vector<test_event_entry> &events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = beldex_generate_sequential_hard_fork_table();
+  std::vector<cryptonote::hard_fork> hard_forks = beldex_generate_hard_fork_table();
   beldex_chain_generator gen(events, hard_forks);
-  gen.add_blocks_until_version(hard_forks.back().first);
+  gen.add_blocks_until_version(hard_forks.back().version);
   gen.add_mined_money_unlock_blocks();
 
   int constexpr NUM_MASTER_NODES = master_nodes::CHECKPOINT_QUORUM_SIZE;
@@ -266,10 +267,10 @@ bool beldex_checkpointing_alt_chain_too_old_should_be_dropped::generate(std::vec
 // available checkpoint heights whilst maintaining equal heights with the main chain
 bool beldex_checkpointing_alt_chain_with_increasing_master_node_checkpoints::generate(std::vector<test_event_entry>& events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = beldex_generate_sequential_hard_fork_table();
+  std::vector<cryptonote::hard_fork> hard_forks = beldex_generate_hard_fork_table();
   beldex_chain_generator gen(events, hard_forks);
 
-  gen.add_blocks_until_version(hard_forks.back().first);
+  gen.add_blocks_until_version(hard_forks.back().version);
   gen.add_mined_money_unlock_blocks();
   add_master_nodes(gen, master_nodes::CHECKPOINT_QUORUM_SIZE);
 
@@ -326,10 +327,10 @@ bool beldex_checkpointing_alt_chain_with_increasing_master_node_checkpoints::gen
 //       - Checks invalid vote (signature or key) is not accepted due to not being part of the quorum
 bool beldex_checkpointing_master_node_checkpoint_from_votes::generate(std::vector<test_event_entry>& events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = beldex_generate_sequential_hard_fork_table();
+  std::vector<cryptonote::hard_fork> hard_forks = beldex_generate_hard_fork_table();
   beldex_chain_generator gen(events, hard_forks);
 
-  gen.add_blocks_until_version(hard_forks.back().first);
+  gen.add_blocks_until_version(hard_forks.back().version);
   gen.add_mined_money_unlock_blocks();
   add_master_nodes(gen, master_nodes::CHECKPOINT_QUORUM_SIZE);
 
@@ -390,10 +391,10 @@ bool beldex_checkpointing_master_node_checkpoint_from_votes::generate(std::vecto
 //       - Checks you can add a block after the 1st checkpoint out of 2 checkpoints.
 bool beldex_checkpointing_master_node_checkpoints_check_reorg_windows::generate(std::vector<test_event_entry>& events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = beldex_generate_sequential_hard_fork_table();
+  std::vector<cryptonote::hard_fork> hard_forks = beldex_generate_hard_fork_table();
   beldex_chain_generator gen(events, hard_forks);
 
-  gen.add_blocks_until_version(hard_forks.back().first);
+  gen.add_blocks_until_version(hard_forks.back().version);
   gen.add_mined_money_unlock_blocks();
   add_master_nodes(gen, master_nodes::CHECKPOINT_QUORUM_SIZE);
 
@@ -437,11 +438,11 @@ bool beldex_checkpointing_master_node_checkpoints_check_reorg_windows::generate(
 
 bool beldex_core_block_reward_unpenalized_pre_pulse::generate(std::vector<test_event_entry>& events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = beldex_generate_sequential_hard_fork_table(cryptonote::network_version_17_pulse - 1);
+  auto hard_forks = beldex_generate_hard_fork_table(cryptonote::network_version_17_pulse - 1);
   beldex_chain_generator gen(events, hard_forks);
-  gen.add_blocks_until_version(hard_forks.back().first);
+  gen.add_blocks_until_version(hard_forks.back().version);
 
-  uint8_t newest_hf = hard_forks.back().first;
+  uint8_t newest_hf = hard_forks.back().version;
   assert(newest_hf >= cryptonote::network_version_14_enforce_checkpoints);
 
   gen.add_mined_money_unlock_blocks();
@@ -476,13 +477,13 @@ bool beldex_core_block_reward_unpenalized_pre_pulse::generate(std::vector<test_e
 
 bool beldex_core_block_reward_unpenalized_post_pulse::generate(std::vector<test_event_entry>& events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = beldex_generate_sequential_hard_fork_table(cryptonote::network_version_count -1, 150 /*Proof Of Stake Delay*/);
+  std::vector<cryptonote::hard_fork> hard_forks = beldex_generate_hard_fork_table(cryptonote::network_version_count -1, 150 /*Proof Of Stake Delay*/);
   beldex_chain_generator gen(events, hard_forks);
 
-  uint8_t const newest_hf = hard_forks.back().first;
+  uint8_t const newest_hf = hard_forks.back().version;
   assert(newest_hf >= cryptonote::network_version_14_enforce_checkpoints);
 
-  gen.add_blocks_until_version(hard_forks.back().first);
+  gen.add_blocks_until_version(hard_forks.back().version);
   gen.add_mined_money_unlock_blocks();
 
   // Make big chunky TX's to trigger the block size penalty
@@ -539,11 +540,11 @@ bool beldex_core_block_reward_unpenalized_post_pulse::generate(std::vector<test_
 
 bool beldex_core_fee_burning::generate(std::vector<test_event_entry>& events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = beldex_generate_sequential_hard_fork_table();
+  std::vector<cryptonote::hard_fork> hard_forks = beldex_generate_hard_fork_table();
   beldex_chain_generator gen(events, hard_forks);
-  gen.add_blocks_until_version(hard_forks.back().first);
+  gen.add_blocks_until_version(hard_forks.back().version);
 
-  uint8_t newest_hf = hard_forks.back().first;
+  uint8_t newest_hf = hard_forks.back().version;
   assert(newest_hf >= cryptonote::network_version_15_blink);
 
   gen.add_mined_money_unlock_blocks();
@@ -621,14 +622,14 @@ bool beldex_core_fee_burning::generate(std::vector<test_event_entry>& events)
 
 bool beldex_core_governance_batched_reward::generate(std::vector<test_event_entry>& events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = beldex_generate_sequential_hard_fork_table(cryptonote::network_version_10_bulletproofs);
+  auto hard_forks = beldex_generate_hard_fork_table(cryptonote::network_version_10_bulletproofs);
 
   uint64_t hf10_height = 0;
-  for (std::pair<uint8_t, uint64_t> hf_pair : hard_forks)
+  for (const auto& [maj, mn_rev, height, ts] : hard_forks)
   {
-    if (hf_pair.first == cryptonote::network_version_10_bulletproofs)
+    if (maj == cryptonote::network_version_10_bulletproofs)
     {
-      hf10_height = hf_pair.second;
+      hf10_height = height;
       break;
     }
   }
@@ -647,14 +648,14 @@ bool beldex_core_governance_batched_reward::generate(std::vector<test_event_entr
     // NOTE(beldex): Since hard fork 8 we have an emissions curve change, so if
     // you don't atleast progress and generate blocks from hf8 you will run into
     // problems
-    std::vector<std::pair<uint8_t, uint64_t>> other_hard_forks = {
-        std::make_pair(cryptonote::network_version_7, 0),
-        std::make_pair(cryptonote::network_version_8, 1),
-        std::make_pair(cryptonote::network_version_9_master_nodes, hf10_height)};
+    std::vector<cryptonote::hard_fork> other_hard_forks = {
+        {7,0,0,0},
+        {8,0,1,0},
+        {9,0,hf10_height,0}};
 
     std::vector<test_event_entry> unused_events;
     beldex_chain_generator no_batched_governance_generator(unused_events, other_hard_forks);
-    no_batched_governance_generator.add_blocks_until_version(other_hard_forks.back().first);
+    no_batched_governance_generator.add_blocks_until_version(other_hard_forks.back().version);
 
     while(no_batched_governance_generator.height() < batched_governance_generator.height())
       no_batched_governance_generator.create_and_add_next_block();
@@ -697,9 +698,9 @@ bool beldex_core_governance_batched_reward::generate(std::vector<test_event_entr
 bool beldex_core_block_rewards_lrc6::generate(std::vector<test_event_entry>& events)
 {
   constexpr auto& network = cryptonote::get_config(cryptonote::FAKECHAIN);
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = beldex_generate_sequential_hard_fork_table(cryptonote::network_version_16_bns);
-  hard_forks.emplace_back(cryptonote::network_version_17_pulse, hard_forks.back().second + network.GOVERNANCE_REWARD_INTERVAL_IN_BLOCKS + 10);
-  hard_forks.emplace_back(cryptonote::network_version_18, hard_forks.back().second + network.GOVERNANCE_REWARD_INTERVAL_IN_BLOCKS);
+  std::vector<cryptonote::hard_fork> hard_forks = beldex_generate_hard_fork_table(cryptonote::network_version_16_bns);
+  hard_forks.push_back({cryptonote::network_version_17_pulse,0, hard_forks.back().height + network.GOVERNANCE_REWARD_INTERVAL_IN_BLOCKS + 10});
+  hard_forks.push_back({cryptonote::network_version_18,0, hard_forks.back().height + network.GOVERNANCE_REWARD_INTERVAL_IN_BLOCKS});
   beldex_chain_generator batched_governance_generator(events, hard_forks);
   batched_governance_generator.add_blocks_until_version(cryptonote::network_version_18);
   batched_governance_generator.add_n_blocks(network.GOVERNANCE_REWARD_INTERVAL_IN_BLOCKS);
@@ -707,12 +708,12 @@ bool beldex_core_block_rewards_lrc6::generate(std::vector<test_event_entry>& eve
   uint64_t hf15_height = 0, hf16_height = 0, hf17_height = 0;
   for (const auto &hf : hard_forks)
   {
-    if (hf.first == cryptonote::network_version_16_bns)
-      hf15_height = hf.second;
-    else if (hf.first == cryptonote::network_version_17_pulse)
-      hf16_height = hf.second;
+    if (hf.version == cryptonote::network_version_16_bns)
+      hf15_height = hf.height;
+    else if (hf.version == cryptonote::network_version_17_pulse)
+      hf16_height = hf.height;
     else
-      hf17_height = hf.second;
+      hf17_height = hf.height;
   }
 
   beldex_register_callback(events, "check_lrc6_7_block_rewards", [hf15_height, hf16_height, hf17_height, interval=network.GOVERNANCE_REWARD_INTERVAL_IN_BLOCKS](cryptonote::core &c, size_t ev_index)
@@ -780,12 +781,12 @@ bool beldex_core_block_rewards_lrc6::generate(std::vector<test_event_entry>& eve
 
 bool beldex_core_test_deregister_preferred::generate(std::vector<test_event_entry> &events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = beldex_generate_sequential_hard_fork_table(cryptonote::network_version_9_master_nodes);
+  std::vector<cryptonote::hard_fork> hard_forks = beldex_generate_hard_fork_table(cryptonote::network_version_9_master_nodes);
   beldex_chain_generator gen(events, hard_forks);
   const auto miner                 = gen.first_miner();
   const auto alice                 = gen.add_account();
 
-  gen.add_blocks_until_version(hard_forks.back().first);
+  gen.add_blocks_until_version(hard_forks.back().version);
   gen.add_n_blocks(60); /// give miner some outputs to spend and unlock them
   gen.add_mined_money_unlock_blocks();
   add_master_nodes(gen, 12);
@@ -798,8 +799,8 @@ bool beldex_core_test_deregister_preferred::generate(std::vector<test_event_entr
   /// generate two deregisters
   const auto deregister_pub_key_1 = gen.top_quorum().obligations->workers[0];
   const auto deregister_pub_key_2 = gen.top_quorum().obligations->workers[1];
-  gen.create_and_add_state_change_tx(master_nodes::new_state::deregister, deregister_pub_key_1);
-  gen.create_and_add_state_change_tx(master_nodes::new_state::deregister, deregister_pub_key_2);
+  gen.create_and_add_state_change_tx(master_nodes::new_state::deregister, deregister_pub_key_1,0,0);
+  gen.create_and_add_state_change_tx(master_nodes::new_state::deregister, deregister_pub_key_2,0,0);
 
   beldex_register_callback(events, "check_prefer_deregisters", [&events, miner](cryptonote::core &c, size_t ev_index)
   {
@@ -837,11 +838,11 @@ bool beldex_core_test_deregister_preferred::generate(std::vector<test_event_entr
 // to test), they don't get deregistered.
 bool beldex_core_test_deregister_safety_buffer::generate(std::vector<test_event_entry> &events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = beldex_generate_sequential_hard_fork_table(cryptonote::network_version_9_master_nodes);
+  std::vector<cryptonote::hard_fork> hard_forks = beldex_generate_hard_fork_table(cryptonote::network_version_9_master_nodes);
   beldex_chain_generator gen(events, hard_forks);
   const auto miner = gen.first_miner();
 
-  gen.add_blocks_until_version(hard_forks.back().first);
+  gen.add_blocks_until_version(hard_forks.back().version);
   gen.add_n_blocks(40); /// give miner some outputs to spend and unlock them
   gen.add_mined_money_unlock_blocks();
   add_master_nodes(gen, master_nodes::STATE_CHANGE_QUORUM_SIZE * 2 + 1);
@@ -863,7 +864,7 @@ bool beldex_core_test_deregister_safety_buffer::generate(std::vector<test_event_
 
   const auto deregister_pub_key = quorum_intersection[0];
   {
-    const auto dereg_tx = gen.create_and_add_state_change_tx(master_nodes::new_state::deregister, deregister_pub_key, height_a);
+    const auto dereg_tx = gen.create_and_add_state_change_tx(master_nodes::new_state::deregister, deregister_pub_key, 0, 0, height_a);
     gen.create_and_add_next_block({dereg_tx});
   }
 
@@ -876,7 +877,7 @@ bool beldex_core_test_deregister_safety_buffer::generate(std::vector<test_event_
   }
 
   /// Try to deregister the node again for heightB (should fail)
-  const auto dereg_tx = gen.create_state_change_tx(master_nodes::new_state::deregister, deregister_pub_key, height_b);
+  const auto dereg_tx = gen.create_state_change_tx(master_nodes::new_state::deregister, deregister_pub_key, 0,0, height_b);
   gen.add_tx(dereg_tx, false /*can_be_added_to_blockchain*/, "After a Master Node has deregistered, it can NOT be deregistered from the result of a quorum preceeding the height that the Master Node re-registered as.");
   return true;
 
@@ -886,9 +887,9 @@ bool beldex_core_test_deregister_safety_buffer::generate(std::vector<test_event_
 // Daemon A accepts the block without X. Now X is too old and should not be added in future blocks.
 bool beldex_core_test_deregister_too_old::generate(std::vector<test_event_entry>& events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = beldex_generate_sequential_hard_fork_table(cryptonote::network_version_9_master_nodes);
+  std::vector<cryptonote::hard_fork> hard_forks = beldex_generate_hard_fork_table(cryptonote::network_version_9_master_nodes);
   beldex_chain_generator gen(events, hard_forks);
-  gen.add_blocks_until_version(hard_forks.back().first);
+  gen.add_blocks_until_version(hard_forks.back().version);
 
   /// generate some outputs and unlock them
   gen.add_n_blocks(20);
@@ -896,7 +897,7 @@ bool beldex_core_test_deregister_too_old::generate(std::vector<test_event_entry>
   add_master_nodes(gen, 11);
 
   const auto pk       = gen.top_quorum().obligations->workers[0];
-  const auto dereg_tx = gen.create_and_add_state_change_tx(master_nodes::new_state::deregister, pk);
+  const auto dereg_tx = gen.create_and_add_state_change_tx(master_nodes::new_state::deregister, pk, 0, 0);
   gen.add_n_blocks(master_nodes::STATE_CHANGE_TX_LIFETIME_IN_BLOCKS); /// create enough blocks to make deregistrations invalid (60 blocks)
 
   /// In the real world, this transaction should not make it into a block, but in this case we do try to add it (as in
@@ -911,10 +912,10 @@ bool beldex_core_test_deregister_too_old::generate(std::vector<test_event_entry>
 
 bool beldex_core_test_deregister_zero_fee::generate(std::vector<test_event_entry> &events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = beldex_generate_sequential_hard_fork_table();
+  std::vector<cryptonote::hard_fork> hard_forks = beldex_generate_hard_fork_table();
   beldex_chain_generator gen(events, hard_forks);
 
-  gen.add_blocks_until_version(hard_forks.back().first);
+  gen.add_blocks_until_version(hard_forks.back().version);
   gen.add_mined_money_unlock_blocks();
 
   size_t const NUM_MASTER_NODES = 11;
@@ -925,7 +926,7 @@ bool beldex_core_test_deregister_zero_fee::generate(std::vector<test_event_entry
   gen.create_and_add_next_block(reg_txs);
   const auto deregister_pub_key = gen.top_quorum().obligations->workers[0];
   cryptonote::transaction const invalid_deregister =
-      gen.create_state_change_tx(master_nodes::new_state::deregister, deregister_pub_key, -1 /*height*/, {} /*voters*/, MK_COINS(1) /*fee*/);
+      gen.create_state_change_tx(master_nodes::new_state::deregister, deregister_pub_key,0, 0, -1 /*height*/, {} /*voters*/, MK_COINS(1) /*fee*/);
   gen.add_tx(invalid_deregister, false /*can_be_added_to_blockchain*/, "Deregister transactions with non-zero fee can NOT be added to the blockchain");
   return true;
 }
@@ -936,10 +937,10 @@ bool beldex_core_test_deregister_zero_fee::generate(std::vector<test_event_entry
 // those sitting on Chain 1 should not have problems switching over.
 bool beldex_core_test_deregister_on_split::generate(std::vector<test_event_entry> &events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = beldex_generate_sequential_hard_fork_table();
+  std::vector<cryptonote::hard_fork> hard_forks = beldex_generate_hard_fork_table();
   beldex_chain_generator gen(events, hard_forks);
 
-  gen.add_blocks_until_version(hard_forks.back().first);
+  gen.add_blocks_until_version(hard_forks.back().version);
   gen.add_mined_money_unlock_blocks();
  
   add_master_nodes(gen, master_nodes::CHECKPOINT_QUORUM_SIZE + 1);
@@ -952,11 +953,11 @@ bool beldex_core_test_deregister_on_split::generate(std::vector<test_event_entry
 
   gen.add_event_msg("create deregistration A");
   std::vector<uint64_t> const quorum_indexes = {1, 2, 3, 4, 5, 6, 7};
-  const auto dereg_a                         = gen.create_and_add_state_change_tx(master_nodes::new_state::deregister, pk, split_height, quorum_indexes);
+  const auto dereg_a                         = gen.create_and_add_state_change_tx(master_nodes::new_state::deregister, pk,0,0, split_height, quorum_indexes);
 
   gen.add_event_msg("create deregistration on alt chain (B)");
   std::vector<uint64_t> const fork_quorum_indexes = {1, 3, 4, 5, 6, 7, 8};
-  const auto dereg_b            = fork.create_and_add_state_change_tx(master_nodes::new_state::deregister, pk, split_height, fork_quorum_indexes, 0 /*fee*/, true /*kept_by_block*/);
+  const auto dereg_b            = fork.create_and_add_state_change_tx(master_nodes::new_state::deregister, pk,0,0, split_height, fork_quorum_indexes, 0 /*fee*/, true /*kept_by_block*/);
   crypto::hash expected_tx_hash = cryptonote::get_transaction_hash(dereg_b);
   size_t dereg_index            = gen.event_index();
 
@@ -996,10 +997,10 @@ bool beldex_core_test_deregister_on_split::generate(std::vector<test_event_entry
 
 bool beldex_core_test_state_change_ip_penalty_disallow_dupes::generate(std::vector<test_event_entry> &events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = beldex_generate_sequential_hard_fork_table();
+  std::vector<cryptonote::hard_fork> hard_forks = beldex_generate_hard_fork_table();
   beldex_chain_generator gen(events, hard_forks);
 
-  gen.add_blocks_until_version(hard_forks.back().first);
+  gen.add_blocks_until_version(hard_forks.back().version);
   gen.add_mined_money_unlock_blocks();
 
   add_master_nodes(gen, master_nodes::STATE_CHANGE_QUORUM_SIZE + 1);
@@ -1007,12 +1008,12 @@ bool beldex_core_test_state_change_ip_penalty_disallow_dupes::generate(std::vect
 
   const auto pub_key                         = gen.top_quorum().obligations->workers[0];
   std::vector<uint64_t> const quorum_indexes = {1, 2, 3, 4, 5, 6, 7};
-  const auto state_change_1                  = gen.create_and_add_state_change_tx(master_nodes::new_state::ip_change_penalty, pub_key, gen.height(), quorum_indexes);
+  const auto state_change_1                  = gen.create_and_add_state_change_tx(master_nodes::new_state::ip_change_penalty, pub_key,0,0, gen.height(), quorum_indexes);
 
   // NOTE: Try duplicate state change with different quorum indexes
   {
     std::vector<uint64_t> const alt_quorum_indexes = {1, 3, 4, 5, 6, 7, 8};
-    const auto state_change_2 = gen.create_state_change_tx(master_nodes::new_state::ip_change_penalty, pub_key, gen.height(), alt_quorum_indexes);
+    const auto state_change_2 = gen.create_state_change_tx(master_nodes::new_state::ip_change_penalty, pub_key,0,0, gen.height(), alt_quorum_indexes);
     gen.add_tx(state_change_2, false /*can_be_added_to_blockchain*/, "Can't add a state change with different permutation of votes than previously submitted");
 
     // NOTE: Try same duplicate state change on a new height
@@ -1058,11 +1059,11 @@ static bool verify_bns_mapping_record(char const *perr_context,
 
 bool beldex_name_system_disallow_reserved_type::generate(std::vector<test_event_entry> &events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = beldex_generate_sequential_hard_fork_table();
+  std::vector<cryptonote::hard_fork> hard_forks = beldex_generate_hard_fork_table();
   beldex_chain_generator gen(events, hard_forks);
 
   cryptonote::account_base miner = gen.first_miner_;
-  gen.add_blocks_until_version(hard_forks.back().first);
+  gen.add_blocks_until_version(hard_forks.back().version);
   gen.add_mined_money_unlock_blocks();
 
   bns::mapping_value mapping_value = {};
@@ -1110,11 +1111,11 @@ uint64_t beldexnet_expiry(bns::mapping_type type) {
 
 bool beldex_name_system_expiration::generate(std::vector<test_event_entry> &events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = beldex_generate_sequential_hard_fork_table();
+  std::vector<cryptonote::hard_fork> hard_forks = beldex_generate_hard_fork_table();
   beldex_chain_generator gen(events, hard_forks);
   cryptonote::account_base miner = gen.first_miner_;
 
-  gen.add_blocks_until_version(hard_forks.back().first);
+  gen.add_blocks_until_version(hard_forks.back().version);
   gen.add_mined_money_unlock_blocks();
 
   bns_keys_t miner_key = make_bns_keys(miner);
@@ -1182,12 +1183,12 @@ bool beldex_name_system_expiration::generate(std::vector<test_event_entry> &even
 
 bool beldex_name_system_get_mappings_by_owner::generate(std::vector<test_event_entry> &events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = beldex_generate_sequential_hard_fork_table();
+  std::vector<cryptonote::hard_fork> hard_forks = beldex_generate_hard_fork_table();
   beldex_chain_generator gen(events, hard_forks);
 
   cryptonote::account_base miner = gen.first_miner_;
   cryptonote::account_base bob   = gen.add_account();
-  gen.add_blocks_until_version(hard_forks.back().first);
+  gen.add_blocks_until_version(hard_forks.back().version);
 
   // NOTE: Fund Bob's wallet
   {
@@ -1258,9 +1259,10 @@ bool beldex_name_system_get_mappings_by_owner::generate(std::vector<test_event_e
     std::vector<bns::mapping_record> records = bns_db.get_mappings_by_owner(bob_key.owner);
 
     size_t expected_size = 0;
-    if (bns::mapping_type_allowed(c.get_blockchain_storage().get_current_hard_fork_version(), bns::mapping_type::session)) expected_size += 2;
-    if (bns::mapping_type_allowed(c.get_blockchain_storage().get_current_hard_fork_version(), bns::mapping_type::wallet)) expected_size += 2;
-    if (bns::mapping_type_allowed(c.get_blockchain_storage().get_current_hard_fork_version(), bns::mapping_type::beldexnet)) expected_size += 2;
+    auto netv = get_network_version(c.get_nettype(), c.get_current_blockchain_height());
+    if (bns::mapping_type_allowed(netv, bns::mapping_type::session)) expected_size += 2;
+    if (bns::mapping_type_allowed(netv, bns::mapping_type::wallet)) expected_size += 2;
+    if (bns::mapping_type_allowed(netv, bns::mapping_type::beldexnet)) expected_size += 2;
     CHECK_EQ(records.size(), expected_size);
 
     std::sort(records.begin(), records.end(), [](const auto& a, const auto& b) {
@@ -1268,7 +1270,7 @@ bool beldex_name_system_get_mappings_by_owner::generate(std::vector<test_event_e
            < std::make_tuple(b.update_height, b.name_hash);
     });
 
-    if (bns::mapping_type_allowed(c.get_blockchain_storage().get_current_hard_fork_version(), bns::mapping_type::session))
+    if (bns::mapping_type_allowed(netv, bns::mapping_type::session))
     {
       CHECK_EQ(records[0].name_hash, session_name_hash1);
       CHECK_TEST_CONDITION(verify_bns_mapping_record(perr_context, records[0], bns::mapping_type::session, session_name1, bob_key.session_value, session_height, std::nullopt, session_name1_txid, bob_key.owner, {} /*backup_owner*/));
@@ -1276,7 +1278,7 @@ bool beldex_name_system_get_mappings_by_owner::generate(std::vector<test_event_e
       CHECK_TEST_CONDITION(verify_bns_mapping_record(perr_context, records[1], bns::mapping_type::session, session_name2, bob_key.session_value, session_height, std::nullopt, session_name2_txid, bob_key.owner, {} /*backup_owner*/));
     }
 
-    if (bns::mapping_type_allowed(c.get_blockchain_storage().get_current_hard_fork_version(), bns::mapping_type::beldexnet))
+    if (bns::mapping_type_allowed(netv, bns::mapping_type::beldexnet))
     {
       CHECK_EQ(records[2].name_hash, beldexnet_name_hash1);
       CHECK_TEST_CONDITION(verify_bns_mapping_record(perr_context, records[2], bns::mapping_type::beldexnet, beldexnet_name1, bob_key.beldexnet_value, beldexnet_height, beldexnet_height + beldexnet_expiry(bns::mapping_type::beldexnet), beldexnet_name1_txid, bob_key.owner, {} /*backup_owner*/));
@@ -1284,7 +1286,7 @@ bool beldex_name_system_get_mappings_by_owner::generate(std::vector<test_event_e
       CHECK_TEST_CONDITION(verify_bns_mapping_record(perr_context, records[3], bns::mapping_type::beldexnet, beldexnet_name2, bob_key.beldexnet_value, beldexnet_height, beldexnet_height + beldexnet_expiry(bns::mapping_type::beldexnet_5years), beldexnet_name2_txid, bob_key.owner, {} /*backup_owner*/));
     }
 
-    if (bns::mapping_type_allowed(c.get_blockchain_storage().get_current_hard_fork_version(), bns::mapping_type::wallet))
+    if (bns::mapping_type_allowed(netv, bns::mapping_type::wallet))
     {
       CHECK_EQ(records[4].name_hash, wallet_name_hash1);
       CHECK_TEST_CONDITION(verify_bns_mapping_record(perr_context, records[4], bns::mapping_type::wallet, wallet_name1, bob_key.wallet_value, wallet_height, std::nullopt, wallet_name1_txid, bob_key.owner, {} /*backup_owner*/));
@@ -1299,12 +1301,12 @@ bool beldex_name_system_get_mappings_by_owner::generate(std::vector<test_event_e
 
 bool beldex_name_system_get_mappings_by_owners::generate(std::vector<test_event_entry> &events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = beldex_generate_sequential_hard_fork_table();
+  std::vector<cryptonote::hard_fork> hard_forks = beldex_generate_hard_fork_table();
   beldex_chain_generator gen(events, hard_forks);
 
   cryptonote::account_base miner = gen.first_miner_;
   cryptonote::account_base bob   = gen.add_account();
-  gen.add_blocks_until_version(hard_forks.back().first);
+  gen.add_blocks_until_version(hard_forks.back().version);
 
   // NOTE: Fund Bob's wallet
   {
@@ -1369,12 +1371,12 @@ bool beldex_name_system_get_mappings_by_owners::generate(std::vector<test_event_
 
 bool beldex_name_system_get_mappings::generate(std::vector<test_event_entry> &events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = beldex_generate_sequential_hard_fork_table();
+  std::vector<cryptonote::hard_fork> hard_forks = beldex_generate_hard_fork_table();
   beldex_chain_generator gen(events, hard_forks);
 
   cryptonote::account_base miner = gen.first_miner_;
   cryptonote::account_base bob   = gen.add_account();
-  gen.add_blocks_until_version(hard_forks.back().first);
+  gen.add_blocks_until_version(hard_forks.back().version);
 
   // NOTE: Fund Bob's wallet
   {
@@ -1411,13 +1413,13 @@ bool beldex_name_system_get_mappings::generate(std::vector<test_event_entry> &ev
 
 bool beldex_name_system_handles_duplicate_in_bns_db::generate(std::vector<test_event_entry> &events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = beldex_generate_sequential_hard_fork_table();
+  auto hard_forks = beldex_generate_hard_fork_table();
   beldex_chain_generator gen(events, hard_forks);
 
   cryptonote::account_base miner = gen.first_miner_;
   cryptonote::account_base bob   = gen.add_account();
 
-  gen.add_blocks_until_version(hard_forks.back().first);
+  gen.add_blocks_until_version(hard_forks.back().version);
   gen.add_mined_money_unlock_blocks();
 
   cryptonote::transaction transfer = gen.create_and_add_tx(miner, bob.get_keys().m_account_address, MK_COINS(400));
@@ -1447,16 +1449,16 @@ bool beldex_name_system_handles_duplicate_in_bns_db::generate(std::vector<test_e
 
     gen.create_and_add_next_block(txs);
   }
-  uint64_t height_of_bns_entry = gen.height();
+  uint64_t height_of_ons_entry = gen.height();
 
   {
     cryptonote::transaction bar6 = gen.create_beldex_name_system_tx(bob, gen.hardfork(), bns::mapping_type::session, session_name, bob_key.session_value);
-    gen.add_tx(bar6, false /*can_be_added_to_blockchain*/, "Duplicate name requested by new owner: original already exists in bns db");
+    gen.add_tx(bar6, false /*can_be_added_to_blockchain*/, "Duplicate name requested by new owner: original already exists in ons db");
   }
 
-  beldex_register_callback(events, "check_bns_entries", [=, blockchain_height=gen.chain_height()](cryptonote::core &c, size_t ev_index)
+  beldex_register_callback(events, "check_ons_entries", [=, blockchain_height=gen.chain_height()](cryptonote::core &c, size_t ev_index)
   {
-    DEFINE_TESTS_ERROR_CONTEXT("check_bns_entries");
+    DEFINE_TESTS_ERROR_CONTEXT("check_ons_entries");
     bns::name_system_db &bns_db = c.get_blockchain_storage().name_system_db();
 
     bns::owner_record owner = bns_db.get_owner_by_key(miner_key.owner);
@@ -1468,13 +1470,14 @@ bool beldex_name_system_handles_duplicate_in_bns_db::generate(std::vector<test_e
 
     std::string session_name_hash = bns::name_to_base64_hash(session_name);
     bns::mapping_record record1 = bns_db.get_mapping(bns::mapping_type::session, session_name_hash);
-    CHECK_TEST_CONDITION(verify_bns_mapping_record(perr_context, record1, bns::mapping_type::session, session_name, bob_key.session_value, height_of_bns_entry, std::nullopt, session_tx_hash, miner_key.owner, {} /*backup_owner*/));
+    CHECK_TEST_CONDITION(verify_bns_mapping_record(perr_context, record1, bns::mapping_type::session, session_name, bob_key.session_value, height_of_ons_entry, std::nullopt, session_tx_hash, miner_key.owner, {} /*backup_owner*/));
     CHECK_EQ(record1.owner_id, owner.id);
 
-    if (bns::mapping_type_allowed(c.get_blockchain_storage().get_current_hard_fork_version(), bns::mapping_type::beldexnet))
+    auto netv = get_network_version(c.get_nettype(), c.get_current_blockchain_height());
+    if (bns::mapping_type_allowed(netv, bns::mapping_type::beldexnet))
     {
       bns::mapping_record record2 = bns_db.get_mapping(bns::mapping_type::beldexnet, session_name_hash);
-      CHECK_TEST_CONDITION(verify_bns_mapping_record(perr_context, record2, bns::mapping_type::beldexnet, beldexnet_name, miner_key.beldexnet_value, height_of_bns_entry, height_of_bns_entry + beldexnet_expiry(bns::mapping_type::beldexnet_2years), beldexnet_tx_hash, miner_key.owner, {} /*backup_owner*/));
+      CHECK_TEST_CONDITION(verify_bns_mapping_record(perr_context, record2, bns::mapping_type::beldexnet, beldexnet_name, miner_key.beldexnet_value, height_of_ons_entry, height_of_ons_entry + beldexnet_expiry(bns::mapping_type::beldexnet_2years), beldexnet_tx_hash, miner_key.owner, {} /*backup_owner*/));
       CHECK_EQ(record2.owner_id, owner.id);
       CHECK_EQ(record2.active(blockchain_height), true);
     }
@@ -1488,13 +1491,13 @@ bool beldex_name_system_handles_duplicate_in_bns_db::generate(std::vector<test_e
 
 bool beldex_name_system_handles_duplicate_in_tx_pool::generate(std::vector<test_event_entry> &events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = beldex_generate_sequential_hard_fork_table();
+  auto hard_forks = beldex_generate_hard_fork_table();
   beldex_chain_generator gen(events, hard_forks);
 
   cryptonote::account_base miner = gen.first_miner_;
   cryptonote::account_base bob   = gen.add_account();
   {
-    gen.add_blocks_until_version(hard_forks.back().first);
+    gen.add_blocks_until_version(hard_forks.back().version);
     gen.add_mined_money_unlock_blocks();
 
     cryptonote::transaction transfer = gen.create_and_add_tx(miner, bob.get_keys().m_account_address, MK_COINS(400));
@@ -1522,11 +1525,11 @@ bool beldex_name_system_handles_duplicate_in_tx_pool::generate(std::vector<test_
 
 bool beldex_name_system_invalid_tx_extra_params::generate(std::vector<test_event_entry> &events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = beldex_generate_sequential_hard_fork_table();
+  auto hard_forks = beldex_generate_hard_fork_table();
   beldex_chain_generator gen(events, hard_forks);
 
   cryptonote::account_base miner = gen.first_miner_;
-  gen.add_blocks_until_version(hard_forks.back().first);
+  gen.add_blocks_until_version(hard_forks.back().version);
   gen.add_mined_money_unlock_blocks();
 
   bns_keys_t miner_key = make_bns_keys(miner);
@@ -1572,7 +1575,7 @@ bool beldex_name_system_invalid_tx_extra_params::generate(std::vector<test_event
         cryptonote::tx_extra_beldex_name_system data = valid_data;
         data.name_hash                             = {};
         data.encrypted_value                       = miner_key.wallet_value.make_encrypted("").to_string();
-        make_bns_tx_with_custom_extra(gen, events, miner, data, false, "(Blockchain) Empty wallet name in BNS is invalid");
+        make_bns_tx_with_custom_extra(gen, events, miner, data, false, "(Blockchain) Empty wallet name in ONS is invalid");
       }
 
       // Blockchain value (wallet address) is invalid, too short
@@ -1580,7 +1583,7 @@ bool beldex_name_system_invalid_tx_extra_params::generate(std::vector<test_event
         cryptonote::tx_extra_beldex_name_system data = valid_data;
         data.encrypted_value                       = miner_key.wallet_value.make_encrypted(name).to_string();
         data.encrypted_value.resize(data.encrypted_value.size() - 1);
-        make_bns_tx_with_custom_extra(gen, events, miner, data, false, "(Blockchain) Wallet value in BNS too long");
+        make_bns_tx_with_custom_extra(gen, events, miner, data, false, "(Blockchain) Wallet value in ONS too long");
       }
 
       // Blockchain value (wallet address) is invalid, too long
@@ -1588,35 +1591,35 @@ bool beldex_name_system_invalid_tx_extra_params::generate(std::vector<test_event
         cryptonote::tx_extra_beldex_name_system data = valid_data;
         data.encrypted_value                       = miner_key.wallet_value.make_encrypted(name).to_string();
         data.encrypted_value.resize(data.encrypted_value.size() + 1);
-        make_bns_tx_with_custom_extra(gen, events, miner, data, false, "(Blockchain) Wallet value in BNS too long");
+        make_bns_tx_with_custom_extra(gen, events, miner, data, false, "(Blockchain) Wallet value in ONS too long");
       }
     }
 
     if (bns::mapping_type_allowed(gen.hardfork(), bns::mapping_type::beldexnet))
     {
       valid_data.type = bns::mapping_type::beldexnet;
-      // Beldexnet name empty
+      // beldexnet name empty
       {
         cryptonote::tx_extra_beldex_name_system data = valid_data;
         data.name_hash                             = {};
         data.encrypted_value                       = miner_key.beldexnet_value.make_encrypted("").to_string();
-        make_bns_tx_with_custom_extra(gen, events, miner, data, false, "(Beldexnet) Empty domain name in BNS is invalid");
+        make_bns_tx_with_custom_extra(gen, events, miner, data, false, "(beldexnet) Empty domain name in ONS is invalid");
       }
 
-      // Beldexnet value too short
+      // beldexnet value too short
       {
         cryptonote::tx_extra_beldex_name_system data = valid_data;
         data.encrypted_value                       = miner_key.beldexnet_value.make_encrypted(name).to_string();
         data.encrypted_value.resize(data.encrypted_value.size() - 1);
-        make_bns_tx_with_custom_extra(gen, events, miner, data, false, "(Beldexnet) Domain value in BNS too long");
+        make_bns_tx_with_custom_extra(gen, events, miner, data, false, "(beldexnet) Domain value in ONS too long");
       }
 
-      // Beldexnet value too long
+      // beldexnet value too long
       {
         cryptonote::tx_extra_beldex_name_system data = valid_data;
         data.encrypted_value                       = miner_key.beldexnet_value.make_encrypted(name).to_string();
         data.encrypted_value.resize(data.encrypted_value.size() + 1);
-        make_bns_tx_with_custom_extra(gen, events, miner, data, false, "(Beldexnet) Domain value in BNS too long");
+        make_bns_tx_with_custom_extra(gen, events, miner, data, false, "(beldexnet) Domain value in ONS too long");
       }
     }
 
@@ -1653,7 +1656,7 @@ bool beldex_name_system_invalid_tx_extra_params::generate(std::vector<test_event
 
 bool beldex_name_system_large_reorg::generate(std::vector<test_event_entry> &events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = beldex_generate_sequential_hard_fork_table();
+  auto hard_forks = beldex_generate_hard_fork_table();
   beldex_chain_generator gen(events, hard_forks);
 
   cryptonote::account_base const miner = gen.first_miner_;
@@ -1661,7 +1664,7 @@ bool beldex_name_system_large_reorg::generate(std::vector<test_event_entry> &eve
   bns_keys_t const miner_key           = make_bns_keys(miner);
   bns_keys_t const bob_key             = make_bns_keys(bob);
   {
-    gen.add_blocks_until_version(hard_forks.back().first);
+    gen.add_blocks_until_version(hard_forks.back().version);
     gen.add_mined_money_unlock_blocks();
 
     cryptonote::transaction transfer = gen.create_and_add_tx(miner, bob.get_keys().m_account_address, MK_COINS(400));
@@ -1669,11 +1672,11 @@ bool beldex_name_system_large_reorg::generate(std::vector<test_event_entry> &eve
     gen.add_transfer_unlock_blocks();
   }
 
-  // NOTE: Generate the first round of BNS transactions belonging to miner
-  uint64_t first_bns_height                 = 0;
+  // NOTE: Generate the first round of ONS transactions belonging to miner
+  uint64_t first_ons_height                 = 0;
   std::string const beldexnet_name1           = "website.beldex";
   std::string const wallet_name1            = "MyWallet";
-  std::string const session_name1           = "I-Like-Beldex";
+  std::string const session_name1           = "I-Like-beldex";
   crypto::hash session_tx_hash1 = {}, wallet_tx_hash1 = {}, beldexnet_tx_hash1 = {};
   {
     // NOTE: Generate and add the (transactions + block) to the blockchain
@@ -1698,28 +1701,29 @@ bool beldex_name_system_large_reorg::generate(std::vector<test_event_entry> &eve
       }
       gen.create_and_add_next_block(txs);
     }
-    first_bns_height = gen.height();
+    first_ons_height = gen.height();
 
-    beldex_register_callback(events, "check_first_bns_entries", [=](cryptonote::core &c, size_t ev_index)
+    beldex_register_callback(events, "check_first_ons_entries", [=](cryptonote::core &c, size_t ev_index)
     {
-      DEFINE_TESTS_ERROR_CONTEXT("check_first_bns_entries");
+      DEFINE_TESTS_ERROR_CONTEXT("check_first_ons_entries");
       bns::name_system_db &bns_db        = c.get_blockchain_storage().name_system_db();
       std::vector<bns::mapping_record> records = bns_db.get_mappings_by_owner(miner_key.owner);
-      CHECK_EQ(bns_db.height(), first_bns_height);
+      CHECK_EQ(bns_db.height(), first_ons_height);
 
       size_t expected_size = 1;
-      if (bns::mapping_type_allowed(c.get_blockchain_storage().get_current_hard_fork_version(), bns::mapping_type::wallet)) expected_size += 1;
-      if (bns::mapping_type_allowed(c.get_blockchain_storage().get_current_hard_fork_version(), bns::mapping_type::beldexnet)) expected_size += 1;
+      auto netv = get_network_version(c.get_nettype(), c.get_current_blockchain_height());
+      if (bns::mapping_type_allowed(netv, bns::mapping_type::wallet)) expected_size += 1;
+      if (bns::mapping_type_allowed(netv, bns::mapping_type::beldexnet)) expected_size += 1;
       CHECK_EQ(records.size(), expected_size);
 
       for (bns::mapping_record const &record : records)
       {
         if (record.type == bns::mapping_type::session)
-          CHECK_TEST_CONDITION(verify_bns_mapping_record(perr_context, record, bns::mapping_type::session, session_name1, miner_key.session_value, first_bns_height, std::nullopt, session_tx_hash1, miner_key.owner, {} /*backup_owner*/));
+          CHECK_TEST_CONDITION(verify_bns_mapping_record(perr_context, record, bns::mapping_type::session, session_name1, miner_key.session_value, first_ons_height, std::nullopt, session_tx_hash1, miner_key.owner, {} /*backup_owner*/));
         else if (record.type == bns::mapping_type::beldexnet)
-          CHECK_TEST_CONDITION(verify_bns_mapping_record(perr_context, record, bns::mapping_type::beldexnet, beldexnet_name1, miner_key.beldexnet_value, first_bns_height, first_bns_height + beldexnet_expiry(bns::mapping_type::beldexnet_10years), beldexnet_tx_hash1, miner_key.owner, {} /*backup_owner*/));
+          CHECK_TEST_CONDITION(verify_bns_mapping_record(perr_context, record, bns::mapping_type::beldexnet, beldexnet_name1, miner_key.beldexnet_value, first_ons_height, first_ons_height + beldexnet_expiry(bns::mapping_type::beldexnet_10years), beldexnet_tx_hash1, miner_key.owner, {} /*backup_owner*/));
         else if (record.type == bns::mapping_type::wallet)
-          CHECK_TEST_CONDITION(verify_bns_mapping_record(perr_context, record, bns::mapping_type::wallet, wallet_name1, miner_key.wallet_value, first_bns_height, std::nullopt, wallet_tx_hash1, miner_key.owner, {} /*backup_owner*/));
+          CHECK_TEST_CONDITION(verify_bns_mapping_record(perr_context, record, bns::mapping_type::wallet, wallet_name1, miner_key.wallet_value, first_ons_height, std::nullopt, wallet_tx_hash1, miner_key.owner, {} /*backup_owner*/));
         else
         {
           assert(false);
@@ -1732,7 +1736,7 @@ bool beldex_name_system_large_reorg::generate(std::vector<test_event_entry> &eve
   // NOTE: Generate and add the second round of (transactions + block) to the blockchain, renew beldexnet and add bob's session, update miner's session value to other's session value
   cryptonote::account_base const other = gen.add_account();
   bns_keys_t const other_key           = make_bns_keys(other);
-  uint64_t second_bns_height = 0;
+  uint64_t second_ons_height = 0;
   {
     std::string const bob_session_name1 = "I-Like-Session";
     crypto::hash session_tx_hash2 = {}, beldexnet_tx_hash2 = {}, session_tx_hash3;
@@ -1752,13 +1756,13 @@ bool beldex_name_system_large_reorg::generate(std::vector<test_event_entry> &eve
 
       gen.create_and_add_next_block(txs);
     }
-    second_bns_height = gen.height();
+    second_ons_height = gen.height();
 
-    beldex_register_callback(events, "check_second_bns_entries", [=](cryptonote::core &c, size_t ev_index)
+    beldex_register_callback(events, "check_second_ons_entries", [=](cryptonote::core &c, size_t ev_index)
     {
-      DEFINE_TESTS_ERROR_CONTEXT("check_second_bns_entries");
+      DEFINE_TESTS_ERROR_CONTEXT("check_second_ons_entries");
       bns::name_system_db &bns_db = c.get_blockchain_storage().name_system_db();
-      CHECK_EQ(bns_db.height(), second_bns_height);
+      CHECK_EQ(bns_db.height(), second_ons_height);
 
       // NOTE: Check miner's record
       {
@@ -1766,11 +1770,11 @@ bool beldex_name_system_large_reorg::generate(std::vector<test_event_entry> &eve
         for (bns::mapping_record const &record : records)
         {
           if (record.type == bns::mapping_type::session)
-            CHECK_TEST_CONDITION(verify_bns_mapping_record(perr_context, record, bns::mapping_type::session, session_name1, other_key.session_value, second_bns_height, std::nullopt, session_tx_hash3, miner_key.owner, {} /*backup_owner*/));
+            CHECK_TEST_CONDITION(verify_bns_mapping_record(perr_context, record, bns::mapping_type::session, session_name1, other_key.session_value, second_ons_height, std::nullopt, session_tx_hash3, miner_key.owner, {} /*backup_owner*/));
           else if (record.type == bns::mapping_type::beldexnet)
-            CHECK_TEST_CONDITION(verify_bns_mapping_record(perr_context, record, bns::mapping_type::beldexnet, beldexnet_name1, miner_key.beldexnet_value, second_bns_height, first_bns_height + beldexnet_expiry(bns::mapping_type::beldexnet_5years) + beldexnet_expiry(bns::mapping_type::beldexnet_10years), beldexnet_tx_hash2, miner_key.owner, {} /*backup_owner*/));
+            CHECK_TEST_CONDITION(verify_bns_mapping_record(perr_context, record, bns::mapping_type::beldexnet, beldexnet_name1, miner_key.beldexnet_value, second_ons_height, first_ons_height + beldexnet_expiry(bns::mapping_type::beldexnet_5years) + beldexnet_expiry(bns::mapping_type::beldexnet_10years), beldexnet_tx_hash2, miner_key.owner, {} /*backup_owner*/));
           else if (record.type == bns::mapping_type::wallet)
-            CHECK_TEST_CONDITION(verify_bns_mapping_record(perr_context, record, bns::mapping_type::wallet, wallet_name1, miner_key.wallet_value, first_bns_height, std::nullopt, wallet_tx_hash1, miner_key.owner, {} /*backup_owner*/));
+            CHECK_TEST_CONDITION(verify_bns_mapping_record(perr_context, record, bns::mapping_type::wallet, wallet_name1, miner_key.wallet_value, first_ons_height, std::nullopt, wallet_tx_hash1, miner_key.owner, {} /*backup_owner*/));
           else
           {
             assert(false);
@@ -1782,7 +1786,7 @@ bool beldex_name_system_large_reorg::generate(std::vector<test_event_entry> &eve
       {
         std::vector<bns::mapping_record> records = bns_db.get_mappings_by_owner(bob_key.owner);
         CHECK_EQ(records.size(), 1);
-        CHECK_TEST_CONDITION(verify_bns_mapping_record(perr_context, records[0], bns::mapping_type::session, bob_session_name1, bob_key.session_value, second_bns_height, std::nullopt, session_tx_hash2, bob_key.owner, {} /*backup_owner*/));
+        CHECK_TEST_CONDITION(verify_bns_mapping_record(perr_context, records[0], bns::mapping_type::session, bob_session_name1, bob_key.session_value, second_ons_height, std::nullopt, session_tx_hash2, bob_key.owner, {} /*backup_owner*/));
       }
 
       return true;
@@ -1794,9 +1798,9 @@ bool beldex_name_system_large_reorg::generate(std::vector<test_event_entry> &eve
     DEFINE_TESTS_ERROR_CONTEXT("trigger_blockchain_detach");
     cryptonote::Blockchain &blockchain = c.get_blockchain_storage();
 
-    // NOTE: Reorg to just before the 2nd round of BNS entries
+    // NOTE: Reorg to just before the 2nd round of ONS entries
     uint64_t curr_height   = blockchain.get_current_blockchain_height();
-    uint64_t blocks_to_pop = curr_height - second_bns_height;
+    uint64_t blocks_to_pop = curr_height - second_ons_height;
     blockchain.pop_blocks(blocks_to_pop);
     bns::name_system_db &bns_db  = blockchain.name_system_db();
     CHECK_EQ(bns_db.height(), blockchain.get_current_blockchain_height() - 1);
@@ -1814,18 +1818,19 @@ bool beldex_name_system_large_reorg::generate(std::vector<test_event_entry> &eve
     {
       std::vector<bns::mapping_record> records = bns_db.get_mappings_by_owner(miner_key.owner);
       size_t expected_size = 1;
-      if (bns::mapping_type_allowed(c.get_blockchain_storage().get_current_hard_fork_version(), bns::mapping_type::wallet)) expected_size += 1;
-      if (bns::mapping_type_allowed(c.get_blockchain_storage().get_current_hard_fork_version(), bns::mapping_type::beldexnet)) expected_size += 1;
+      auto netv = get_network_version(c.get_nettype(), c.get_current_blockchain_height());
+      if (bns::mapping_type_allowed(netv, bns::mapping_type::wallet)) expected_size += 1;
+      if (bns::mapping_type_allowed(netv, bns::mapping_type::beldexnet)) expected_size += 1;
       CHECK_EQ(records.size(), expected_size);
 
       for (bns::mapping_record const &record : records)
       {
         if (record.type == bns::mapping_type::session)
-          CHECK_TEST_CONDITION(verify_bns_mapping_record(perr_context, record, bns::mapping_type::session, session_name1, miner_key.session_value, first_bns_height, std::nullopt, session_tx_hash1, miner_key.owner, {} /*backup_owner*/));
+          CHECK_TEST_CONDITION(verify_bns_mapping_record(perr_context, record, bns::mapping_type::session, session_name1, miner_key.session_value, first_ons_height, std::nullopt, session_tx_hash1, miner_key.owner, {} /*backup_owner*/));
         else if (record.type == bns::mapping_type::beldexnet)
-          CHECK_TEST_CONDITION(verify_bns_mapping_record(perr_context, record, bns::mapping_type::beldexnet, beldexnet_name1, miner_key.beldexnet_value, first_bns_height, first_bns_height + beldexnet_expiry(bns::mapping_type::beldexnet_10years), beldexnet_tx_hash1, miner_key.owner, {} /*backup_owner*/));
+          CHECK_TEST_CONDITION(verify_bns_mapping_record(perr_context, record, bns::mapping_type::beldexnet, beldexnet_name1, miner_key.beldexnet_value, first_ons_height, first_ons_height + beldexnet_expiry(bns::mapping_type::beldexnet_10years), beldexnet_tx_hash1, miner_key.owner, {} /*backup_owner*/));
         else if (record.type == bns::mapping_type::wallet)
-          CHECK_TEST_CONDITION(verify_bns_mapping_record(perr_context, record, bns::mapping_type::wallet, wallet_name1, miner_key.wallet_value, first_bns_height, std::nullopt, wallet_tx_hash1, miner_key.owner, {} /*backup_owner*/));
+          CHECK_TEST_CONDITION(verify_bns_mapping_record(perr_context, record, bns::mapping_type::wallet, wallet_name1, miner_key.wallet_value, first_ons_height, std::nullopt, wallet_tx_hash1, miner_key.owner, {} /*backup_owner*/));
         else
         {
           assert(false);
@@ -1836,14 +1841,14 @@ bool beldex_name_system_large_reorg::generate(std::vector<test_event_entry> &eve
     return true;
   });
 
-  beldex_register_callback(events, "trigger_blockchain_detach_all_records_gone", [miner_key, first_bns_height](cryptonote::core &c, size_t ev_index)
+  beldex_register_callback(events, "trigger_blockchain_detach_all_records_gone", [miner_key, first_ons_height](cryptonote::core &c, size_t ev_index)
   {
-    DEFINE_TESTS_ERROR_CONTEXT("check_second_bns_entries");
+    DEFINE_TESTS_ERROR_CONTEXT("check_second_ons_entries");
     cryptonote::Blockchain &blockchain = c.get_blockchain_storage();
 
-    // NOTE: Reorg to just before the 2nd round of BNS entries
+    // NOTE: Reorg to just before the 2nd round of ONS entries
     uint64_t curr_height   = blockchain.get_current_blockchain_height();
-    uint64_t blocks_to_pop = curr_height - first_bns_height;
+    uint64_t blocks_to_pop = curr_height - first_ons_height;
     blockchain.pop_blocks(blocks_to_pop);
     bns::name_system_db &bns_db  = blockchain.name_system_db();
     CHECK_EQ(bns_db.height(), blockchain.get_current_blockchain_height() - 1);
@@ -1863,15 +1868,15 @@ bool beldex_name_system_large_reorg::generate(std::vector<test_event_entry> &eve
 
 bool beldex_name_system_name_renewal::generate(std::vector<test_event_entry> &events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = beldex_generate_sequential_hard_fork_table();
+  auto hard_forks = beldex_generate_hard_fork_table();
   beldex_chain_generator gen(events, hard_forks);
   cryptonote::account_base miner = gen.first_miner_;
 
-  if (!bns::mapping_type_allowed(hard_forks.back().first, bns::mapping_type::beldexnet))
+  if (!bns::mapping_type_allowed(hard_forks.back().version, bns::mapping_type::beldexnet))
       return true;
 
   {
-    gen.add_blocks_until_version(hard_forks.back().first);
+    gen.add_blocks_until_version(hard_forks.back().version);
     gen.add_mined_money_unlock_blocks();
   }
 
@@ -1881,11 +1886,11 @@ bool beldex_name_system_name_renewal::generate(std::vector<test_event_entry> &ev
   gen.create_and_add_next_block({tx});
   crypto::hash prev_txid = get_transaction_hash(tx);
 
-  uint64_t height_of_bns_entry = gen.height();
+  uint64_t height_of_ons_entry = gen.height();
 
-  beldex_register_callback(events, "check_bns_entries", [=](cryptonote::core &c, size_t ev_index)
+  beldex_register_callback(events, "check_ons_entries", [=](cryptonote::core &c, size_t ev_index)
   {
-    DEFINE_TESTS_ERROR_CONTEXT("check_bns_entries");
+    DEFINE_TESTS_ERROR_CONTEXT("check_ons_entries");
     bns::name_system_db &bns_db = c.get_blockchain_storage().name_system_db();
 
     bns::owner_record owner = bns_db.get_owner_by_key(miner_key.owner);
@@ -1897,7 +1902,7 @@ bool beldex_name_system_name_renewal::generate(std::vector<test_event_entry> &ev
 
     std::string name_hash = bns::name_to_base64_hash(name);
     bns::mapping_record record = bns_db.get_mapping(bns::mapping_type::beldexnet, name_hash);
-    CHECK_TEST_CONDITION(verify_bns_mapping_record(perr_context, record, bns::mapping_type::beldexnet, name, miner_key.beldexnet_value, height_of_bns_entry, height_of_bns_entry + beldexnet_expiry(bns::mapping_type::beldexnet), prev_txid, miner_key.owner, {} /*backup_owner*/));
+    CHECK_TEST_CONDITION(verify_bns_mapping_record(perr_context, record, bns::mapping_type::beldexnet, name, miner_key.beldexnet_value, height_of_ons_entry, height_of_ons_entry + beldexnet_expiry(bns::mapping_type::beldexnet), prev_txid, miner_key.owner, {} /*backup_owner*/));
     return true;
   });
 
@@ -1931,7 +1936,7 @@ bool beldex_name_system_name_renewal::generate(std::vector<test_event_entry> &ev
     bns::mapping_record record = bns_db.get_mapping(bns::mapping_type::beldexnet, name_hash);
     CHECK_TEST_CONDITION(verify_bns_mapping_record(perr_context, record, bns::mapping_type::beldexnet, name, miner_key.beldexnet_value, renewal_height,
           // Original registration:
-          height_of_bns_entry + beldexnet_expiry(bns::mapping_type::beldexnet)
+          height_of_ons_entry + beldexnet_expiry(bns::mapping_type::beldexnet)
           // The renewals:
           + beldexnet_expiry(bns::mapping_type::beldexnet_5years)
           + beldexnet_expiry(bns::mapping_type::beldexnet_10years)
@@ -1946,11 +1951,11 @@ bool beldex_name_system_name_renewal::generate(std::vector<test_event_entry> &ev
 
 bool beldex_name_system_name_value_max_lengths::generate(std::vector<test_event_entry> &events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = beldex_generate_sequential_hard_fork_table();
+  auto hard_forks = beldex_generate_hard_fork_table();
   beldex_chain_generator gen(events, hard_forks);
 
   cryptonote::account_base miner = gen.first_miner_;
-  gen.add_blocks_until_version(hard_forks.back().first);
+  gen.add_blocks_until_version(hard_forks.back().version);
   gen.add_mined_money_unlock_blocks();
 
   auto make_bns_tx_with_custom_extra = [&](beldex_chain_generator &gen,
@@ -1990,7 +1995,7 @@ bool beldex_name_system_name_value_max_lengths::generate(std::vector<test_event_
     make_bns_tx_with_custom_extra(gen, events, miner, data);
   }
 
-  // Beldexnet
+  // beldexnet
   if (bns::mapping_type_allowed(gen.hardfork(), bns::mapping_type::beldexnet))
   {
     std::string name(bns::BELDEXNET_DOMAIN_NAME_MAX, 'a');
@@ -2016,11 +2021,11 @@ bool beldex_name_system_name_value_max_lengths::generate(std::vector<test_event_
 
 bool beldex_name_system_update_mapping_after_expiry_fails::generate(std::vector<test_event_entry> &events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = beldex_generate_sequential_hard_fork_table();
+  auto hard_forks = beldex_generate_hard_fork_table();
   beldex_chain_generator gen(events, hard_forks);
   cryptonote::account_base miner = gen.first_miner_;
 
-  gen.add_blocks_until_version(hard_forks.back().first);
+  gen.add_blocks_until_version(hard_forks.back().version);
   gen.add_mined_money_unlock_blocks();
 
   bns_keys_t miner_key = make_bns_keys(miner);
@@ -2031,8 +2036,8 @@ bool beldex_name_system_update_mapping_after_expiry_fails::generate(std::vector<
     crypto::hash tx_hash = cryptonote::get_transaction_hash(tx);
     gen.create_and_add_next_block({tx});
 
-    uint64_t height_of_bns_entry   = gen.height();
-    uint64_t expected_expiry_block = height_of_bns_entry + beldexnet_expiry(bns::mapping_type::beldexnet);
+    uint64_t height_of_ons_entry   = gen.height();
+    uint64_t expected_expiry_block = height_of_ons_entry + beldexnet_expiry(bns::mapping_type::beldexnet);
 
     while (gen.height() <= expected_expiry_block)
       gen.create_and_add_next_block();
@@ -2040,7 +2045,7 @@ bool beldex_name_system_update_mapping_after_expiry_fails::generate(std::vector<
     {
       bns_keys_t bob_key = make_bns_keys(gen.add_account());
       cryptonote::transaction tx1 = gen.create_beldex_name_system_tx_update(miner, gen.hardfork(), bns::mapping_type::beldexnet, name, &bob_key.beldexnet_value);
-      gen.add_tx(tx1, false /*can_be_added_to_blockchain*/, "Can not update a BNS record that is already expired");
+      gen.add_tx(tx1, false /*can_be_added_to_blockchain*/, "Can not update a ONS record that is already expired");
     }
 
     beldex_register_callback(events, "check_still_expired", [=, blockchain_height=gen.chain_height()](cryptonote::core &c, size_t ev_index)
@@ -2057,7 +2062,7 @@ bool beldex_name_system_update_mapping_after_expiry_fails::generate(std::vector<
 
       std::string name_hash        = bns::name_to_base64_hash(name);
       bns::mapping_record record = bns_db.get_mapping(bns::mapping_type::beldexnet, name_hash);
-      CHECK_TEST_CONDITION(verify_bns_mapping_record(perr_context, record, bns::mapping_type::beldexnet, name, miner_key.beldexnet_value, height_of_bns_entry, height_of_bns_entry + beldexnet_expiry(bns::mapping_type::beldexnet), tx_hash, miner_key.owner, {} /*backup_owner*/));
+      CHECK_TEST_CONDITION(verify_bns_mapping_record(perr_context, record, bns::mapping_type::beldexnet, name, miner_key.beldexnet_value, height_of_ons_entry, height_of_ons_entry + beldexnet_expiry(bns::mapping_type::beldexnet), tx_hash, miner_key.owner, {} /*backup_owner*/));
       CHECK_EQ(record.active(blockchain_height), false);
       CHECK_EQ(record.owner_id, owner.id);
       return true;
@@ -2070,9 +2075,9 @@ uint8_t beldex_name_system_update_mapping::hf() { return cryptonote::network_ver
 uint8_t beldex_name_system_update_mapping_argon2::hf() { return cryptonote::network_version_16_bns; }
 bool beldex_name_system_update_mapping::generate(std::vector<test_event_entry> &events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = beldex_generate_sequential_hard_fork_table(hf());
+  auto hard_forks = beldex_generate_hard_fork_table(hf());
   beldex_chain_generator gen(events, hard_forks);
-  gen.add_blocks_until_version(hard_forks.back().first);
+  gen.add_blocks_until_version(hard_forks.back().version);
   gen.add_mined_money_unlock_blocks();
 
   cryptonote::account_base miner     = gen.first_miner_;
@@ -2105,7 +2110,7 @@ bool beldex_name_system_update_mapping::generate(std::vector<test_event_entry> &
   // Test update mapping with same name fails
   if (hf() == cryptonote::network_version_16_bns) {
     cryptonote::transaction tx1 = gen.create_beldex_name_system_tx_update(miner, gen.hardfork(), bns::mapping_type::session, session_name1, &miner_key.session_value);
-    gen.add_tx(tx1, false /*can_be_added_to_blockchain*/, "Can not add a BNS TX that re-updates the underlying value to same value");
+    gen.add_tx(tx1, false /*can_be_added_to_blockchain*/, "Can not add a ONS TX that re-updates the underlying value to same value");
   }
 
   crypto::hash session_tx_hash2;
@@ -2132,7 +2137,7 @@ bool beldex_name_system_update_mapping::generate(std::vector<test_event_entry> &
 }
 
 template <typename... Args>
-static crypto::hash bns_signature_hash(Args&&... args) {
+static crypto::hash ons_signature_hash(Args&&... args) {
   crypto::hash hash{};
   auto data = bns::tx_extra_signature(std::forward<Args>(args)...);
   if (!data.empty())
@@ -2140,7 +2145,7 @@ static crypto::hash bns_signature_hash(Args&&... args) {
   return hash;
 }
 
-bns::generic_signature bns_monero_signature(const crypto::hash& h, const crypto::public_key& pkey, const crypto::secret_key& skey) {
+bns::generic_signature ons_monero_signature(const crypto::hash& h, const crypto::public_key& pkey, const crypto::secret_key& skey) {
     bns::generic_signature result{};
     result.type = bns::generic_owner_sig_type::monero;
     generate_signature(h, pkey, skey, result.monero);
@@ -2149,9 +2154,9 @@ bns::generic_signature bns_monero_signature(const crypto::hash& h, const crypto:
 
 bool beldex_name_system_update_mapping_multiple_owners::generate(std::vector<test_event_entry>& events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = beldex_generate_sequential_hard_fork_table();
+  auto hard_forks = beldex_generate_hard_fork_table();
   beldex_chain_generator gen(events, hard_forks);
-  gen.add_blocks_until_version(hard_forks.back().first);
+  gen.add_blocks_until_version(hard_forks.back().version);
   gen.add_n_blocks(10); /// generate some outputs and unlock them
   gen.add_mined_money_unlock_blocks();
 
@@ -2190,7 +2195,7 @@ bool beldex_name_system_update_mapping_multiple_owners::generate(std::vector<tes
     {
       bns_keys_t temp_keys = make_bns_keys(gen.add_account());
       bns::mapping_value encrypted_value = temp_keys.session_value.make_encrypted(name);
-      crypto::hash hash = bns_signature_hash(encrypted_value.to_view(), nullptr /*owner*/, nullptr /*backup_owner*/, txid);
+      crypto::hash hash = ons_signature_hash(encrypted_value.to_view(), nullptr /*owner*/, nullptr /*backup_owner*/, txid);
       auto signature = bns::make_ed25519_signature(hash, owner1_key);
 
       cryptonote::transaction tx2 = gen.create_and_add_beldex_name_system_tx_update(miner, gen.hardfork(), bns::mapping_type::session, name, &encrypted_value, nullptr /*owner*/, nullptr /*backup_owner*/, &signature);
@@ -2211,7 +2216,7 @@ bool beldex_name_system_update_mapping_multiple_owners::generate(std::vector<tes
     {
       bns_keys_t temp_keys = make_bns_keys(gen.add_account());
       bns::mapping_value encrypted_value = temp_keys.session_value.make_encrypted(name);
-      crypto::hash hash = bns_signature_hash(encrypted_value.to_view(), nullptr /*owner*/, nullptr /*backup_owner*/, txid);
+      crypto::hash hash = ons_signature_hash(encrypted_value.to_view(), nullptr /*owner*/, nullptr /*backup_owner*/, txid);
       auto signature = bns::make_ed25519_signature(hash, owner2_key);
 
       cryptonote::transaction tx2 = gen.create_and_add_beldex_name_system_tx_update(miner, gen.hardfork(), bns::mapping_type::session, name, &encrypted_value, nullptr /*owner*/, nullptr /*backup_owner*/, &signature);
@@ -2247,8 +2252,8 @@ bool beldex_name_system_update_mapping_multiple_owners::generate(std::vector<tes
     {
       bns_keys_t temp_keys = make_bns_keys(gen.add_account());
       bns::mapping_value encrypted_value = temp_keys.session_value.make_encrypted(name);
-      crypto::hash hash = bns_signature_hash(encrypted_value.to_view(), nullptr /*owner*/, nullptr /*backup_owner*/, txid);
-      auto signature = bns_monero_signature(hash, owner1.wallet.address.m_spend_public_key, account1.get_keys().m_spend_secret_key);
+      crypto::hash hash = ons_signature_hash(encrypted_value.to_view(), nullptr /*owner*/, nullptr /*backup_owner*/, txid);
+      auto signature = ons_monero_signature(hash, owner1.wallet.address.m_spend_public_key, account1.get_keys().m_spend_secret_key);
 
       cryptonote::transaction tx2 = gen.create_and_add_beldex_name_system_tx_update(miner, gen.hardfork(), bns::mapping_type::session, name, &encrypted_value, nullptr /*owner*/, nullptr /*backup_owner*/, &signature);
       gen.create_and_add_next_block({tx2});
@@ -2268,8 +2273,8 @@ bool beldex_name_system_update_mapping_multiple_owners::generate(std::vector<tes
     {
       bns_keys_t temp_keys = make_bns_keys(gen.add_account());
       bns::mapping_value encrypted_value = temp_keys.session_value.make_encrypted(name);
-      crypto::hash hash = bns_signature_hash(encrypted_value.to_view(), nullptr /*owner*/, nullptr /*backup_owner*/, txid);
-      auto signature = bns_monero_signature(hash, owner2.wallet.address.m_spend_public_key, account2.get_keys().m_spend_secret_key);
+      crypto::hash hash = ons_signature_hash(encrypted_value.to_view(), nullptr /*owner*/, nullptr /*backup_owner*/, txid);
+      auto signature = ons_monero_signature(hash, owner2.wallet.address.m_spend_public_key, account2.get_keys().m_spend_secret_key);
 
       cryptonote::transaction tx2 = gen.create_and_add_beldex_name_system_tx_update(miner, gen.hardfork(), bns::mapping_type::session, name, &encrypted_value, nullptr /*owner*/, nullptr /*backup_owner*/, &signature);
       gen.create_and_add_next_block({tx2});
@@ -2308,7 +2313,7 @@ bool beldex_name_system_update_mapping_multiple_owners::generate(std::vector<tes
     {
       bns_keys_t temp_keys = make_bns_keys(gen.add_account());
       bns::mapping_value encrypted_value = temp_keys.session_value.make_encrypted(name);
-      crypto::hash hash = bns_signature_hash(encrypted_value.to_view(), nullptr /*owner*/, nullptr /*backup_owner*/, txid);
+      crypto::hash hash = ons_signature_hash(encrypted_value.to_view(), nullptr /*owner*/, nullptr /*backup_owner*/, txid);
       auto signature = bns::make_ed25519_signature(hash, owner1_key);
 
       cryptonote::transaction tx2 = gen.create_and_add_beldex_name_system_tx_update(miner, gen.hardfork(), bns::mapping_type::session, name, &encrypted_value, nullptr /*owner*/, nullptr /*backup_owner*/, &signature);
@@ -2329,8 +2334,8 @@ bool beldex_name_system_update_mapping_multiple_owners::generate(std::vector<tes
     {
       bns_keys_t temp_keys = make_bns_keys(gen.add_account());
       bns::mapping_value encrypted_value = temp_keys.session_value.make_encrypted(name);
-      crypto::hash hash = bns_signature_hash(encrypted_value.to_view(), nullptr /*owner*/, nullptr /*backup_owner*/, txid);
-      auto signature = bns_monero_signature(hash, owner2.wallet.address.m_spend_public_key, account2.get_keys().m_spend_secret_key);
+      crypto::hash hash = ons_signature_hash(encrypted_value.to_view(), nullptr /*owner*/, nullptr /*backup_owner*/, txid);
+      auto signature = ons_monero_signature(hash, owner2.wallet.address.m_spend_public_key, account2.get_keys().m_spend_secret_key);
 
       cryptonote::transaction tx2 = gen.create_and_add_beldex_name_system_tx_update(miner, gen.hardfork(), bns::mapping_type::session, name, &encrypted_value, nullptr /*owner*/, nullptr /*backup_owner*/, &signature);
       gen.create_and_add_next_block({tx2});
@@ -2369,8 +2374,8 @@ bool beldex_name_system_update_mapping_multiple_owners::generate(std::vector<tes
       bns_keys_t temp_keys = make_bns_keys(gen.add_account());
 
       bns::mapping_value encrypted_value = temp_keys.session_value.make_encrypted(name);
-      crypto::hash hash = bns_signature_hash(encrypted_value.to_view(), nullptr /*owner*/, nullptr /*backup_owner*/, txid);
-      auto signature = bns_monero_signature(hash, owner1.wallet.address.m_spend_public_key, account1.get_keys().m_spend_secret_key);
+      crypto::hash hash = ons_signature_hash(encrypted_value.to_view(), nullptr /*owner*/, nullptr /*backup_owner*/, txid);
+      auto signature = ons_monero_signature(hash, owner1.wallet.address.m_spend_public_key, account1.get_keys().m_spend_secret_key);
 
       cryptonote::transaction tx2 = gen.create_and_add_beldex_name_system_tx_update(miner, gen.hardfork(), bns::mapping_type::session, name, &encrypted_value, nullptr /*owner*/, nullptr /*backup_owner*/, &signature);
       gen.create_and_add_next_block({tx2});
@@ -2391,7 +2396,7 @@ bool beldex_name_system_update_mapping_multiple_owners::generate(std::vector<tes
       bns_keys_t temp_keys = make_bns_keys(gen.add_account());
 
       bns::mapping_value encrypted_value = temp_keys.session_value.make_encrypted(name);
-      crypto::hash hash = bns_signature_hash(encrypted_value.to_view(), nullptr /*owner*/, nullptr /*backup_owner*/, txid);
+      crypto::hash hash = ons_signature_hash(encrypted_value.to_view(), nullptr /*owner*/, nullptr /*backup_owner*/, txid);
       auto signature = bns::make_ed25519_signature(hash, owner2_key);
 
       cryptonote::transaction tx2 = gen.create_and_add_beldex_name_system_tx_update(miner, gen.hardfork(), bns::mapping_type::session, name, &encrypted_value, nullptr /*owner*/, nullptr /*backup_owner*/, &signature);
@@ -2413,24 +2418,24 @@ bool beldex_name_system_update_mapping_multiple_owners::generate(std::vector<tes
 
 bool beldex_name_system_update_mapping_non_existent_name_fails::generate(std::vector<test_event_entry> &events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = beldex_generate_sequential_hard_fork_table();
+  auto hard_forks = beldex_generate_hard_fork_table();
   beldex_chain_generator gen(events, hard_forks);
-  gen.add_blocks_until_version(hard_forks.back().first);
+  gen.add_blocks_until_version(hard_forks.back().version);
   gen.add_mined_money_unlock_blocks();
 
   cryptonote::account_base miner = gen.first_miner_;
   bns_keys_t miner_key           = make_bns_keys(miner);
   std::string name               = "hello-world";
   cryptonote::transaction tx1 = gen.create_beldex_name_system_tx_update(miner, gen.hardfork(), bns::mapping_type::session, name, &miner_key.session_value, nullptr /*owner*/, nullptr /*backup_owner*/, nullptr /*signature*/, false /*use_asserts*/);
-  gen.add_tx(tx1, false /*can_be_added_to_blockchain*/, "Can not add a updating BNS TX referencing a non-existent BNS entry");
+  gen.add_tx(tx1, false /*can_be_added_to_blockchain*/, "Can not add a updating ONS TX referencing a non-existent ONS entry");
   return true;
 }
 
 bool beldex_name_system_update_mapping_invalid_signature::generate(std::vector<test_event_entry> &events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = beldex_generate_sequential_hard_fork_table();
+  auto hard_forks = beldex_generate_hard_fork_table();
   beldex_chain_generator gen(events, hard_forks);
-  gen.add_blocks_until_version(hard_forks.back().first);
+  gen.add_blocks_until_version(hard_forks.back().version);
   gen.add_mined_money_unlock_blocks();
 
   cryptonote::account_base miner = gen.first_miner_;
@@ -2444,15 +2449,15 @@ bool beldex_name_system_update_mapping_invalid_signature::generate(std::vector<t
   bns::mapping_value encrypted_value = bob_key.session_value.make_encrypted(name);
   bns::generic_signature invalid_signature = {};
   cryptonote::transaction tx2 = gen.create_beldex_name_system_tx_update(miner, gen.hardfork(), bns::mapping_type::session, name, &encrypted_value, nullptr /*owner*/, nullptr /*backup_owner*/, &invalid_signature, false /*use_asserts*/);
-  gen.add_tx(tx2, false /*can_be_added_to_blockchain*/, "Can not add a updating BNS TX with an invalid signature");
+  gen.add_tx(tx2, false /*can_be_added_to_blockchain*/, "Can not add a updating ONS TX with an invalid signature");
   return true;
 }
 
 bool beldex_name_system_update_mapping_replay::generate(std::vector<test_event_entry> &events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = beldex_generate_sequential_hard_fork_table();
+  auto hard_forks = beldex_generate_hard_fork_table();
   beldex_chain_generator gen(events, hard_forks);
-  gen.add_blocks_until_version(hard_forks.back().first);
+  gen.add_blocks_until_version(hard_forks.back().version);
   gen.add_mined_money_unlock_blocks();
 
   cryptonote::account_base miner = gen.first_miner_;
@@ -2461,24 +2466,24 @@ bool beldex_name_system_update_mapping_replay::generate(std::vector<test_event_e
   bns_keys_t alice_key           = make_bns_keys(gen.add_account());
 
   std::string const name = "hello-world";
-  // Make BNS Mapping
+  // Make ONS Mapping
   {
     cryptonote::transaction tx1 = gen.create_and_add_beldex_name_system_tx(miner, gen.hardfork(), bns::mapping_type::session, name, miner_key.session_value);
     gen.create_and_add_next_block({tx1});
   }
 
-  // (1) Update BNS Mapping
-  cryptonote::tx_extra_beldex_name_system bns_entry = {};
+  // (1) Update ONS Mapping
+  cryptonote::tx_extra_beldex_name_system ons_entry = {};
   {
     cryptonote::transaction tx1 = gen.create_and_add_beldex_name_system_tx_update(miner, gen.hardfork(), bns::mapping_type::session, name, &bob_key.session_value);
     gen.create_and_add_next_block({tx1});
-    [[maybe_unused]] bool found_tx_extra = cryptonote::get_field_from_tx_extra(tx1.extra, bns_entry);
+    [[maybe_unused]] bool found_tx_extra = cryptonote::get_field_from_tx_extra(tx1.extra, ons_entry);
     assert(found_tx_extra);
   }
 
   // Replay the (1)st update mapping, should fail because the update is to the same session value
   {
-    cryptonote::transaction tx1 = gen.create_beldex_name_system_tx_update_w_extra(miner, gen.hardfork(), bns_entry);
+    cryptonote::transaction tx1 = gen.create_beldex_name_system_tx_update_w_extra(miner, gen.hardfork(), ons_entry);
     gen.add_tx(tx1, false /*can_be_added_to_blockchain*/, "Can not replay an older update mapping to the same session value");
   }
 
@@ -2491,9 +2496,9 @@ bool beldex_name_system_update_mapping_replay::generate(std::vector<test_event_e
   }
 
   // Replay the (1)st update mapping, should fail now even though it's not to the same session value, but that the signature no longer matches so you can't replay.
-  bns_entry.prev_txid = new_hash;
+  ons_entry.prev_txid = new_hash;
   {
-    cryptonote::transaction tx1 = gen.create_beldex_name_system_tx_update_w_extra(miner, gen.hardfork(), bns_entry);
+    cryptonote::transaction tx1 = gen.create_beldex_name_system_tx_update_w_extra(miner, gen.hardfork(), ons_entry);
     gen.add_tx(tx1, false /*can_be_added_to_blockchain*/, "Can not replay an older update mapping, should fail signature verification");
   }
 
@@ -2502,17 +2507,17 @@ bool beldex_name_system_update_mapping_replay::generate(std::vector<test_event_e
 
 bool beldex_name_system_wrong_burn::generate(std::vector<test_event_entry> &events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = beldex_generate_sequential_hard_fork_table();
+  auto hard_forks = beldex_generate_hard_fork_table();
   beldex_chain_generator gen(events, hard_forks);
   cryptonote::account_base miner = gen.first_miner_;
-  gen.add_blocks_until_version(hard_forks.back().first);
+  gen.add_blocks_until_version(hard_forks.back().version);
 
   // NOTE: Fund Miner's wallet
   {
     gen.add_mined_money_unlock_blocks();
   }
 
-  bns_keys_t bns_keys             = make_bns_keys(miner);
+  bns_keys_t ons_keys             = make_bns_keys(miner);
   bns::mapping_type const types[] = {bns::mapping_type::session, bns::mapping_type::wallet, bns::mapping_type::beldexnet};
   for (int i = 0; i < 2; i++)
   {
@@ -2526,17 +2531,17 @@ bool beldex_name_system_wrong_burn::generate(std::vector<test_event_entry> &even
 
         if (type == bns::mapping_type::session)
         {
-          value = bns_keys.session_value;
+          value = ons_keys.session_value;
           name  = "my-friendly-session-name";
         }
         else if (type == bns::mapping_type::wallet)
         {
-          value = bns_keys.wallet_value;
+          value = ons_keys.wallet_value;
           name = "my-friendly-wallet-name";
         }
         else if (type == bns::mapping_type::beldexnet)
         {
-          value = bns_keys.beldexnet_value;
+          value = ons_keys.beldexnet_value;
           name  = "myfriendlybeldexnetname.beldex";
         }
         else
@@ -2549,7 +2554,12 @@ bool beldex_name_system_wrong_burn::generate(std::vector<test_event_entry> &even
         else            burn += 1;
 
         cryptonote::transaction tx = gen.create_beldex_name_system_tx(miner, gen.hardfork(), type, name, value, nullptr /*owner*/, nullptr /*backup_owner*/, burn);
-        gen.add_tx(tx, false /*can_be_added_to_blockchain*/, "Wrong burn for a BNS tx", false /*kept_by_block*/);
+        if (new_hf_version == cryptonote::network_version_18 && !under_burn && new_height < 524'000)
+        {
+          gen.add_tx(tx, true /*can_be_added_to_blockchain*/, "Wrong burn for a ONS tx but workaround for testnet", true /*kept_by_block*/);
+        } else {
+          gen.add_tx(tx, false /*can_be_added_to_blockchain*/, "Wrong burn for a ONS tx", false /*kept_by_block*/);
+        }
       }
     }
   }
@@ -2558,14 +2568,14 @@ bool beldex_name_system_wrong_burn::generate(std::vector<test_event_entry> &even
 
 bool beldex_name_system_wrong_version::generate(std::vector<test_event_entry> &events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = beldex_generate_sequential_hard_fork_table();
+  auto hard_forks = beldex_generate_hard_fork_table();
   beldex_chain_generator gen(events, hard_forks);
 
   cryptonote::account_base miner = gen.first_miner_;
-  gen.add_blocks_until_version(hard_forks.back().first);
+  gen.add_blocks_until_version(hard_forks.back().version);
   gen.add_mined_money_unlock_blocks();
 
-  std::string name = "bns_name";
+  std::string name = "ons_name";
   bns_keys_t miner_key                       = make_bns_keys(miner);
   cryptonote::tx_extra_beldex_name_system data = {};
   data.version                               = 0xFF;
@@ -2589,17 +2599,17 @@ bool beldex_name_system_wrong_version::generate(std::vector<test_event_entry> &e
       .with_fee(burn_requirement + TESTS_DEFAULT_FEE)
       .build();
 
-  gen.add_tx(tx, false /*can_be_added_to_blockchain*/, "Incorrect BNS record version specified", false /*kept_by_block*/);
+  gen.add_tx(tx, false /*can_be_added_to_blockchain*/, "Incorrect ONS record version specified", false /*kept_by_block*/);
   return true;
 }
 
 // NOTE: Generate forked block, check that alternative quorums are generated and accessible
 bool beldex_master_nodes_alt_quorums::generate(std::vector<test_event_entry>& events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = beldex_generate_sequential_hard_fork_table();
+  auto hard_forks = beldex_generate_hard_fork_table();
   beldex_chain_generator gen(events, hard_forks);
 
-  gen.add_blocks_until_version(hard_forks.back().first);
+  gen.add_blocks_until_version(hard_forks.back().version);
   gen.add_mined_money_unlock_blocks();
   add_master_nodes(gen, master_nodes::STATE_CHANGE_QUORUM_SIZE + 3);
 
@@ -2644,10 +2654,10 @@ bool beldex_master_nodes_alt_quorums::generate(std::vector<test_event_entry>& ev
 
 bool beldex_master_nodes_checkpoint_quorum_size::generate(std::vector<test_event_entry>& events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = beldex_generate_sequential_hard_fork_table();
+  auto hard_forks = beldex_generate_hard_fork_table();
   beldex_chain_generator gen(events, hard_forks);
 
-  gen.add_blocks_until_version(hard_forks.back().first);
+  gen.add_blocks_until_version(hard_forks.back().version);
   gen.add_mined_money_unlock_blocks();
   add_master_nodes(gen, master_nodes::CHECKPOINT_QUORUM_SIZE - 1);
 
@@ -2684,19 +2694,19 @@ bool beldex_master_nodes_checkpoint_quorum_size::generate(std::vector<test_event
 
 bool beldex_master_nodes_gen_nodes::generate(std::vector<test_event_entry> &events)
 {
-  const std::vector<std::pair<uint8_t, uint64_t>> hard_forks = beldex_generate_sequential_hard_fork_table(cryptonote::network_version_9_master_nodes);
+  const auto hard_forks = beldex_generate_hard_fork_table(cryptonote::network_version_9_master_nodes);
   beldex_chain_generator gen(events, hard_forks);
   const auto miner                      = gen.first_miner();
   const auto alice                      = gen.add_account();
   size_t alice_account_base_event_index = gen.event_index();
 
-  gen.add_blocks_until_version(hard_forks.back().first);
+  gen.add_blocks_until_version(hard_forks.back().version);
   gen.add_n_blocks(10);
   gen.add_mined_money_unlock_blocks();
 
   const auto tx0 = gen.create_and_add_tx(miner, alice.get_keys().m_account_address, MK_COINS(101));
   gen.create_and_add_next_block({tx0});
-  gen.add_mined_money_unlock_blocks();
+  gen.add_transfer_unlock_blocks();
 
   const auto reg_tx = gen.create_and_add_registration_tx(alice);
   gen.create_and_add_next_block({reg_tx});
@@ -2705,8 +2715,7 @@ bool beldex_master_nodes_gen_nodes::generate(std::vector<test_event_entry> &even
   {
     DEFINE_TESTS_ERROR_CONTEXT("gen_master_nodes::check_registered");
     std::vector<cryptonote::block> blocks;
-    size_t count = 15 + (2 * CRYPTONOTE_MINED_MONEY_UNLOCK_WINDOW);
-    bool r       = c.get_blocks((uint64_t)0, count, blocks);
+    bool r = c.get_blocks((uint64_t)0, (uint64_t)-1, blocks);
     CHECK_TEST_CONDITION(r);
     std::vector<cryptonote::block> chain;
     map_hash2tx_t mtx;
@@ -2722,7 +2731,7 @@ bool beldex_master_nodes_gen_nodes::generate(std::vector<test_event_entry> &even
 
     /// check that alice is registered
     const auto info_v = c.get_master_node_list_state({});
-    CHECK_EQ(info_v.empty(), false);
+    CHECK_EQ(info_v.size(), 1);
     return true;
   });
 
@@ -2754,21 +2763,19 @@ bool beldex_master_nodes_gen_nodes::generate(std::vector<test_event_entry> &even
   return true;
 }
 
-using mn_info_t = master_nodes::master_node_pubkey_info;
-static bool contains(const std::vector<mn_info_t>& infos, const crypto::public_key& key)
+using sn_info_t = master_nodes::master_node_pubkey_info;
+static bool contains(const std::vector<sn_info_t>& infos, const crypto::public_key& key)
 {
   const auto it =
-    std::find_if(infos.begin(), infos.end(), [&key](const mn_info_t& info) { return info.pubkey == key; });
+    std::find_if(infos.begin(), infos.end(), [&key](const sn_info_t& info) { return info.pubkey == key; });
   return it != infos.end();
 }
 
 bool beldex_master_nodes_test_rollback::generate(std::vector<test_event_entry>& events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = beldex_generate_sequential_hard_fork_table(cryptonote::network_version_9_master_nodes);
+  auto hard_forks = beldex_generate_hard_fork_table();
   beldex_chain_generator gen(events, hard_forks);
-  gen.add_blocks_until_version(hard_forks.back().first);
-  gen.add_n_blocks(20); /// generate some outputs and unlock them
-  gen.add_mined_money_unlock_blocks();
+  gen.add_blocks_until_version(hard_forks.back().version);
   add_master_nodes(gen, 11);
 
   gen.add_n_blocks(5);   /// create a few blocks with active master nodes
@@ -2776,22 +2783,24 @@ bool beldex_master_nodes_test_rollback::generate(std::vector<test_event_entry>& 
 
   // deregister some node (A) on main
   const auto pk           = gen.top_quorum().obligations->workers[0];
-  const auto dereg_tx     = gen.create_and_add_state_change_tx(master_nodes::new_state::deregister, pk);
+  const auto dereg_tx     = gen.create_and_add_state_change_tx(master_nodes::new_state::deregister, pk, 0, 0);
   size_t deregister_index = gen.event_index();
   gen.create_and_add_next_block({dereg_tx});
 
+  size_t reg_evnt_idx;
   /// create a new master node (B) in the next block
   {
     const auto tx = gen.create_and_add_registration_tx(gen.first_miner());
+    reg_evnt_idx = gen.event_index();
     gen.create_and_add_next_block({tx});
   }
 
   fork.add_n_blocks(3); /// create blocks on the alt chain and trigger chain switch
   fork.add_n_blocks(15); // create a few more blocks to test winner selection
-  beldex_register_callback(events, "test_registrations", [&events, deregister_index](cryptonote::core &c, size_t ev_index)
+  beldex_register_callback(events, "test_registrations", [&events, deregister_index, reg_evnt_idx](cryptonote::core &c, size_t ev_index)
   {
     DEFINE_TESTS_ERROR_CONTEXT("test_registrations");
-    const auto mn_list = c.get_master_node_list_state({});
+    const auto sn_list = c.get_master_node_list_state({});
     /// Test that node A is still registered
     {
       /// obtain public key of node A
@@ -2801,22 +2810,21 @@ bool beldex_master_nodes_test_rollback::generate(std::vector<test_event_entry>& 
       CHECK_TEST_CONDITION(dereg_tx.data.tx.type == cryptonote::txtype::state_change);
 
       cryptonote::tx_extra_master_node_state_change deregistration;
-      cryptonote::get_master_node_state_change_from_tx_extra(
-          dereg_tx.data.tx.extra, deregistration, c.get_blockchain_storage().get_current_hard_fork_version());
+      auto netv = get_network_version(c.get_nettype(), c.get_current_blockchain_height());
+      cryptonote::get_master_node_state_change_from_tx_extra(dereg_tx.data.tx.extra, deregistration, netv);
 
       const auto uptime_quorum = c.get_quorum(master_nodes::quorum_type::obligations, deregistration.block_height);
       CHECK_TEST_CONDITION(uptime_quorum);
       const auto pk_a = uptime_quorum->workers.at(deregistration.master_node_index);
 
       /// Check present
-      const bool found_a = contains(mn_list, pk_a);
+      const bool found_a = contains(sn_list, pk_a);
       CHECK_AND_ASSERT_MES(found_a, false, "Node deregistered in alt chain is not found in the main chain after reorg.");
     }
 
     /// Test that node B is not registered
     {
       /// obtain public key of node B
-      constexpr size_t reg_evnt_idx = 73;
       const auto event_b = events.at(reg_evnt_idx);
       CHECK_TEST_CONDITION(std::holds_alternative<beldex_blockchain_addable<beldex_transaction>>(event_b));
       const auto reg_tx = var::get<beldex_blockchain_addable<beldex_transaction>>(event_b);
@@ -2828,7 +2836,7 @@ bool beldex_master_nodes_test_rollback::generate(std::vector<test_event_entry>& 
       }
 
       /// Check not present
-      const bool found_b = contains(mn_list, pk_b);
+      const bool found_b = contains(sn_list, pk_b);
       CHECK_AND_ASSERT_MES(!found_b, false, "Node registered in alt chain is present in the main chain after reorg.");
     }
     return true;
@@ -2839,20 +2847,20 @@ bool beldex_master_nodes_test_rollback::generate(std::vector<test_event_entry>& 
 
 bool beldex_master_nodes_test_swarms_basic::generate(std::vector<test_event_entry>& events)
 {
-  const std::vector<std::pair<uint8_t, uint64_t>> hard_forks = {
-      std::make_pair(7, 0), std::make_pair(8, 1), std::make_pair(9, 2), std::make_pair(10, 150)};
+  const std::vector<cryptonote::hard_fork> hard_forks = {
+      {7,0,0,0}, {8,0,1,0}, {9,0,2,0}, {10,0,150,0}};
 
   beldex_chain_generator gen(events, hard_forks);
-  gen.add_blocks_until_version(hard_forks.rbegin()[1].first);
+  gen.add_blocks_until_version(hard_forks.rbegin()[1].version);
 
   /// Create some master nodes before hf version 10
-  constexpr size_t INIT_MN_COUNT  = 13;
-  constexpr size_t TOTAL_MN_COUNT = 25;
+  constexpr size_t INIT_SN_COUNT  = 13;
+  constexpr size_t TOTAL_SN_COUNT = 25;
   gen.add_n_blocks(90);
   gen.add_mined_money_unlock_blocks();
 
   /// register some master nodes
-  add_master_nodes(gen, INIT_MN_COUNT);
+  add_master_nodes(gen, INIT_SN_COUNT);
 
   /// create a few blocks with active master nodes
   gen.add_n_blocks(5);
@@ -2862,9 +2870,9 @@ bool beldex_master_nodes_test_swarms_basic::generate(std::vector<test_event_entr
   beldex_register_callback(events, "test_initial_swarms", [](cryptonote::core &c, size_t ev_index)
   {
     DEFINE_TESTS_ERROR_CONTEXT("test_swarms_basic::test_initial_swarms");
-    const auto mn_list = c.get_master_node_list_state({}); /// Check that there is one active swarm and the swarm queue is not empty
+    const auto sn_list = c.get_master_node_list_state({}); /// Check that there is one active swarm and the swarm queue is not empty
     std::map<master_nodes::swarm_id_t, std::vector<crypto::public_key>> swarms;
-    for (const auto& entry : mn_list)
+    for (const auto& entry : sn_list)
     {
       const auto id = entry.info->swarm_id;
       swarms[id].push_back(entry.pubkey);
@@ -2881,12 +2889,12 @@ bool beldex_master_nodes_test_swarms_basic::generate(std::vector<test_event_entr
     gen.create_and_add_next_block({tx});
   }
 
-  beldex_register_callback(events, "test_with_one_more_mn", [](cryptonote::core &c, size_t ev_index) /// test that another swarm has been created
+  beldex_register_callback(events, "test_with_one_more_sn", [](cryptonote::core &c, size_t ev_index) /// test that another swarm has been created
   {
-    DEFINE_TESTS_ERROR_CONTEXT("test_with_one_more_mn");
-    const auto mn_list = c.get_master_node_list_state({});
+    DEFINE_TESTS_ERROR_CONTEXT("test_with_one_more_sn");
+    const auto sn_list = c.get_master_node_list_state({});
     std::map<master_nodes::swarm_id_t, std::vector<crypto::public_key>> swarms;
-    for (const auto& entry : mn_list)
+    for (const auto& entry : sn_list)
     {
       const auto id = entry.info->swarm_id;
       swarms[id].push_back(entry.pubkey);
@@ -2895,18 +2903,18 @@ bool beldex_master_nodes_test_swarms_basic::generate(std::vector<test_event_entr
     return true;
   });
 
-  for (auto i = INIT_MN_COUNT + 1; i < TOTAL_MN_COUNT; ++i)
+  for (auto i = INIT_SN_COUNT + 1; i < TOTAL_SN_COUNT; ++i)
   {
     const auto tx = gen.create_and_add_registration_tx(gen.first_miner());
     gen.create_and_add_next_block({tx});
   }
 
-  beldex_register_callback(events, "test_with_more_mn", [](cryptonote::core &c, size_t ev_index) /// test that another swarm has been created
+  beldex_register_callback(events, "test_with_more_sn", [](cryptonote::core &c, size_t ev_index) /// test that another swarm has been created
   {
-    DEFINE_TESTS_ERROR_CONTEXT("test_with_more_mn");
-    const auto mn_list = c.get_master_node_list_state({});
+    DEFINE_TESTS_ERROR_CONTEXT("test_with_more_sn");
+    const auto sn_list = c.get_master_node_list_state({});
     std::map<master_nodes::swarm_id_t, std::vector<crypto::public_key>> swarms;
-    for (const auto& entry : mn_list)
+    for (const auto& entry : sn_list)
     {
       const auto id = entry.info->swarm_id;
       swarms[id].push_back(entry.pubkey);
@@ -2916,12 +2924,12 @@ bool beldex_master_nodes_test_swarms_basic::generate(std::vector<test_event_entr
   });
 
   std::vector<cryptonote::transaction> dereg_txs; /// deregister enough mnode to bring all 3 swarm to the min size
-  const size_t excess = TOTAL_MN_COUNT - 3 * master_nodes::EXCESS_BASE;
+  const size_t excess = TOTAL_SN_COUNT - 3 * master_nodes::EXCESS_BASE;
   master_nodes::quorum_manager top_quorum = gen.top_quorum();
   for (size_t i = 0; i < excess; ++i)
   {
     const auto pk = top_quorum.obligations->workers[i];
-    const auto tx = gen.create_and_add_state_change_tx(master_nodes::new_state::deregister, pk, cryptonote::get_block_height(gen.top().block));
+    const auto tx = gen.create_and_add_state_change_tx(master_nodes::new_state::deregister, pk, 0, 0, cryptonote::get_block_height(gen.top().block));
     dereg_txs.push_back(tx);
   }
 
@@ -2929,9 +2937,9 @@ bool beldex_master_nodes_test_swarms_basic::generate(std::vector<test_event_entr
   beldex_register_callback(events, "test_after_first_deregisters", [](cryptonote::core &c, size_t ev_index)
   {
     DEFINE_TESTS_ERROR_CONTEXT("test_after_first_deregisters");
-    const auto mn_list = c.get_master_node_list_state({});
+    const auto sn_list = c.get_master_node_list_state({});
     std::map<master_nodes::swarm_id_t, std::vector<crypto::public_key>> swarms;
-    for (const auto& entry : mn_list)
+    for (const auto& entry : sn_list)
     {
       const auto id = entry.info->swarm_id;
       swarms[id].push_back(entry.pubkey);
@@ -2944,7 +2952,7 @@ bool beldex_master_nodes_test_swarms_basic::generate(std::vector<test_event_entr
   dereg_txs.clear();
   {
     const auto pk = gen.top_quorum().obligations->workers[0];
-    const auto tx = gen.create_and_add_state_change_tx(master_nodes::new_state::deregister, pk);
+    const auto tx = gen.create_and_add_state_change_tx(master_nodes::new_state::deregister, pk, 0, 0);
     dereg_txs.push_back(tx);
   }
   gen.create_and_add_next_block(dereg_txs);
@@ -2952,9 +2960,9 @@ bool beldex_master_nodes_test_swarms_basic::generate(std::vector<test_event_entr
   beldex_register_callback(events, "test_after_final_deregisters", [](cryptonote::core &c, size_t ev_index)
   {
     DEFINE_TESTS_ERROR_CONTEXT("test_after_first_deregisters");
-    const auto mn_list = c.get_master_node_list_state({});
+    const auto sn_list = c.get_master_node_list_state({});
     std::map<master_nodes::swarm_id_t, std::vector<crypto::public_key>> swarms;
-    for (const auto &entry : mn_list)
+    for (const auto &entry : sn_list)
     {
       const auto id = entry.info->swarm_id;
       swarms[id].push_back(entry.pubkey);
@@ -2970,29 +2978,29 @@ bool beldex_master_nodes_test_swarms_basic::generate(std::vector<test_event_entr
 
 bool beldex_master_nodes_insufficient_contribution::generate(std::vector<test_event_entry> &events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = beldex_generate_sequential_hard_fork_table();
+  auto hard_forks = beldex_generate_hard_fork_table();
   beldex_chain_generator gen(events, hard_forks);
 
-  gen.add_blocks_until_version(hard_forks.back().first);
+  gen.add_blocks_until_version(hard_forks.back().version);
   gen.add_mined_money_unlock_blocks();
 
-  uint64_t operator_portions                = STAKING_PORTIONS / 2;
-  uint64_t remaining_portions               = STAKING_PORTIONS - operator_portions;
-  cryptonote::keypair mn_keys               = cryptonote::keypair{hw::get_device("default")};
-  cryptonote::transaction register_tx       = gen.create_registration_tx(gen.first_miner_, mn_keys, operator_portions);
+  uint64_t operator_portions = STAKING_PORTIONS / 2;
+  uint64_t remaining_portions = STAKING_PORTIONS - operator_portions;
+  cryptonote::keypair sn_keys{hw::get_device("default")};
+  cryptonote::transaction register_tx = gen.create_registration_tx(gen.first_miner_, sn_keys, operator_portions);
   gen.add_tx(register_tx);
   gen.create_and_add_next_block({register_tx});
 
-  cryptonote::transaction stake = gen.create_and_add_staking_tx(mn_keys.pub, gen.first_miner_, MK_COINS(1));
+  cryptonote::transaction stake = gen.create_and_add_staking_tx(sn_keys.pub, gen.first_miner_, MK_COINS(1));
   gen.create_and_add_next_block({stake});
 
-  beldex_register_callback(events, "test_insufficient_stake_does_not_get_accepted", [mn_keys](cryptonote::core &c, size_t ev_index)
+  beldex_register_callback(events, "test_insufficient_stake_does_not_get_accepted", [sn_keys](cryptonote::core &c, size_t ev_index)
   {
     DEFINE_TESTS_ERROR_CONTEXT("test_insufficient_stake_does_not_get_accepted");
-    const auto mn_list = c.get_master_node_list_state({mn_keys.pub});
-    CHECK_TEST_CONDITION(mn_list.size() == 1);
+    const auto sn_list = c.get_master_node_list_state({sn_keys.pub});
+    CHECK_TEST_CONDITION(sn_list.size() == 1);
 
-    master_nodes::master_node_pubkey_info const &pubkey_info = mn_list[0];
+    master_nodes::master_node_pubkey_info const &pubkey_info = sn_list[0];
     CHECK_EQ(pubkey_info.info->total_contributed, MK_COINS(50));
     return true;
   });
@@ -3002,10 +3010,10 @@ bool beldex_master_nodes_insufficient_contribution::generate(std::vector<test_ev
 
 static beldex_chain_generator setup_pulse_tests(std::vector<test_event_entry> &events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = beldex_generate_sequential_hard_fork_table();
+  auto hard_forks = beldex_generate_hard_fork_table();
   beldex_chain_generator result(events, hard_forks);
 
-  result.add_blocks_until_version(hard_forks.back().first);
+  result.add_blocks_until_version(hard_forks.back().version);
   result.add_mined_money_unlock_blocks();
 
   std::vector<cryptonote::transaction> registration_txs(master_nodes::pulse_min_master_nodes(cryptonote::FAKECHAIN));
@@ -3088,7 +3096,7 @@ bool beldex_pulse_non_participating_validator::generate(std::vector<test_event_e
 
     master_nodes::quorum quorum = {};
     {
-      std::vector<master_nodes::pubkey_and_sninfo> active_mnode_list = params.prev.master_node_state.active_master_nodes_infos();
+      std::vector<master_nodes::pubkey_and_mninfo> active_mnode_list = params.prev.master_node_state.active_master_nodes_infos();
       std::vector<crypto::hash> entropy = master_nodes::get_pulse_entropy_for_next_block(gen.db_, params.prev.block, entry.block.pulse.round);
       quorum = generate_pulse_quorum(cryptonote::FAKECHAIN, params.block_leader.key, entry.block.major_version, active_mnode_list, entropy, entry.block.pulse.round);
       assert(quorum.validators.size() == master_nodes::PULSE_QUORUM_NUM_VALIDATORS);
@@ -3164,7 +3172,7 @@ bool beldex_pulse_reject_miner_block::generate(std::vector<test_event_entry> &ev
   params.type = beldex_create_block_type::miner;
   gen.block_begin(entry, params, {} /*tx_list*/);
 
-  // NOTE: Create an ordinary miner block even when we have enough Master Nodes for Pulse.
+  // NOTE: Create an ordinary miner block even when we have enough master nodes for Pulse.
   fill_nonce_with_beldex_generator(&gen, entry.block, TEST_DEFAULT_DIFFICULTY, cryptonote::get_block_height(entry.block));
 
   gen.block_end(entry, params);
@@ -3174,10 +3182,10 @@ bool beldex_pulse_reject_miner_block::generate(std::vector<test_event_entry> &ev
 
 bool beldex_pulse_generate_blocks::generate(std::vector<test_event_entry> &events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = beldex_generate_sequential_hard_fork_table();
+  auto hard_forks = beldex_generate_hard_fork_table();
   beldex_chain_generator gen(events, hard_forks);
 
-  gen.add_blocks_until_version(hard_forks.back().first);
+  gen.add_blocks_until_version(hard_forks.back().version);
   gen.add_mined_money_unlock_blocks();
 
   add_master_nodes(gen, master_nodes::pulse_min_master_nodes(cryptonote::FAKECHAIN));
@@ -3198,10 +3206,10 @@ bool beldex_pulse_generate_blocks::generate(std::vector<test_event_entry> &event
 
 bool beldex_pulse_fallback_to_pow_and_back::generate(std::vector<test_event_entry> &events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = beldex_generate_sequential_hard_fork_table();
+  auto hard_forks = beldex_generate_hard_fork_table();
   beldex_chain_generator gen(events, hard_forks);
 
-  gen.add_blocks_until_version(hard_forks.back().first);
+  gen.add_blocks_until_version(hard_forks.back().version);
   gen.add_mined_money_unlock_blocks();
 
   add_master_nodes(gen, master_nodes::pulse_min_master_nodes(cryptonote::FAKECHAIN));
@@ -3211,7 +3219,7 @@ bool beldex_pulse_fallback_to_pow_and_back::generate(std::vector<test_event_entr
   {
     const auto deregister_pub_key_1 = gen.top_quorum().obligations->workers[0];
     cryptonote::transaction tx =
-        gen.create_and_add_state_change_tx(master_nodes::new_state::deregister, deregister_pub_key_1);
+        gen.create_and_add_state_change_tx(master_nodes::new_state::deregister, deregister_pub_key_1, 0, 0);
     gen.create_and_add_next_block({tx});
   }
 
@@ -3246,10 +3254,10 @@ bool beldex_pulse_fallback_to_pow_and_back::generate(std::vector<test_event_entr
 
 bool beldex_pulse_chain_split::generate(std::vector<test_event_entry> &events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = beldex_generate_sequential_hard_fork_table();
+  auto hard_forks = beldex_generate_hard_fork_table();
   beldex_chain_generator gen(events, hard_forks);
 
-  gen.add_blocks_until_version(hard_forks.back().first);
+  gen.add_blocks_until_version(hard_forks.back().version);
   gen.add_mined_money_unlock_blocks();
   add_master_nodes(gen, std::max(master_nodes::pulse_min_master_nodes(cryptonote::FAKECHAIN), master_nodes::CHECKPOINT_QUORUM_SIZE));
 
@@ -3291,10 +3299,10 @@ bool beldex_pulse_chain_split::generate(std::vector<test_event_entry> &events)
 // Pulse chain weight to switch over.
 bool beldex_pulse_chain_split_with_no_checkpoints::generate(std::vector<test_event_entry> &events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = beldex_generate_sequential_hard_fork_table();
+  auto hard_forks = beldex_generate_hard_fork_table();
   beldex_chain_generator gen(events, hard_forks);
 
-  gen.add_blocks_until_version(hard_forks.back().first);
+  gen.add_blocks_until_version(hard_forks.back().version);
   gen.add_mined_money_unlock_blocks();
   add_master_nodes(gen, std::max(master_nodes::pulse_min_master_nodes(cryptonote::FAKECHAIN), master_nodes::CHECKPOINT_QUORUM_SIZE));
 

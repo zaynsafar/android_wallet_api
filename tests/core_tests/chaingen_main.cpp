@@ -91,7 +91,7 @@ int main(int argc, char* argv[])
   {
     list_tests = command_line::get_arg(vm, arg_list_tests);
 
-    // NOTE: beldex Tests
+    // NOTE: Beldex Tests
     GENERATE_AND_PLAY(beldex_checkpointing_alt_chain_handle_alt_blocks_at_tip);
     GENERATE_AND_PLAY(beldex_checkpointing_alt_chain_more_master_node_checkpoints_less_pow_overtakes);
     GENERATE_AND_PLAY(beldex_checkpointing_alt_chain_receive_checkpoint_votes_should_reorg_back);

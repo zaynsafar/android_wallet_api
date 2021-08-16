@@ -70,7 +70,7 @@ add_executable(unit_tests
   pruning.cpp
   random.cpp
   rolling_median.cpp
-  serialization.cpp
+  # serialization.cpp
   master_nodes.cpp
   master_nodes_swarm.cpp
   sha256.cpp
