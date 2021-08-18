@@ -76,16 +76,16 @@ beldex_generate_hard_fork_table(uint8_t hf_version, uint64_t pos_delay)
 {
   assert(hf_version < cryptonote::network_version_count);
   // We always need block 0 == v7 for the genesis block:
-  std::vector<cryptonote::hard_fork> result{{cryptonote::network_version_7, 0, 0}};
+  std::vector<cryptonote::hard_fork> result{{cryptonote::network_version_7, 0,0}};
   uint64_t version_height = 1;
   // HF15 reduces and HF16+ eliminates miner block rewards, so we need to ensure we have enough
   // HF14 blocks to generate enough BELDEX for tests:
-  if (hf_version > cryptonote::network_version_14_blink) {
-      result.push_back({cryptonote::network_version_14_blink, 0, version_height});
+  if (hf_version > cryptonote::network_version_15_blink) {
+      result.push_back({cryptonote::network_version_15_blink,0, version_height});
       version_height += pos_delay;
   }
 
-  result.push_back({hf_version, 0, version_height});
+  result.push_back({hf_version,0, version_height,0});
   return result;
 }
 
@@ -163,7 +163,7 @@ std::vector<cryptonote::block> beldex_chain_generator_db::get_blocks_range(const
   return result;
 }
 
-beldex_chain_generator::beldex_chain_generator(std::vector<test_event_entry> &events, const std::vector<std::pair<uint8_t, uint64_t>> &hard_forks)
+beldex_chain_generator::beldex_chain_generator(std::vector<test_event_entry> &events, const std::vector<cryptonote::hard_fork> &hard_forks)
 : events_(events)
 , hard_forks_(hard_forks)
 {
@@ -270,7 +270,7 @@ cryptonote::account_base beldex_chain_generator::add_account()
 void beldex_chain_generator::add_blocks_until_version(uint8_t hf_version)
 {
   assert(hard_forks_.size());
-  assert(hf_version_ <= hard_forks_.back().first);
+  assert(hf_version_ <= hard_forks_.back().version);
   assert(db_.blocks.size() >= 1); // NOTE: We must have genesis block
   for (;;)
   {
@@ -292,7 +292,7 @@ bool beldex_chain_generator::add_blocks_until_next_checkpointable_height()
     return false;
 
   // NOTE: Add blocks until we get to the first height that has a checkpointing
-  // quorum AND there are master nodes in the quorum. Note we do this naiively
+  // quorum AND there are master nodes in the quorum. Note we do this naively
   // as tests shouldn't have to care about implementation details.
   for (;;)
   {
@@ -324,9 +324,7 @@ void beldex_chain_generator::add_transfer_unlock_blocks()
 
 void beldex_chain_generator::add_tx(cryptonote::transaction const &tx, bool can_be_added_to_blockchain, std::string const &fail_msg, bool kept_by_block)
 {
-  beldex_transaction tx_entry                       = {tx, kept_by_block};
-  beldex_blockchain_addable<beldex_transaction> entry = {std::move(tx_entry), can_be_added_to_blockchain, fail_msg};
-  events_.push_back(entry);
+  events_.emplace_back(beldex_blockchain_addable<beldex_transaction>{{tx, kept_by_block}, can_be_added_to_blockchain, fail_msg});
 }
 
 cryptonote::transaction
@@ -385,16 +383,30 @@ cryptonote::transaction beldex_chain_generator::create_and_add_tx(const cryptono
   return t;
 }
 
-cryptonote::transaction beldex_chain_generator::create_and_add_state_change_tx(master_nodes::new_state state, const crypto::public_key &pub_key, uint64_t height, const std::vector<uint64_t> &voters, uint64_t fee, bool kept_by_block)
+cryptonote::transaction beldex_chain_generator::create_and_add_big_tx(
+        const cryptonote::account_base &src,
+        const cryptonote::account_public_address &dest,
+        uint64_t junk_size,
+        uint64_t amount,
+        uint64_t fee,
+        bool kept_by_block)
 {
-  cryptonote::transaction result = create_state_change_tx(state, pub_key, height, voters, fee);
+  cryptonote::transaction t = create_tx(src, dest, amount, fee);
+  beldex_tx_builder(events_, t, db_.blocks.back().block, src, dest, amount, hf_version_).with_fee(fee).with_junk(junk_size).build();
+  add_tx(t, true /*can_be_added_to_blockchain*/, ""/*fail_msg*/, kept_by_block);
+  return t;
+}
+
+cryptonote::transaction beldex_chain_generator::create_and_add_state_change_tx(master_nodes::new_state state, const crypto::public_key &pub_key, uint16_t reasons_all, uint16_t reasons_any, uint64_t height, const std::vector<uint64_t> &voters, uint64_t fee, bool kept_by_block)
+{
+  cryptonote::transaction result = create_state_change_tx(state, pub_key, reasons_all, reasons_any, height, voters, fee);
   add_tx(result, true /*can_be_added_to_blockchain*/, "" /*fail_msg*/, kept_by_block);
   return result;
 }
 
-cryptonote::transaction beldex_chain_generator::create_and_add_registration_tx(const cryptonote::account_base &src, const cryptonote::keypair &mn_keys, bool kept_by_block)
+cryptonote::transaction beldex_chain_generator::create_and_add_registration_tx(const cryptonote::account_base &src, const cryptonote::keypair &sn_keys, bool kept_by_block)
 {
-  cryptonote::transaction result = create_registration_tx(src, mn_keys);
+  cryptonote::transaction result = create_registration_tx(src, sn_keys);
   add_tx(result, true /*can_be_added_to_blockchain*/, "" /*fail_msg*/, kept_by_block);
   return result;
 }
@@ -450,7 +462,7 @@ beldex_chain_generator::create_registration_tx(const cryptonote::account_base &s
 
     uint64_t new_height    = get_block_height(top().block) + 1;
     uint8_t new_hf_version = get_hf_version_at(new_height);
-    const auto staking_requirement = master_nodes::get_staking_requirement(cryptonote::FAKECHAIN, new_height, new_hf_version);
+    const auto staking_requirement = master_nodes::get_staking_requirement(cryptonote::FAKECHAIN, new_height);
     uint64_t amount                = master_nodes::portions_to_amount(portions[0], staking_requirement);
 
     uint64_t unlock_time = 0;
@@ -505,10 +517,12 @@ cryptonote::transaction beldex_chain_generator::create_staking_tx(const crypto::
   return result;
 }
 
-cryptonote::transaction beldex_chain_generator::create_state_change_tx(master_nodes::new_state state, const crypto::public_key &pub_key, uint64_t height, const std::vector<uint64_t>& voters, uint64_t fee) const
+cryptonote::transaction beldex_chain_generator::create_state_change_tx(master_nodes::new_state state, const crypto::public_key &pub_key, uint16_t reasons_all, uint16_t reasons_any, uint64_t height, const std::vector<uint64_t>& voters, uint64_t fee) const
 {
   if (height == UINT64_MAX)
     height = this->height();
+
+  auto hf_version = get_hf_version_at(height + 1);
 
   master_nodes::quorum_manager const &quorums                   = quorum(height);
   std::vector<crypto::public_key> const &validator_master_nodes = quorums.obligations->validators;
@@ -522,13 +536,16 @@ cryptonote::transaction beldex_chain_generator::create_state_change_tx(master_no
   }
   assert(worker_index < worker_master_nodes.size());
 
-  cryptonote::tx_extra_master_node_state_change state_change_extra(state, height, worker_index);
+  using scver = cryptonote::tx_extra_master_node_state_change::version_t;
+  cryptonote::tx_extra_master_node_state_change state_change_extra(
+          hf_version >= cryptonote::network_version_18 ? scver::v4_reasons : scver::v0,
+          state, height, worker_index, reasons_all, reasons_any, {});
   if (voters.size())
   {
     for (const auto voter_index : voters)
     {
       auto voter_keys = get_cached_keys(validator_master_nodes[voter_index]);
-      master_nodes::quorum_vote_t vote = master_nodes::make_state_change_vote(state_change_extra.block_height, voter_index, state_change_extra.master_node_index, state, voter_keys);
+      master_nodes::quorum_vote_t vote = master_nodes::make_state_change_vote(state_change_extra.block_height, voter_index, state_change_extra.master_node_index, state, 0, voter_keys);
       state_change_extra.votes.push_back({vote.signature, (uint32_t)voter_index});
     }
   }
@@ -538,7 +555,7 @@ cryptonote::transaction beldex_chain_generator::create_state_change_tx(master_no
     {
       auto voter_keys = get_cached_keys(validator_master_nodes[i]);
 
-      master_nodes::quorum_vote_t vote = master_nodes::make_state_change_vote(state_change_extra.block_height, i, state_change_extra.master_node_index, state, voter_keys);
+      master_nodes::quorum_vote_t vote = master_nodes::make_state_change_vote(state_change_extra.block_height, i, state_change_extra.master_node_index, state, 0, voter_keys);
       state_change_extra.votes.push_back({vote.signature, (uint32_t)i});
     }
   }
@@ -546,13 +563,18 @@ cryptonote::transaction beldex_chain_generator::create_state_change_tx(master_no
   cryptonote::transaction result;
   {
     std::vector<uint8_t> extra;
-    const bool full_tx_made = cryptonote::add_master_node_state_change_to_tx_extra(result.extra, state_change_extra, get_hf_version_at(height + 1));
+    const bool full_tx_made = cryptonote::add_master_node_state_change_to_tx_extra(result.extra, state_change_extra, hf_version);
     assert(full_tx_made);
-    if (fee) beldex_tx_builder(events_, result, top().block, first_miner_, first_miner_.get_keys().m_account_address, 0 /*amount*/, get_hf_version_at(height + 1)).with_tx_type(cryptonote::txtype::state_change).with_fee(fee).with_extra(extra).build();
+    if (fee)
+      beldex_tx_builder(events_, result, top().block, first_miner_, first_miner_.get_keys().m_account_address, 0 /*amount*/, hf_version)
+        .with_tx_type(cryptonote::txtype::state_change)
+        .with_fee(fee)
+        .with_extra(extra)
+        .build();
     else
     {
       result.type    = cryptonote::txtype::state_change;
-      result.version = cryptonote::transaction::get_max_version_for_hf(get_hf_version_at(height + 1));
+      result.version = cryptonote::transaction::get_max_version_for_hf(hf_version);
     }
   }
 
@@ -690,10 +712,10 @@ cryptonote::transaction beldex_chain_generator::create_beldex_name_system_tx_upd
 }
 
 cryptonote::transaction
-beldex_chain_generator::create_beldex_name_system_tx_update_w_extra(cryptonote::account_base const &src, uint8_t hf_version, cryptonote::tx_extra_beldex_name_system const &bns_extra) const
+beldex_chain_generator::create_beldex_name_system_tx_update_w_extra(cryptonote::account_base const &src, uint8_t hf_version, cryptonote::tx_extra_beldex_name_system const &ons_extra) const
 {
   std::vector<uint8_t> extra;
-  cryptonote::add_beldex_name_system_to_tx_extra(extra, bns_extra);
+  cryptonote::add_beldex_name_system_to_tx_extra(extra, ons_extra);
 
   cryptonote::block const &head = top().block;
   uint64_t new_height           = get_block_height(top().block) + 1;
@@ -888,12 +910,12 @@ bool beldex_chain_generator::block_begin(beldex_blockchain_entry &entry, beldex_
   }
 
   // NOTE: Calculate governance
-  cryptonote::beldex_miner_tx_context miner_tx_context = {};
-  master_nodes::quorum pulse_quorum                 = {};
-  std::vector<master_nodes::pubkey_and_sninfo> active_mnode_list =
+  cryptonote::beldex_miner_tx_context miner_tx_context;
+  master_nodes::quorum pulse_quorum;
+  std::vector<master_nodes::pubkey_and_mninfo> active_snode_list =
       params.prev.master_node_state.active_master_nodes_infos();
 
-  bool pulse_block_is_possible = blk.major_version >= cryptonote::network_version_17_pulse && active_mnode_list.size() >= master_nodes::pulse_min_master_nodes(cryptonote::FAKECHAIN);
+  bool pulse_block_is_possible = blk.major_version >= cryptonote::network_version_17_pulse && active_snode_list.size() >= master_nodes::pulse_min_master_nodes(cryptonote::FAKECHAIN);
   bool make_pulse_block        = (params.type == beldex_create_block_type::automatic && pulse_block_is_possible) || params.type == beldex_create_block_type::pulse;
 
   if (make_pulse_block)
@@ -906,7 +928,7 @@ bool beldex_chain_generator::block_begin(beldex_blockchain_entry &entry, beldex_
 
     // NOTE: Get Pulse Quorum necessary for this block
     std::vector<crypto::hash> entropy = master_nodes::get_pulse_entropy_for_next_block(db_, params.prev.block, blk.pulse.round);
-    pulse_quorum = master_nodes::generate_pulse_quorum(cryptonote::FAKECHAIN, params.block_leader.key, blk.major_version, active_mnode_list, entropy, blk.pulse.round);
+    pulse_quorum = master_nodes::generate_pulse_quorum(cryptonote::FAKECHAIN, params.block_leader.key, blk.major_version, active_snode_list, entropy, blk.pulse.round);
     assert(pulse_quorum.validators.size() == master_nodes::PULSE_QUORUM_NUM_VALIDATORS);
     assert(pulse_quorum.workers.size() == 1);
 
@@ -936,10 +958,14 @@ bool beldex_chain_generator::block_begin(beldex_blockchain_entry &entry, beldex_
     constexpr uint64_t num_blocks       = cryptonote::get_config(cryptonote::FAKECHAIN).GOVERNANCE_REWARD_INTERVAL_IN_BLOCKS;
     uint64_t start_height               = height - num_blocks;
 
+    static_assert(cryptonote::network_version_count == cryptonote::network_version_18 + 1,
+            "The code below needs to be updated to support higher hard fork versions");
     if (blk.major_version == cryptonote::network_version_16_bns)
-      miner_tx_context.batched_governance = FOUNDATION_REWARD_HF18 * num_blocks;
+      miner_tx_context.batched_governance = FOUNDATION_REWARD_HF16 * num_blocks;
     else if (blk.major_version == cryptonote::network_version_17_pulse)
-      miner_tx_context.batched_governance = (FOUNDATION_REWARD_HF18 + CHAINFLIP_LIQUIDITY_HF17) * num_blocks;
+      miner_tx_context.batched_governance = (FOUNDATION_REWARD_HF16 + CHAINFLIP_LIQUIDITY_HF17) * num_blocks;
+    else if (blk.major_version >= cryptonote::network_version_18 && blk.major_version <= cryptonote::network_version_18)
+      miner_tx_context.batched_governance = FOUNDATION_REWARD_HF18 * num_blocks;
     else
     {
       for (int i = (int)get_block_height(params.prev.block), count = 0;
@@ -1089,8 +1115,8 @@ uint8_t beldex_chain_generator::get_hf_version_at(uint64_t height) const {
   uint8_t cur_hf_ver = 0;
   for (auto i = 0u; i < hard_forks_.size(); ++i)
   {
-    if (height < hard_forks_[i].second) break;
-    cur_hf_ver = hard_forks_[i].first;
+    if (height < hard_forks_[i].height) break;
+    cur_hf_ver = hard_forks_[i].version;
   }
 
   assert(cur_hf_ver != 0);
@@ -1421,7 +1447,7 @@ cryptonote::transaction make_registration_tx(std::vector<test_event_entry>& even
                                              uint8_t hf_version)
 {
   const auto new_height          = cryptonote::get_block_height(head) + 1;
-  const auto staking_requirement = master_nodes::get_staking_requirement(cryptonote::FAKECHAIN, new_height, hf_version);
+  const auto staking_requirement = master_nodes::get_staking_requirement(cryptonote::FAKECHAIN, new_height);
   uint64_t amount                = master_nodes::portions_to_amount(portions[0], staking_requirement);
 
   cryptonote::transaction tx;
@@ -2243,7 +2269,7 @@ uint64_t get_unlocked_balance(const cryptonote::account_base& addr, const std::v
     return res;
 }
 
-bool extract_hard_forks(const std::vector<test_event_entry>& events, v_hardforks_t& hard_forks)
+bool extract_hard_forks(const std::vector<test_event_entry>& events, std::vector<cryptonote::hard_fork>& hard_forks)
 {
   for(auto & ev : events)
   {

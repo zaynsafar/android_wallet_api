@@ -78,8 +78,8 @@ bool gen_bp_tx_validation_base::generate_with(std::vector<test_event_entry>& eve
   for (size_t i = 0; i < NUM_MINERS; ++i)
     miner_accounts[i].generate();
 
-  uint8_t const first_hf = hard_forks[1].first;
-  uint8_t const last_hf  = hard_forks.back().first;
+  uint8_t const first_hf = hard_forks[1].version;
+  uint8_t const last_hf  = hard_forks.back().version;
   generator.m_hf_version = first_hf;
   for (size_t n = 0; n < NUM_UNLOCKED_BLOCKS; ++n) {
     CHECK_AND_ASSERT_MES(
@@ -240,7 +240,7 @@ bool gen_bp_tx_validation_base::generate_with(std::vector<test_event_entry>& eve
     }
 
     // If we are constructing an invalid tx serialization may fail, in which case
-    // get_transaction_hash will throw (before beldex 8.x it returned a garbage hash made from the
+    // get_transaction_hash will throw (before Loki 8.x it returned a garbage hash made from the
     // partially serialized transaction), but we still want to build a block with it, so if that
     // happens just use a mostly random hash value.
     crypto::hash tx_hash;
