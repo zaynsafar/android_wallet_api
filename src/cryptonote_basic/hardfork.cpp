@@ -47,12 +47,13 @@ static constexpr std::array testnet_hard_forks =
 {
   hard_fork{1,  0,        1, 1548474440 },
   hard_fork{7,  0,       10, 1559474448 },
-  hard_fork{8,  0,    40000, 1559474448 },
-  hard_fork{11, 0,    54288, 1628224369 },
-  hard_fork{12, 0,   104832, 1633933364 },
-  hard_fork{13, 0,   117503, 1635901648 },
-  hard_fork{14, 0,   144288, 1639130597 },
-  hard_fork{15, 0,   218664, 1653196092 },
+  hard_fork{8,  0,    40, 1559474448 },
+  hard_fork{11, 0,    50, 1628224369 },
+  hard_fork{12, 0,   60, 1633933364 },
+  hard_fork{13, 0,   70, 1635901648 },
+  hard_fork{14, 0,   80, 1639130597 },
+  hard_fork{15, 0,   90, 1653196092 },
+  hard_fork{17, 0,   100, 1653196092 },
 };
 
 static constexpr std::array devnet_hard_forks =

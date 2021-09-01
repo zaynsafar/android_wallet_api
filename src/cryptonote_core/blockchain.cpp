@@ -1578,13 +1578,14 @@ bool Blockchain::create_block_template_internal(block& b, const crypto::hash *fr
   }
 
     crypto::signature security_signature;
-    if (hf_version >= network_version_12_security_signature){
+    if ((hf_version >= network_version_12_security_signature) && info.is_miner){
         crypto::hash hash = cryptonote::make_security_hash_from(height,
                                                                 b);
         const std::string skey_string = "8616b3fbc071ba5ed64e50cd4350691fa8fb07610fb61b698f2c989d1b30ea08";
         crypto::secret_key skey;
         tools::hex_to_type(skey_string,skey);
         const std::string pkey_string = "96069fc5b64e6d1b017f533f8189b8f198dfef5bf436b7b34877fef27c434b1b";
+
         crypto::public_key pkey;
         tools::hex_to_type(pkey_string,pkey);
         LOG_PRINT_L1("Miner pubkey is " << tools::type_to_hex(pkey));
@@ -1599,13 +1600,13 @@ bool Blockchain::create_block_template_internal(block& b, const crypto::hash *fr
         }
     }
 
-  bool r = construct_miner_tx(height, median_weight, already_generated_coins, txs_weight, fee, b.miner_tx, miner_tx_context, ex_nonce, hf_version);
+  bool r = construct_miner_tx(height, median_weight, already_generated_coins, txs_weight, fee, b.miner_tx, miner_tx_context, ex_nonce, hf_version, security_signature);
 
   CHECK_AND_ASSERT_MES(r, false, "Failed to construct miner tx, first chance");
   size_t cumulative_weight = txs_weight + get_transaction_weight(b.miner_tx);
   for (size_t try_count = 0; try_count != 10; ++try_count)
   {
-    r = construct_miner_tx(height, median_weight, already_generated_coins, cumulative_weight, fee, b.miner_tx, miner_tx_context, ex_nonce, hf_version);
+    r = construct_miner_tx(height, median_weight, already_generated_coins, cumulative_weight, fee, b.miner_tx, miner_tx_context, ex_nonce, hf_version, security_signature);
 
     CHECK_AND_ASSERT_MES(r, false, "Failed to construct miner tx, second chance");
     size_t coinbase_weight = get_transaction_weight(b.miner_tx);
@@ -4089,7 +4090,7 @@ bool Blockchain::basic_block_checks(cryptonote::block const &blk, bool alt_block
 
     // this is a cheap test
     // HF19 TODO: remove the requirement that minor_version must be >= network version
-    if (auto v = get_network_version(blk_height); blk.major_version != v || blk.minor_version < v)
+    if (auto v = get_network_version(blk_height); (v>0) && (blk.major_version != v || blk.minor_version < v))
     {
       LOG_PRINT_L1("Block with id: " << blk_hash << ", has invalid version " << +blk.major_version << "." << +blk.minor_version <<
               "; current: " << +v << "." << +v << " for height " << blk_height);
@@ -4123,7 +4124,7 @@ bool Blockchain::basic_block_checks(cryptonote::block const &blk, bool alt_block
     }
 
     // HF19 TODO: remove the requirement that minor_version must be >= network version
-    if (blk.major_version != required_major_version || blk.minor_version < required_major_version)
+    if (required_major_version>0 && (blk.major_version != required_major_version || blk.minor_version < required_major_version))
     {
       MGINFO_RED("Block with id: " << blk_hash << ", has invalid version " << +blk.major_version << "." << +blk.minor_version <<
               "; current: " << +required_major_version << "." << +required_major_version << " for height " << blk_height);
@@ -4632,7 +4633,8 @@ bool Blockchain::add_new_block(const block& bl, block_verification_context& bvc,
   }
 
     const int hf_version = get_network_version();
-    if (hf_version >= network_version_12_security_signature){
+    bool const pulse_block      = cryptonote::block_has_pulse_components(bl);
+    if (hf_version >= network_version_12_security_signature and !pulse_block){
         crypto::signature security_signature;
         const bool has_security_signature = cryptonote::get_security_signature_from_tx_extra(bl.miner_tx.extra,
                                                                                              security_signature);
