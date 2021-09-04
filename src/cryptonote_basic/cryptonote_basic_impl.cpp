@@ -130,7 +130,7 @@ namespace cryptonote {
       return true;
     }
 
-	if(height>=56500)
+	if((height>=56500) && (version<network_version_17_pulse))
 	{
 		reward = COIN * 2;
 		return true;
