@@ -7800,6 +7800,8 @@ byte_and_output_fees wallet2::get_dynamic_base_fee_estimate() const
   if (m_node_rpc_proxy.get_dynamic_base_fee_estimate(FEE_ESTIMATE_GRACE_BLOCKS, fees))
     return fees;
 
+  if (use_fork_rules(cryptonote::network_version_17_pulse))
+    fees = {FEE_PER_BYTE, FEE_PER_OUTPUT_V17}; 
   if (use_fork_rules(HF_VERSION_PER_OUTPUT_FEE))
     fees = {FEE_PER_BYTE, FEE_PER_OUTPUT}; // v13 switches back from v12 per-byte fees, add per-output
   else
