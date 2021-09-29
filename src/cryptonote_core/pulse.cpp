@@ -734,19 +734,19 @@ bool pulse::convert_time_to_round(pulse::time_point const &time, pulse::time_poi
 bool pulse::get_round_timings(cryptonote::Blockchain const &blockchain, uint64_t block_height, uint64_t prev_timestamp, pulse::timings &times)
 {
   times = {};
-  auto hf16 = hard_fork_begins(blockchain.nettype(), cryptonote::network_version_17_pulse);
-  if (!hf16 || blockchain.get_current_blockchain_height() < *hf16)
+  auto hf17 = hard_fork_begins(blockchain.nettype(), cryptonote::network_version_17_pulse);
+  if (!hf17 || blockchain.get_current_blockchain_height() < *hf17)
     return false;
 
-  cryptonote::block genesis_block;
-  if (!blockchain.get_block_by_height(*hf16 - 1, genesis_block))
+  cryptonote::block pulse_genesis_block;
+  if (!blockchain.get_block_by_height(*hf17 - 1, pulse_genesis_block))
     return false;
 
-  uint64_t const delta_height = block_height - cryptonote::get_block_height(genesis_block);
-  times.genesis_timestamp     = pulse::time_point(std::chrono::seconds(genesis_block.timestamp));
-
+  uint64_t const delta_height = block_height - cryptonote::get_block_height(pulse_genesis_block);
+  times.genesis_timestamp     = pulse::time_point(std::chrono::seconds(pulse_genesis_block.timestamp));
   times.prev_timestamp  = pulse::time_point(std::chrono::seconds(prev_timestamp));
-  times.ideal_timestamp = pulse::time_point(times.genesis_timestamp + (TARGET_BLOCK_TIME * delta_height));
+  times.ideal_timestamp  = pulse::time_point(times.genesis_timestamp + (TARGET_BLOCK_TIME_V17 * delta_height)); //only for pulse
+
 
 #if 1
   times.r0_timestamp    = std::clamp(times.ideal_timestamp,
@@ -889,14 +889,14 @@ Yes +-----[Block can not be added to blockchain]
 
     - The ideal next block timestamp is determined by
 
-      G.Timestamp + (height * TARGET_BLOCK_TIME)
+      G.Timestamp + (height * TARGET_BLOCK_TIME_v17)
 
       Where 'G' is the base Pulse genesis block, i.e. the hardforking block
-      activating Pulse (HF16).
+      activating Pulse (HF17).
 
       The actual next block timestamp is determined by
 
-      P.Timestamp + (TARGET_BLOCK_TIME ±15s)
+      P.Timestamp + (TARGET_BLOCK_TIME_V17 ±15s)
 
       Where 'P' is the previous block. The block time is adjusted ±15s depending
       on how close/far away the ideal block time is.
@@ -1044,7 +1044,7 @@ round_state goto_wait_for_next_block_and_clear_round_data(round_context &context
   return round_state::wait_for_next_block;
 }
 
-round_state wait_for_next_block(uint64_t hf16_height, round_context &context, cryptonote::Blockchain const &blockchain)
+round_state wait_for_next_block(uint64_t hf17_height, round_context &context, cryptonote::Blockchain const &blockchain)
 {
   //
   // NOTE: If already processing pulse for height, wait for next height
@@ -1682,18 +1682,18 @@ void pulse::main(void *quorumnet_state, cryptonote::core &core)
   //
   // NOTE: Early exit if too early
   //
-  auto hf16 = hard_fork_begins(core.get_nettype(), cryptonote::network_version_17_pulse);
-  if (!hf16)
+  auto hf17 = hard_fork_begins(core.get_nettype(), cryptonote::network_version_17_pulse);
+  if (!hf17)
   {
     for (static bool once = true; once; once = !once)
-      MERROR("Pulse: HF16 is not defined, pulse worker waiting");
+      MERROR("Pulse: HF17 is not defined, pulse worker waiting");
     return;
   }
 
-  if (uint64_t height = blockchain.get_current_blockchain_height(true /*lock*/); height < *hf16)
+  if (uint64_t height = blockchain.get_current_blockchain_height(true /*lock*/); height < *hf17)
   {
     for (static bool once = true; once; once = !once)
-      MDEBUG("Pulse: Network at block " << height << " is not ready for Pulse until block " << *hf16 << ", waiting");
+      MDEBUG("Pulse: Network at block " << height << " is not ready for Pulse until block " << *hf17 << ", waiting");
     return;
   }
 
@@ -1710,7 +1710,7 @@ void pulse::main(void *quorumnet_state, cryptonote::core &core)
         break;
 
       case round_state::wait_for_next_block:
-        context.state = wait_for_next_block(*hf16, context, blockchain);
+        context.state = wait_for_next_block(*hf17, context, blockchain);
         break;
 
       case round_state::prepare_for_round:

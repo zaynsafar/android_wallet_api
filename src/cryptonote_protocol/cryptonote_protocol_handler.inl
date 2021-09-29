@@ -468,8 +468,21 @@ namespace cryptonote
     int64_t diff = static_cast<int64_t>(hshd.current_height) - static_cast<int64_t>(curr_height);
     uint64_t abs_diff = std::abs(diff);
     uint64_t max_block_height = std::max(hshd.current_height, curr_height);
+    auto nettype = m_core.get_nettype();
+    auto hf17 = hard_fork_begins(m_core.get_nettype(), cryptonote::network_version_17_pulse);
+    if (!hf17)
+    {
+        for (static bool once = true; once; once = !once)
+            MERROR("process_payload_sync_data: HF17 is not defined");
+        return false;
+    }
+    std::chrono::seconds behindtime = std::min(abs_diff,*hf17) * TARGET_BLOCK_TIME;//the old Blocktime
+    if (max_block_height > *hf17){
+        behindtime = behindtime + ((max_block_height-*hf17)*TARGET_BLOCK_TIME_V17);
+    }
+
     MCLOG(is_inital ? el::Level::Info : el::Level::Debug, "global", context <<  "Sync data returned a new top block candidate: " << curr_height << " -> " << hshd.current_height
-      << " [Your node is " << abs_diff << " blocks (" << tools::get_human_readable_timespan(abs_diff * TARGET_BLOCK_TIME) << " "
+      << " [Your node is " << abs_diff << " blocks (" << tools::get_human_readable_timespan(behindtime) << " "
       << (0 <= diff ? "behind" : "ahead")
       << ")]\nSYNCHRONIZATION started");
 

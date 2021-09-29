@@ -49,6 +49,7 @@ using namespace std::literals;
 #define CRYPTONOTE_MINED_MONEY_UNLOCK_WINDOW            60
 #define CRYPTONOTE_BLOCK_FUTURE_TIME_LIMIT_V2           60*10
 #define CRYPTONOTE_DEFAULT_TX_SPENDABLE_AGE             10
+#define CRYPTONOTE_DEFAULT_TX_SPENDABLE_AGE_V17         2
 #define CRYPTONOTE_DEFAULT_TX_MIXIN                     9
 #define FINAL_SUBSIDY_PER_MINUTE                        ((uint64_t)500000000) // 3 * pow(10, 7)
 
@@ -84,6 +85,7 @@ static_assert(STAKING_PORTIONS % 12 == 0, "Use a multiple of twelve, so that it 
 #define DIFFICULTY_TARGET_V2                            120  // seconds
 #define DIFFICULTY_TARGET_V1                            60  // seconds - before first fork
 constexpr auto TARGET_BLOCK_TIME           = 2min;
+constexpr auto TARGET_BLOCK_TIME_V17       = 30s;
 constexpr uint64_t DIFFICULTY_WINDOW       = 59;
 constexpr uint64_t DIFFICULTY_BLOCKS_COUNT(bool before_hf16)
 {
@@ -105,11 +107,10 @@ constexpr uint64_t DIFFICULTY_BLOCKS_COUNT(bool before_hf16)
   return result;
 }
 
-constexpr uint64_t BLOCKS_EXPECTED_IN_HOURS(int hours) { return (1h / TARGET_BLOCK_TIME) * hours; }
-constexpr uint64_t BLOCKS_EXPECTED_IN_DAYS(int days)   { return BLOCKS_EXPECTED_IN_HOURS(24) * days; }
-constexpr uint64_t BLOCKS_EXPECTED_IN_YEARS(int years) { return BLOCKS_EXPECTED_IN_DAYS(365) * years; }
+
 
 #define CRYPTONOTE_LOCKED_TX_ALLOWED_DELTA_SECONDS_V2   TARGET_BLOCK_TIME * CRYPTONOTE_LOCKED_TX_ALLOWED_DELTA_BLOCKS
+#define CRYPTONOTE_LOCKED_TX_ALLOWED_DELTA_SECONDS_V3   TARGET_BLOCK_TIME_V17 * CRYPTONOTE_LOCKED_TX_ALLOWED_DELTA_BLOCKS
 #define CRYPTONOTE_LOCKED_TX_ALLOWED_DELTA_BLOCKS       1
 
 
@@ -200,6 +201,10 @@ constexpr uint64_t BLOCKS_EXPECTED_IN_YEARS(int years) { return BLOCKS_EXPECTED_
 #define CRYPTONOTE_PRUNING_TIP_BLOCKS           5500 // the smaller, the more space saved
 //#define CRYPTONOTE_PRUNING_DEBUG_SPOOF_SEED
 
+constexpr uint64_t PRE_PULSE_BLOCKS_EXPECTED_IN_HOURS(int hours) { return (1h / TARGET_BLOCK_TIME) * hours; }
+constexpr uint64_t PRE_PULSE_BLOCKS_EXPECTED_IN_DAYS(int days)   { return PRE_PULSE_BLOCKS_EXPECTED_IN_HOURS(24) * days; }
+constexpr uint64_t PRE_PULSE_BLOCKS_EXPECTED_IN_YEARS(int years) { return PRE_PULSE_BLOCKS_EXPECTED_IN_DAYS(365) * years; }
+
 // New constants are intended to go here
 namespace config
 {
@@ -234,7 +239,7 @@ namespace config
   inline constexpr std::string_view GENESIS_TX = "013c01ff0005978c390224a302c019c844f7141f35bf7f0fc5b02ada055e4ba897557b17ac6ccf88f0a2c09fab030276d443549feee11fe325048eeea083fcb7535312572d255ede1ecb58f84253b480e89226023b7d7c5e6eff4da699393abf12b6e3d04eae7909ae21932520fb3166b8575bb180cab5ee0102e93beb645ce7d5574d6a5ed5d9b8aadec7368342d08a7ca7b342a428353a10df80e497d01202b6e6844c1e9a478d0e4f7f34e455b26077a51f0005357aa19a49ca16eb373f622101f7c2a3a2ed7011b61998b1cd4f45b4d3c1daaa82908a10ca191342297eef1cf8"sv;
   inline constexpr uint32_t GENESIS_NONCE = 11011;
 
-  inline constexpr uint64_t GOVERNANCE_REWARD_INTERVAL_IN_BLOCKS = BLOCKS_EXPECTED_IN_DAYS(7);
+  inline constexpr uint64_t GOVERNANCE_REWARD_INTERVAL_IN_BLOCKS = PRE_PULSE_BLOCKS_EXPECTED_IN_DAYS(7);//Governance added from V17
   inline constexpr std::array GOVERNANCE_WALLET_ADDRESS =
   {
     "bxcguQiBhYaDW5wAdPLSwRHA6saX1nCEYUF89SPKZfBY1BENdLQWjti59aEtAEgrVZjnCJEVFoCDrG1DCoz2HeeN2pxhxL9xa"sv, // hardfork v7-10
@@ -306,7 +311,7 @@ namespace config
     inline constexpr std::string_view GENESIS_TX = "023c01ff0001d7c1c4e81402a25ba172ed7bca3b35e0be2f097b743973cf3c26777342032bed1036b19ab7a4420145706ec71eec5d57962c225b0615c172f8429984ec4954ba8b05bdad3f454f0472000000000000000000000000000000000000000000000000000000000000000000"sv;
     inline constexpr uint32_t GENESIS_NONCE = 11013;
 
-    inline constexpr uint64_t GOVERNANCE_REWARD_INTERVAL_IN_BLOCKS = BLOCKS_EXPECTED_IN_DAYS(7);
+    inline constexpr uint64_t GOVERNANCE_REWARD_INTERVAL_IN_BLOCKS = PRE_PULSE_BLOCKS_EXPECTED_IN_DAYS(7);//governance added from V17
     inline constexpr std::array GOVERNANCE_WALLET_ADDRESS =
     {
       "59XZKiAFwAKVyWN1CuuyFqMTTFLu9PEjpb3WhXfVuStgdoCZM1MtyJ2C41qijqfbdnY844F3boaW29geb8pT3mfrV9QQSRB"sv, // hardfork v7-9
@@ -499,3 +504,7 @@ namespace cryptonote
     }
   }
 }
+
+constexpr uint64_t BLOCKS_EXPECTED_IN_HOURS(int hours, uint8_t hf_version) { return (1h / (hf_version>=cryptonote::network_version_17_pulse?TARGET_BLOCK_TIME_V17:TARGET_BLOCK_TIME)) * hours; }
+constexpr uint64_t BLOCKS_EXPECTED_IN_DAYS(int days, uint8_t hf_version)   { return BLOCKS_EXPECTED_IN_HOURS(24,hf_version) * days; }
+constexpr uint64_t BLOCKS_EXPECTED_IN_YEARS(int years, uint8_t hf_version) { return BLOCKS_EXPECTED_IN_DAYS(365,hf_version) * years; }

@@ -75,9 +75,9 @@ namespace master_nodes
 
   static uint64_t short_term_state_cull_height(uint8_t hf_version, uint64_t block_height)
   {
-    size_t constexpr DEFAULT_SHORT_TERM_STATE_HISTORY = 6 * STATE_CHANGE_TX_LIFETIME_IN_BLOCKS;
-    static_assert(DEFAULT_SHORT_TERM_STATE_HISTORY >= BLOCKS_EXPECTED_IN_HOURS(12), // Arbitrary, but raises a compilation failure if it gets shortened.
-        "not enough short term state storage for blink quorum retrieval!");
+    uint64_t state_change_tx_lifetime_in_blocks = BLOCKS_EXPECTED_IN_HOURS(2,hf_version);
+    size_t DEFAULT_SHORT_TERM_STATE_HISTORY = 6 * state_change_tx_lifetime_in_blocks;
+
     uint64_t result =
         (block_height < DEFAULT_SHORT_TERM_STATE_HISTORY) ? 0 : block_height - DEFAULT_SHORT_TERM_STATE_HISTORY;
     return result;
@@ -565,7 +565,7 @@ namespace master_nodes
           if (tx.version >= cryptonote::txversion::v3_per_output_unlock_times)
             unlock_time = tx.output_unlock_times[i];
 
-          uint64_t min_height = block_height + staking_num_lock_blocks(nettype);
+          uint64_t min_height = block_height + staking_num_lock_blocks(nettype,hf_version);
           has_correct_unlock_time = unlock_time < CRYPTONOTE_MAX_BLOCK_NUMBER && unlock_time >= min_height;
         }
 
@@ -679,7 +679,7 @@ namespace master_nodes
               key_image_blacklist.emplace_back(); // NOTE: Use default value for version in key_image_blacklist_entry
               key_image_blacklist_entry &entry = key_image_blacklist.back();
               entry.key_image                  = contribution.key_image;
-              entry.unlock_height              = block_height + staking_num_lock_blocks(nettype);
+              entry.unlock_height              = block_height + staking_num_lock_blocks(nettype,hf_version);
               entry.amount                     = contribution.amount;
             }
           }
@@ -744,7 +744,7 @@ namespace master_nodes
 
         // To figure out how much credit the node gets at recommissioned we need to know how much it
         // had when it got decommissioned, and how long it's been decommisioned.
-        int64_t credit_at_decomm = quorum_cop::calculate_decommission_credit(info, info.last_decommission_height);
+        int64_t credit_at_decomm = quorum_cop::calculate_decommission_credit(info, info.last_decommission_height, hf_version);
         int64_t decomm_blocks = block_height - info.last_decommission_height;
 
         info.active_since_height = block_height;
@@ -801,7 +801,7 @@ namespace master_nodes
     }
   }
 
-  bool master_node_list::state_t::process_key_image_unlock_tx(cryptonote::network_type nettype, uint64_t block_height, const cryptonote::transaction &tx)
+  bool master_node_list::state_t::process_key_image_unlock_tx(cryptonote::network_type nettype, uint64_t block_height, const cryptonote::transaction &tx,uint8_t version)
   {
     crypto::public_key mnode_key;
     if (!cryptonote::get_master_node_pubkey_from_tx_extra(tx.extra, mnode_key))
@@ -828,7 +828,7 @@ namespace master_nodes
       return false;
     }
 
-    uint64_t unlock_height = get_locked_key_image_unlock_height(nettype, node_info.registration_height, block_height);
+    uint64_t unlock_height = get_locked_key_image_unlock_height(nettype, node_info.registration_height, block_height,version );
     for (const auto &contributor : node_info.contributors)
     {
       auto cit = std::find_if(contributor.locked_contributions.begin(),
@@ -1035,7 +1035,7 @@ namespace master_nodes
         if (hf_version >= cryptonote::network_version_10_bulletproofs)
         {
           master_node_info const &old_info = *iter->second;
-          uint64_t expiry_height = old_info.registration_height + staking_num_lock_blocks(nettype);
+          uint64_t expiry_height = old_info.registration_height + staking_num_lock_blocks(nettype,hf_version);
           if (block_height < expiry_height)
             return false;
 
@@ -1601,8 +1601,8 @@ namespace master_nodes
       bool newest_block           = m_blockchain.get_current_blockchain_height() == (block_height + 1);
 
       auto now                    = pulse::clock::now().time_since_epoch();
-      auto earliest_time          = std::chrono::seconds(block.timestamp) - TARGET_BLOCK_TIME;
-      auto latest_time            = std::chrono::seconds(block.timestamp) + TARGET_BLOCK_TIME;
+      auto earliest_time          = std::chrono::seconds(block.timestamp) - (block.major_version>=cryptonote::network_version_17_pulse?TARGET_BLOCK_TIME_V17:TARGET_BLOCK_TIME);
+      auto latest_time            = std::chrono::seconds(block.timestamp) + (block.major_version>=cryptonote::network_version_17_pulse?TARGET_BLOCK_TIME_V17:TARGET_BLOCK_TIME);
 
       if (newest_block && (now >= earliest_time && now <= latest_time))
       {
@@ -2082,7 +2082,7 @@ namespace master_nodes
       }
       else if (tx.type == cryptonote::txtype::key_image_unlock)
       {
-        process_key_image_unlock_tx(nettype, block_height, tx);
+        process_key_image_unlock_tx(nettype, block_height, tx, hf_version);
       }
     }
 
@@ -2127,6 +2127,7 @@ namespace master_nodes
     uint64_t cull_height = short_term_state_cull_height(hf_version, block_height);
     {
       auto end_it = m_transient.state_history.upper_bound(cull_height);
+      uint64_t vote_lifetime =   BLOCKS_EXPECTED_IN_HOURS(2,hf_version);
       for (auto it = m_transient.state_history.begin(); it != end_it; it++)
       {
         if (m_store_quorum_history)
@@ -2134,7 +2135,7 @@ namespace master_nodes
 
         uint64_t next_long_term_state         = ((it->height / STORE_LONG_TERM_STATE_INTERVAL) + 1) * STORE_LONG_TERM_STATE_INTERVAL;
         uint64_t dist_to_next_long_term_state = next_long_term_state - it->height;
-        bool need_quorum_for_future_states    = (dist_to_next_long_term_state <= VOTE_LIFETIME + VOTE_OR_TX_VERIFY_HEIGHT_BUFFER);
+        bool need_quorum_for_future_states    = (dist_to_next_long_term_state <= vote_lifetime + VOTE_OR_TX_VERIFY_HEIGHT_BUFFER);
         if ((it->height % STORE_LONG_TERM_STATE_INTERVAL) == 0 || need_quorum_for_future_states)
         {
           m_transient.state_added_to_archive = true;
@@ -2216,7 +2217,7 @@ namespace master_nodes
                                                                                uint64_t block_height) const
   {
     std::vector<crypto::public_key> expired_nodes;
-    uint64_t const lock_blocks = staking_num_lock_blocks(nettype);
+    uint64_t const lock_blocks = staking_num_lock_blocks(nettype,hf_version);
 
     // TODO(beldex): This should really use the registration height instead of getting the block and expiring nodes.
     // But there's something subtly off when using registration height causing syncing problems.
@@ -2692,14 +2693,14 @@ namespace master_nodes
         m_transient.cache_long_term_data.states.push_back(serialize_master_node_state_object(hf_version, it));
     }
 
-    // NOTE: A state_t may reference quorums up to (VOTE_LIFETIME
+    // NOTE: A state_t may reference quorums up to (vote_lifetime
     // + VOTE_OR_TX_VERIFY_HEIGHT_BUFFER) blocks back. So in the
     // (MAX_SHORT_TERM_STATE_HISTORY | 2nd oldest checkpoint) window of states we store, the
-    // first (VOTE_LIFETIME + VOTE_OR_TX_VERIFY_HEIGHT_BUFFER) states we only
+    // first (vote_lifetime + VOTE_OR_TX_VERIFY_HEIGHT_BUFFER) states we only
     // store their quorums, such that the following states have quorum
     // information preceeding it.
-
-    uint64_t const max_short_term_height = short_term_state_cull_height(hf_version, (m_state.height - 1)) + VOTE_LIFETIME + VOTE_OR_TX_VERIFY_HEIGHT_BUFFER;
+    uint64_t vote_lifetime =   BLOCKS_EXPECTED_IN_HOURS(2,hf_version);
+    uint64_t const max_short_term_height = short_term_state_cull_height(hf_version, (m_state.height - 1)) + vote_lifetime + VOTE_OR_TX_VERIFY_HEIGHT_BUFFER;
     for (auto it = m_transient.state_history.begin();
          it != m_transient.state_history.end() && it->height <= max_short_term_height;
          it++)
@@ -3345,8 +3346,10 @@ namespace master_nodes
         // two valid values here: initial for a node that has never been recommissioned, or 0 for a recommission.
 
         auto was = info.recommission_credit;
+        auto hf_version = mn_list->m_blockchain.get_network_version();
         if (info.decommission_count <= info.is_decommissioned()) // Has never been decommissioned (or is currently in the first decommission), so add initial starting credit
-          info.recommission_credit = DECOMMISSION_INITIAL_CREDIT;
+
+            info.recommission_credit = BLOCKS_EXPECTED_IN_HOURS(2,hf_version);
         else
           info.recommission_credit = 0;
 
@@ -3427,7 +3430,6 @@ namespace master_nodes
               // need to do a full rescan.
               continue;
             }
-
             state_t entry{this, std::move(serialized_entry)};
             entry.height--;
             entry.quorums = quorum_for_serialization_to_quorum_manager(prev_serialized_entry.quorums);

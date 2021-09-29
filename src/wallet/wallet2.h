@@ -103,8 +103,8 @@ namespace tools
   {
   public:
     uint64_t pick();
-    gamma_picker(const std::vector<uint64_t> &rct_offsets);
-    gamma_picker(const std::vector<uint64_t> &rct_offsets, double shape, double scale);
+    gamma_picker(const std::vector<uint64_t> &rct_offsets,uint8_t hf_version);
+    gamma_picker(const std::vector<uint64_t> &rct_offsets, double shape, double scale,uint8_t hf_version);
 
   private:
     struct gamma_engine

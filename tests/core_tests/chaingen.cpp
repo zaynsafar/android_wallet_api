@@ -1087,9 +1087,9 @@ beldex_create_block_params beldex_chain_generator::next_block_params() const
   beldex_create_block_params result = {};
   result.prev                     = prev;
   result.miner_acc                = first_miner_;
-  result.timestamp                = prev.block.timestamp + tools::to_seconds(TARGET_BLOCK_TIME);
   result.block_weights            = last_n_block_weights(height(), CRYPTONOTE_REWARD_BLOCKS_WINDOW);
   result.hf_version               = get_hf_version_at(next_height);
+  result.timestamp                = prev.block.timestamp + tools::to_seconds((result.hf_version>=cryptonote::network_version_17_pulse?TARGET_BLOCK_TIME_V17:TARGET_BLOCK_TIME));
   result.block_leader             = prev.master_node_state.get_block_leader();
   result.total_fee                = 0; // Request chain generator to calculate the fee
   return result;
@@ -1371,7 +1371,7 @@ bool test_generator::construct_block(cryptonote::block &blk,
   uint64_t height = var::get<cryptonote::txin_gen>(blk_prev.miner_tx.vin.front()).height + 1;
   crypto::hash prev_id = get_block_hash(blk_prev);
   // Keep difficulty unchanged
-  uint64_t timestamp = blk_prev.timestamp + tools::to_seconds(TARGET_BLOCK_TIME);
+  uint64_t timestamp = blk_prev.timestamp + tools::to_seconds((blk_prev.major_version>=cryptonote::network_version_17_pulse?TARGET_BLOCK_TIME_V17:TARGET_BLOCK_TIME));
   uint64_t already_generated_coins = get_already_generated_coins(prev_id);
   std::vector<uint64_t> block_weights;
   get_last_n_block_weights(block_weights, prev_id, CRYPTONOTE_REWARD_BLOCKS_WINDOW);
@@ -1396,7 +1396,7 @@ bool test_generator::construct_block_manually(
 {
   blk.major_version = actual_params & bf_major_ver ? major_ver : static_cast<uint8_t>(cryptonote::network_version_7);
   blk.minor_version = actual_params & bf_minor_ver ? minor_ver : static_cast<uint8_t>(cryptonote::network_version_7);
-  blk.timestamp     = actual_params & bf_timestamp ? timestamp : prev_block.timestamp + tools::to_seconds(TARGET_BLOCK_TIME); // Keep difficulty unchanged
+  blk.timestamp     = actual_params & bf_timestamp ? timestamp : prev_block.timestamp + tools::to_seconds(blk.major_version>=cryptonote::network_version_17_pulse?TARGET_BLOCK_TIME_V17:TARGET_BLOCK_TIME)); // Keep difficulty unchanged
   blk.prev_id       = actual_params & bf_prev_id   ? prev_id   : get_block_hash(prev_block);
   blk.tx_hashes     = actual_params & bf_tx_hashes ? tx_hashes : std::vector<crypto::hash>();
 
@@ -1715,7 +1715,7 @@ bool fill_tx_sources(std::vector<cryptonote::tx_source_entry>& sources, const st
 
         const output_index& oi = outs[sender_out];
         if (oi.spent) continue;
-        if (!cryptonote::rules::is_output_unlocked(oi.unlock_time, cryptonote::get_block_height(blk_head))) continue;
+        if (!cryptonote::rules::is_output_unlocked(oi.unlock_time, cryptonote::get_block_height(blk_head),nettype())) continue;
 
         cryptonote::tx_source_entry ts;
         const auto& tx = *oi.p_tx;
@@ -2261,7 +2261,7 @@ uint64_t get_unlocked_balance(const cryptonote::account_base& addr, const std::v
         return false;
 
     for (const size_t out_idx : outs_mine) {
-        const auto unlocked = cryptonote::rules::is_output_unlocked(outs[out_idx].unlock_time, get_block_height(blockchain.back()));
+        const auto unlocked = cryptonote::rules::is_output_unlocked(outs[out_idx].unlock_time, get_block_height(blockchain.back()),nettype());
         if (outs[out_idx].spent || !unlocked) continue;
         res += outs[out_idx].amount;
     }

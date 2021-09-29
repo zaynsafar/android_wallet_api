@@ -208,7 +208,7 @@ namespace master_nodes
       m_last_checkpointed_height = height - (height % CHECKPOINT_INTERVAL);
     }
 
-    m_vote_pool.remove_expired_votes(height);
+    m_vote_pool.remove_expired_votes(height,hf_version);
   }
 
   void quorum_cop::set_votes_relayed(std::vector<quorum_vote_t> const &relayed_votes)
@@ -246,6 +246,7 @@ namespace master_nodes
 
     uint64_t const height        = cryptonote::get_block_height(block);
     uint64_t const latest_height = std::max(m_core.get_current_blockchain_height(), m_core.get_target_blockchain_height());
+    uint64_t VOTE_LIFETIME                           = BLOCKS_EXPECTED_IN_HOURS(2,hf_version);
     if (latest_height < VOTE_LIFETIME)
       return;
 
@@ -385,7 +386,7 @@ namespace master_nodes
                   if (!test_results.beldexnet_reachable) reason |= cryptonote::Decommission_Reason::beldexnet_unreachable;
                   if (!test_results.timestamp_participation) reason |= cryptonote::Decommission_Reason::timestamp_response_unreachable;
                   if (!test_results.timesync_status) reason |= cryptonote::Decommission_Reason::timesync_status_out_of_sync;
-                  int64_t credit = calculate_decommission_credit(info, latest_height);
+                  int64_t credit = calculate_decommission_credit(info, latest_height,hf_version);
 
                   if (info.is_decommissioned()) {
                     if (credit >= 0) {
@@ -399,7 +400,8 @@ namespace master_nodes
                     LOG_PRINT_L2("Decommissioned master node " << quorum->workers[node_index] << " has no remaining credit; voting to deregister");
                     vote_for_state = new_state::deregister; // Credit ran out!
                   } else {
-                    if (credit >= DECOMMISSION_MINIMUM) {
+                    int64_t decommission_minimum    = BLOCKS_EXPECTED_IN_HOURS(2,hf_version);
+                    if (credit >= decommission_minimum) {
                       vote_for_state = new_state::decommission;
                       LOG_PRINT_L2("Master node "
                                    << quorum->workers[node_index]
@@ -409,7 +411,7 @@ namespace master_nodes
                       LOG_PRINT_L2("Master node "
                                    << quorum->workers[node_index]
                                    << " has stopped passing required checks, but does not have sufficient earned credit ("
-                                   << credit << " blocks, " << DECOMMISSION_MINIMUM
+                                   << credit << " blocks, " << decommission_minimum
                                    << " required) to decommission; voting to deregister");
                     }
                   }
@@ -417,7 +419,7 @@ namespace master_nodes
 
                 quorum_vote_t vote = master_nodes::make_state_change_vote(m_obligations_height, static_cast<uint16_t>(index_in_group), node_index, vote_for_state, reason, my_keys);
                 cryptonote::vote_verification_context vvc;
-                if (!handle_vote(vote, vvc))
+                if (!handle_vote(vote, vvc,hf_version))
                   LOG_ERROR("Failed to add state change vote; reason: " << print_vote_verification_context(vvc, &vote));
               }
               if (good > 0)
@@ -501,7 +503,7 @@ namespace master_nodes
               crypto::hash block_hash = m_core.get_block_id_by_height(m_last_checkpointed_height);
               quorum_vote_t vote = make_checkpointing_vote(checkpointed_height_hf_version, block_hash, m_last_checkpointed_height, static_cast<uint16_t>(index_in_group), my_keys);
               cryptonote::vote_verification_context vvc = {};
-              if (!handle_vote(vote, vvc))
+              if (!handle_vote(vote, vvc,hf_version))
                 LOG_ERROR("Failed to add checkpoint vote; reason: " << print_vote_verification_context(vvc, &vote));
             }
           }
@@ -519,7 +521,7 @@ namespace master_nodes
   {
     process_quorums(block);
     uint64_t const height = cryptonote::get_block_height(block) + 1; // chain height = new top block height + 1
-    m_vote_pool.remove_expired_votes(height);
+    m_vote_pool.remove_expired_votes(height,block.major_version);
     m_vote_pool.remove_used_votes(txs, block.major_version);
 
     // These feels out of place here because the hook system sucks: TODO replace it with
@@ -665,10 +667,10 @@ namespace master_nodes
     return true;
   }
 
-  bool quorum_cop::handle_vote(quorum_vote_t const &vote, cryptonote::vote_verification_context &vvc)
+  bool quorum_cop::handle_vote(quorum_vote_t const &vote, cryptonote::vote_verification_context &vvc,uint8_t hf_version)
   {
     vvc = {};
-    if (!verify_vote_age(vote, m_core.get_current_blockchain_height(), vvc))
+    if (!verify_vote_age(vote, m_core.get_current_blockchain_height(), vvc,hf_version))
       return false;
 
     std::shared_ptr<const quorum> quorum = m_core.get_quorum(vote.type, vote.block_height);
@@ -708,7 +710,7 @@ namespace master_nodes
 
   // Calculate the decommission credit for a master node.  If the SN is current decommissioned this
   // accumulated blocks.
-  int64_t quorum_cop::calculate_decommission_credit(const master_node_info &info, uint64_t current_height)
+  int64_t quorum_cop::calculate_decommission_credit(const master_node_info &info, uint64_t current_height,uint8_t hf_version)
   {
     // If currently decommissioned, we need to know how long it was up before being decommissioned;
     // otherwise we need to know how long since it last become active until now (or 0 if not staked
@@ -723,11 +725,18 @@ namespace master_nodes
 
     // Now we calculate the credit at last commission plus any credit earned from being up for `blocks_up` blocks since
     int64_t credit = info.recommission_credit;
-    if (blocks_up > 0)
-      credit += blocks_up * DECOMMISSION_CREDIT_PER_DAY / BLOCKS_EXPECTED_IN_HOURS(24);
 
-    if (credit > DECOMMISSION_MAX_CREDIT)
-      credit = DECOMMISSION_MAX_CREDIT; // Cap the available decommission credit blocks if above the max
+
+    if (blocks_up > 0) {
+
+        int64_t decommission_credit_per_day = BLOCKS_EXPECTED_IN_HOURS(24,hf_version) / 30;
+        credit += blocks_up * decommission_credit_per_day / BLOCKS_EXPECTED_IN_HOURS(24,hf_version);
+    }
+
+
+    int64_t decommission_max_credit   = BLOCKS_EXPECTED_IN_HOURS(48,hf_version);
+    if (credit > decommission_max_credit)
+      credit = decommission_max_credit; // Cap the available decommission credit blocks if above the max
 
     // If currently decommissioned, remove any used credits used for the current downtime
     if (info.is_decommissioned())

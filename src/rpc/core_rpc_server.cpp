@@ -387,7 +387,7 @@ namespace cryptonote { namespace rpc {
     }
 
     res.difficulty = m_core.get_blockchain_storage().get_difficulty_for_next_block(next_block_is_pulse);
-    res.target = tools::to_seconds(TARGET_BLOCK_TIME);
+    res.target = tools::to_seconds((next_block_is_pulse?TARGET_BLOCK_TIME_V17:TARGET_BLOCK_TIME));
     res.tx_count = m_core.get_blockchain_storage().get_total_transactions() - res.height; //without coinbase
     res.tx_pool_size = m_core.get_pool().get_transactions_count();
     if (context.admin)
@@ -716,6 +716,7 @@ namespace cryptonote { namespace rpc {
     struct extra_extractor {
       GET_TRANSACTIONS::extra_entry& entry;
       const network_type nettype;
+      const uint8_t hf_version;
 
       void operator()(const tx_extra_pub_key& x) { entry.pubkey = tools::type_to_hex(x.pub_key); }
       void operator()(const tx_extra_nonce& x) {
@@ -792,7 +793,7 @@ namespace cryptonote { namespace rpc {
       }
       void operator()(const tx_extra_beldex_name_system& x) {
         auto& bns = entry.bns.emplace();
-        bns.blocks = bns::expiry_blocks(nettype, x.type);
+          bns.blocks = bns::expiry_blocks(nettype, x.type,hf_version) ;
         switch (x.type)
         {
           case bns::mapping_type::beldexnet: [[fallthrough]];
@@ -826,12 +827,12 @@ namespace cryptonote { namespace rpc {
     };
 
 
-    bool load_tx_extra_data(GET_TRANSACTIONS::extra_entry& e, const transaction& tx, network_type nettype)
+    bool load_tx_extra_data(GET_TRANSACTIONS::extra_entry& e, const transaction& tx, network_type nettype,uint8_t hf_version)
     {
       std::vector<tx_extra_field> extras;
       if (!parse_tx_extra(tx.extra, extras))
         return false;
-      extra_extractor visitor{e, nettype};
+      extra_extractor visitor{e, nettype, hf_version};
       for (const auto& extra : extras)
         var::visit(visitor, extra);
       return true;
@@ -936,7 +937,9 @@ namespace cryptonote { namespace rpc {
 
     uint64_t immutable_height = m_core.get_blockchain_storage().get_immutable_height();
     auto blink_lock = pool.blink_shared_lock(std::defer_lock); // Defer until/unless we actually need it
-
+    auto height = m_core.get_current_blockchain_height();
+    auto net = nettype();
+    auto hf_version = get_network_version(net, height);
     cryptonote::blobdata tx_data;
     for(const auto& [tx_hash, unprunable_data, prunable_hash, prunable_data]: txs)
     {
@@ -1002,7 +1005,7 @@ namespace cryptonote { namespace rpc {
         }
 
         if (req.tx_extra)
-          load_tx_extra_data(e.extra.emplace(), t, nettype());
+          load_tx_extra_data(e.extra.emplace(), t, net, hf_version);
       }
       auto ptx_it = per_tx_pool_tx_info.find(tx_hash);
       e.in_pool = ptx_it != per_tx_pool_tx_info.end();
@@ -1303,7 +1306,7 @@ namespace cryptonote { namespace rpc {
 
     const miner& lMiner = m_core.get_miner();
     res.active = lMiner.is_mining();
-    res.block_target = tools::to_seconds(TARGET_BLOCK_TIME);
+    res.block_target = tools::to_seconds(TARGET_BLOCK_TIME); // old_block_time
     res.difficulty = m_core.get_blockchain_storage().get_difficulty_for_next_block(false /*pulse*/);
     if ( lMiner.is_mining() ) {
       res.speed = lMiner.get_speed();
@@ -1468,11 +1471,12 @@ namespace cryptonote { namespace rpc {
     std::function<void(const transaction& tx, tx_info& txi)> load_extra;
     if (req.tx_extra || req.stake_info)
         load_extra = [this, &req, net=nettype()](const transaction& tx, tx_info& txi) {
+            auto height = m_core.get_current_blockchain_height();
+            auto hf_version = get_network_version(net, height);
             if (req.tx_extra)
-                load_tx_extra_data(txi.extra.emplace(), tx, net);
+                load_tx_extra_data(txi.extra.emplace(), tx, net, hf_version);
             if (req.stake_info) {
-                auto height = m_core.get_current_blockchain_height();
-                auto hf_version = get_network_version(net, height);
+
                 master_nodes::staking_components sc;
                 if (master_nodes::tx_get_staking_components_and_amounts(net, hf_version, tx, height, &sc)
                         && sc.transferred > 0)
@@ -3066,7 +3070,7 @@ namespace cryptonote { namespace rpc {
     entry.funded                        = info.is_fully_funded();
     entry.state_height                  = info.is_fully_funded()
         ? (info.is_decommissioned() ? info.last_decommission_height : info.active_since_height) : info.last_reward_block_height;
-    entry.earned_downtime_blocks        = master_nodes::quorum_cop::calculate_decommission_credit(info, current_height);
+    entry.earned_downtime_blocks        = master_nodes::quorum_cop::calculate_decommission_credit(info, current_height,info.registration_hf_version);
     entry.decommission_count            = info.decommission_count;
     entry.last_decommission_reason_consensus_all      = info.last_decommission_reason_consensus_all;
     entry.last_decommission_reason_consensus_any      = info.last_decommission_reason_consensus_any;

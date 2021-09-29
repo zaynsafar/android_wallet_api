@@ -32,6 +32,7 @@
 #include <cstdint>
 #include "cryptonote_config.h"
 #include "common/util.h"
+#include "cryptonote_basic/hardfork.h"
 
 namespace cryptonote
 {
@@ -39,7 +40,7 @@ namespace cryptonote
 namespace rules
 {
 
-bool is_output_unlocked(uint64_t unlock_time, uint64_t height)
+bool is_output_unlocked(uint64_t unlock_time, uint64_t height,network_type nettype)
 {
   if(unlock_time < CRYPTONOTE_MAX_BLOCK_NUMBER)
   {
@@ -52,9 +53,11 @@ bool is_output_unlocked(uint64_t unlock_time, uint64_t height)
   }
   else
   {
+
+    auto hf_version = ::cryptonote::get_network_version(nettype, height);
     //interpret as time
     uint64_t current_time = static_cast<uint64_t>(time(NULL));
-    if(current_time + tools::to_seconds(CRYPTONOTE_LOCKED_TX_ALLOWED_DELTA_SECONDS_V2) >= unlock_time)
+    if(current_time + tools::to_seconds((hf_version>=cryptonote::network_version_17_pulse?CRYPTONOTE_LOCKED_TX_ALLOWED_DELTA_SECONDS_V3:CRYPTONOTE_LOCKED_TX_ALLOWED_DELTA_SECONDS_V2)) >= unlock_time)
       return true;
     else
       return false;

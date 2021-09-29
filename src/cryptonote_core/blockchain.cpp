@@ -649,7 +649,8 @@ void Blockchain::pop_blocks(uint64_t nblocks)
   auto lock = tools::unique_locks(m_tx_pool, *this);
 
   bool stop_batch = m_db->batch_start();
-
+  uint8_t hf_version = get_network_version();
+  uint64_t blocks_expected_in_hours = BLOCKS_EXPECTED_IN_HOURS(24,hf_version);
   try
   {
     const uint64_t blockchain_height = m_db->height();
@@ -662,7 +663,7 @@ void Blockchain::pop_blocks(uint64_t nblocks)
     tools::PerformanceTimer timer;
     for (int progress = 0; i < nblocks; ++i)
     {
-      if (nblocks >= BLOCKS_EXPECTED_IN_HOURS(24) && (i != 0 && (i % blocks_per_update == 0)))
+      if (nblocks >= blocks_expected_in_hours && (i != 0 && (i % blocks_per_update == 0)))
       {
         MGINFO("... popping blocks " << (++progress * PERCENT_PER_PROGRESS_UPDATE) << "% completed, height: " << (blockchain_height - i) << " (" << timer.seconds() << "s)");
         timer.reset();
@@ -953,7 +954,7 @@ difficulty_type Blockchain::get_difficulty_for_next_block(bool pulse)
       m_nettype, m_cache.m_timestamps, m_cache.m_difficulties, chain_height, m_cache.m_timestamps_and_difficulties_height);
   uint64_t diff = next_difficulty_v2(m_cache.m_timestamps,
                                      m_cache.m_difficulties,
-                                     tools::to_seconds(TARGET_BLOCK_TIME),
+                                     tools::to_seconds((hf_version>=cryptonote::network_version_17_pulse?TARGET_BLOCK_TIME_V17:TARGET_BLOCK_TIME)),
                                      difficulty_mode(m_nettype, chain_height));
 
   m_cache.m_timestamps_and_difficulties_height = chain_height;
@@ -1216,9 +1217,10 @@ difficulty_type Blockchain::get_difficulty_for_alternative_chain(const std::list
 
   // calculate the difficulty target for the block and return it
   uint64_t height = (alt_chain.size() ? alt_chain.front().height : alt_block_height) + alt_chain.size() + 1;
+  auto hf_version = cryptonote::get_network_version(m_nettype, height);
   return next_difficulty_v2(timestamps,
                             cumulative_difficulties,
-                            tools::to_seconds(TARGET_BLOCK_TIME),
+                            tools::to_seconds((hf_version>=cryptonote::network_version_17_pulse?TARGET_BLOCK_TIME_V17:TARGET_BLOCK_TIME)),
                             difficulty_mode(m_nettype, height));
 }
 //------------------------------------------------------------------
@@ -3824,7 +3826,7 @@ byte_and_output_fees Blockchain::get_dynamic_base_fee_estimate(uint64_t grace_bl
 bool Blockchain::is_output_spendtime_unlocked(uint64_t unlock_time) const
 {
   LOG_PRINT_L3("Blockchain::" << __func__);
-  return cryptonote::rules::is_output_unlocked(unlock_time, m_db->height());
+  return cryptonote::rules::is_output_unlocked(unlock_time, m_db->height(),nettype());
 }
 //------------------------------------------------------------------
 // This function locates all outputs associated with a given input (mixins)

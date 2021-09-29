@@ -298,7 +298,7 @@ namespace master_nodes
     uint64_t                           last_decommission_height = 0; // The height at which the last (or current!) decommissioning started, or 0 if never decommissioned
     uint16_t                           last_decommission_reason_consensus_all = 0; // The reason which the last (or current!) decommissioning occurred as voted by all MNs, or 0 if never decommissioned
     uint16_t                           last_decommission_reason_consensus_any = 0; // The reason which the last (or current!) decommissioning occurred as voted by any of the MNs, or 0 if never decommissioned
-    int64_t                            recommission_credit = DECOMMISSION_INITIAL_CREDIT; // The number of blocks of credit you started with or kept when you were last activated (i.e. as of `active_since_height`)
+    int64_t                            recommission_credit = 0; // The number of blocks of credit you started with or kept when you were last activated (i.e. as of `active_since_height`)
     std::vector<contributor_t>         contributors;
     uint64_t                           total_contributed = 0;
     uint64_t                           total_reserved = 0;
@@ -718,7 +718,7 @@ namespace master_nodes
           const cryptonote::block &block,
           const cryptonote::transaction& tx,
           const master_node_keys *my_keys);
-      bool process_key_image_unlock_tx(cryptonote::network_type nettype, uint64_t block_height, const cryptonote::transaction &tx);
+      bool process_key_image_unlock_tx(cryptonote::network_type nettype, uint64_t block_height, const cryptonote::transaction &tx,uint8_t version);
       payout get_block_leader() const;
       payout get_block_producer(uint8_t pulse_round) const;
     };

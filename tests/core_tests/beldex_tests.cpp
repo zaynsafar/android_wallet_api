@@ -1104,7 +1104,7 @@ static bns_keys_t make_bns_keys(cryptonote::account_base const &src)
 
 // beldexnet FAKECHAIN BNS expiry blocks
 uint64_t beldexnet_expiry(bns::mapping_type type) {
-  auto exp = bns::expiry_blocks(cryptonote::FAKECHAIN, type);
+  auto exp = bns::expiry_blocks(cryptonote::FAKECHAIN, type,0);
   if (!exp) throw std::logic_error{"test suite bug: beldexnet_expiry called with non-beldexnet mapping type"};
   return *exp;
 }

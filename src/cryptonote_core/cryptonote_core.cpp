@@ -2471,8 +2471,10 @@ namespace cryptonote
     MDEBUG("Not checking block rate, integration test mode");
     return true;
 #endif
+    const auto hf_version = get_network_version(m_nettype, m_target_blockchain_height);
 
-    static constexpr double threshold = 1. / ((24h * 10) / TARGET_BLOCK_TIME); // one false positive every 10 days
+
+    static double threshold = 1. / ((24h * 10) / (hf_version>=cryptonote::network_version_17_pulse?TARGET_BLOCK_TIME_V17:TARGET_BLOCK_TIME)); // one false positive every 10 days
     static constexpr unsigned int max_blocks_checked = 150;
 
     const time_t now = time(NULL);
@@ -2484,7 +2486,7 @@ namespace cryptonote
       unsigned int b = 0;
       const time_t time_boundary = now - static_cast<time_t>(seconds[n]);
       for (time_t ts: timestamps) b += ts >= time_boundary;
-      const double p = probability(b, seconds[n] / tools::to_seconds(TARGET_BLOCK_TIME));
+      const double p = probability(b, seconds[n] / tools::to_seconds((hf_version>=cryptonote::network_version_17_pulse?TARGET_BLOCK_TIME_V17:TARGET_BLOCK_TIME)));
       MDEBUG("blocks in the last " << seconds[n] / 60 << " minutes: " << b << " (probability " << p << ")");
       if (p < threshold)
       {
@@ -2493,7 +2495,7 @@ namespace cryptonote
         std::shared_ptr<tools::Notify> block_rate_notify = m_block_rate_notify;
         if (block_rate_notify)
         {
-          auto expected = seconds[n] / tools::to_seconds(TARGET_BLOCK_TIME);
+          auto expected = seconds[n] / tools::to_seconds((hf_version>=cryptonote::network_version_17_pulse?TARGET_BLOCK_TIME_V17:TARGET_BLOCK_TIME));
           block_rate_notify->notify("%t", std::to_string(seconds[n] / 60).c_str(), "%b", std::to_string(b).c_str(), "%e", std::to_string(expected).c_str(), NULL);
         }
 
@@ -2569,7 +2571,9 @@ namespace cryptonote
   //-----------------------------------------------------------------------------------------------
   bool core::add_master_node_vote(const master_nodes::quorum_vote_t& vote, vote_verification_context &vvc)
   {
-    return m_quorum_cop.handle_vote(vote, vvc);
+    auto height = get_current_blockchain_height();
+    auto hf_version = get_network_version(m_nettype, height);
+    return m_quorum_cop.handle_vote(vote, vvc, hf_version);
   }
   //-----------------------------------------------------------------------------------------------
   uint32_t core::get_blockchain_pruning_seed() const

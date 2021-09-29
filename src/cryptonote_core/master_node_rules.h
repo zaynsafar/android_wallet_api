@@ -31,8 +31,8 @@ namespace master_nodes {
   constexpr size_t PULSE_BLOCK_REQUIRED_SIGNATURES = 7;  // A block must have exactly N signatures to be considered properly
 #endif
 
-  constexpr auto PULSE_MIN_TARGET_BLOCK_TIME = TARGET_BLOCK_TIME - 30s;
-  constexpr auto PULSE_MAX_TARGET_BLOCK_TIME = TARGET_BLOCK_TIME + 30s;
+  constexpr auto PULSE_MIN_TARGET_BLOCK_TIME = TARGET_BLOCK_TIME_V17 - 15s;
+  constexpr auto PULSE_MAX_TARGET_BLOCK_TIME = TARGET_BLOCK_TIME_V17 + 15s;
   constexpr size_t PULSE_QUORUM_SIZE = PULSE_QUORUM_NUM_VALIDATORS + 1 /*Leader*/;
 
   static_assert(PULSE_ROUND_TIME >=
@@ -79,12 +79,9 @@ namespace master_nodes {
   // deregistration count down.  (Note that it is possible for a server to slightly exceed its
   // decommission time: the first quorum test after the credit expires determines whether the server
   // gets recommissioned or decommissioned).
-  constexpr int64_t DECOMMISSION_CREDIT_PER_DAY = BLOCKS_EXPECTED_IN_HOURS(24) / 30;
-  constexpr int64_t DECOMMISSION_INITIAL_CREDIT = BLOCKS_EXPECTED_IN_HOURS(2);
-  constexpr int64_t DECOMMISSION_MAX_CREDIT     = BLOCKS_EXPECTED_IN_HOURS(48);
-  constexpr int64_t DECOMMISSION_MINIMUM        = BLOCKS_EXPECTED_IN_HOURS(2);
 
-  static_assert(DECOMMISSION_INITIAL_CREDIT <= DECOMMISSION_MAX_CREDIT, "Initial registration decommission credit cannot be larger than the maximum decommission credit");
+
+
 
   // This determines how many credits a node gets when being recommissioned after being
   // decommissioned.  It gets passed two values: the credit at the time the node was decomissioned,
@@ -103,29 +100,7 @@ namespace master_nodes {
       return std::max<int64_t>(0, credit_at_decomm - 2*decomm_blocks);
   }
 
-  // Some sanity checks on the recommission credit value:
-  static_assert(RECOMMISSION_CREDIT(DECOMMISSION_MAX_CREDIT, 0) <= DECOMMISSION_MAX_CREDIT,
-          "Max recommission credit should not be higher than DECOMMISSION_MAX_CREDIT");
 
-  // These are by no means exhaustive, but will at least catch simple mistakes
-  static_assert(
-          RECOMMISSION_CREDIT(DECOMMISSION_MAX_CREDIT, DECOMMISSION_MAX_CREDIT) <= RECOMMISSION_CREDIT(DECOMMISSION_MAX_CREDIT, DECOMMISSION_MAX_CREDIT/2) &&
-          RECOMMISSION_CREDIT(DECOMMISSION_MAX_CREDIT, DECOMMISSION_MAX_CREDIT/2) <= RECOMMISSION_CREDIT(DECOMMISSION_MAX_CREDIT, 0) &&
-          RECOMMISSION_CREDIT(DECOMMISSION_MAX_CREDIT/2, DECOMMISSION_MAX_CREDIT/2) <= RECOMMISSION_CREDIT(DECOMMISSION_MAX_CREDIT/2, 0),
-          "Recommission credit should be (weakly) decreasing in the length of decommissioning");
-  static_assert(
-          RECOMMISSION_CREDIT(DECOMMISSION_MAX_CREDIT/2, 1) <= RECOMMISSION_CREDIT(DECOMMISSION_MAX_CREDIT, 1) &&
-          RECOMMISSION_CREDIT(0, 1) <= RECOMMISSION_CREDIT(DECOMMISSION_MAX_CREDIT/2, 1),
-          "Recommission credit should be (weakly) increasing in initial credit blocks");
-
-  // This one actually could be supported (i.e. you can have negative credit and half to crawl out
-  // of that hole), but the current code is entirely untested as to whether or not that actually
-  // works.
-  static_assert(
-          RECOMMISSION_CREDIT(DECOMMISSION_MAX_CREDIT, 0) >= 0 &&
-          RECOMMISSION_CREDIT(DECOMMISSION_MAX_CREDIT, DECOMMISSION_MAX_CREDIT) >= 0 &&
-          RECOMMISSION_CREDIT(DECOMMISSION_MAX_CREDIT, 2*DECOMMISSION_MAX_CREDIT) >= 0, // delayed recommission that overhangs your time
-          "Recommission credit should not be negative");
 
   constexpr uint64_t  CHECKPOINT_NUM_CHECKPOINTS_FOR_CHAIN_FINALITY = 2;  // Number of consecutive checkpoints before, blocks preceeding the N checkpoints are locked in
   constexpr uint64_t  CHECKPOINT_INTERVAL                           = 4;  // Checkpoint every 4 blocks and prune when too old except if (height % CHECKPOINT_STORE_PERSISTENTLY_INTERVAL == 0)
@@ -151,7 +126,7 @@ namespace master_nodes {
   // node on the network: temporary decommissioning, recommissioning, and permanent deregistration.
   constexpr size_t   STATE_CHANGE_NTH_OF_THE_NETWORK_TO_TEST = 100;
   constexpr size_t   STATE_CHANGE_MIN_NODES_TO_TEST          = 50;
-  constexpr uint64_t VOTE_LIFETIME                           = BLOCKS_EXPECTED_IN_HOURS(2);
+
 
 #if defined(BELDEX_ENABLE_INTEGRATION_TEST_HOOKS)
   constexpr size_t STATE_CHANGE_QUORUM_SIZE               = 5;
@@ -180,8 +155,7 @@ namespace master_nodes {
   // NOTE: We can reorg up to last 2 checkpoints + the number of extra blocks before the next checkpoint is set
   constexpr uint64_t  REORG_SAFETY_BUFFER_BLOCKS_POST_HF12 = (CHECKPOINT_INTERVAL * CHECKPOINT_NUM_CHECKPOINTS_FOR_CHAIN_FINALITY) + (CHECKPOINT_INTERVAL - 1);
   constexpr uint64_t  REORG_SAFETY_BUFFER_BLOCKS_PRE_HF12  = 20;
-  static_assert(REORG_SAFETY_BUFFER_BLOCKS_POST_HF12 < VOTE_LIFETIME, "Safety buffer should always be less than the vote lifetime");
-  static_assert(REORG_SAFETY_BUFFER_BLOCKS_PRE_HF12  < VOTE_LIFETIME, "Safety buffer should always be less than the vote lifetime");
+
 
   constexpr auto IP_CHANGE_WINDOW = 24h; // How far back an obligations quorum looks for multiple IPs (unless the following buffer is more recent)
   constexpr auto IP_CHANGE_BUFFER = 2h; // After we bump a MN for an IP change we don't bump again for changes within this time period
@@ -205,7 +179,7 @@ namespace master_nodes {
   constexpr size_t   STEALING_SWARM_UPPER_PERCENTILE  = 75;
   constexpr uint64_t KEY_IMAGE_AWAITING_UNLOCK_HEIGHT = 0;
 
-  constexpr uint64_t STATE_CHANGE_TX_LIFETIME_IN_BLOCKS = VOTE_LIFETIME;
+
 
   // If we get an incoming vote of state change tx that is outside the acceptable range by this many
   // blocks then ignore it but don't trigger a connection drop; the sending side could be a couple
@@ -252,13 +226,13 @@ namespace master_nodes {
         quorum_type::pulse;
   }
 
-  constexpr uint64_t staking_num_lock_blocks(cryptonote::network_type nettype)
+  constexpr uint64_t staking_num_lock_blocks(cryptonote::network_type nettype,uint8_t hf_version)
   {
     switch (nettype)
     {
       case cryptonote::FAKECHAIN: return 30;
-      case cryptonote::TESTNET:   return BLOCKS_EXPECTED_IN_DAYS(2);
-      default:                    return BLOCKS_EXPECTED_IN_DAYS(30);
+      case cryptonote::TESTNET:   return BLOCKS_EXPECTED_IN_DAYS(2,hf_version);
+      default:                    return BLOCKS_EXPECTED_IN_DAYS(30,hf_version);
     }
   }
 
@@ -291,7 +265,7 @@ uint64_t portions_to_amount(uint64_t portions, uint64_t staking_requirement);
 bool check_master_node_portions(uint8_t version, const std::vector<uint64_t>& portions);
 
 crypto::hash generate_request_stake_unlock_hash(uint32_t nonce);
-uint64_t     get_locked_key_image_unlock_height(cryptonote::network_type nettype, uint64_t node_register_height, uint64_t curr_height);
+uint64_t     get_locked_key_image_unlock_height(cryptonote::network_type nettype, uint64_t node_register_height, uint64_t curr_height,uint8_t version);
 
 // Returns lowest x such that (staking_requirement * x/STAKING_PORTIONS) >= amount
 uint64_t get_portions_to_make_amount(uint64_t staking_requirement, uint64_t amount, uint64_t max_portions = STAKING_PORTIONS);

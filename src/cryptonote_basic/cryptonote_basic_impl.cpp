@@ -136,6 +136,7 @@ namespace cryptonote {
 		return true;
 	}
 	static_assert(TARGET_BLOCK_TIME % 1 == 0s, "difficulty targets must be a multiple of 60");
+    static_assert(TARGET_BLOCK_TIME_V17 % 1 == 0s, "difficulty targets must be a multiple of 60");
 
     uint64_t base_reward =
       version >= network_version_18 ? BLOCK_REWARD_HF18 :

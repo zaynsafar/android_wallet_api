@@ -106,8 +106,8 @@ namespace master_nodes
   cryptonote::checkpoint_t make_empty_master_node_checkpoint(crypto::hash const &block_hash, uint64_t height);
 
   bool               verify_checkpoint                  (uint8_t hf_version, cryptonote::checkpoint_t const &checkpoint, master_nodes::quorum const &quorum);
-  bool               verify_tx_state_change             (const cryptonote::tx_extra_master_node_state_change& state_change, uint64_t latest_height, cryptonote::tx_verification_context& vvc, const master_nodes::quorum &quorum, uint8_t hf_version);
-  bool               verify_vote_age                    (const quorum_vote_t& vote, uint64_t latest_height, cryptonote::vote_verification_context &vvc);
+  bool               verify_tx_state_change             (const cryptonote::tx_extra_master_node_state_change& state_change, uint64_t latest_height, cryptonote::tx_verification_context& vvc, const master_nodes::quorum &quorum, const uint8_t hf_version);
+  bool               verify_vote_age                    (const quorum_vote_t& vote, uint64_t latest_height, cryptonote::vote_verification_context &vvc,uint8_t hf_version);
   bool               verify_vote_signature              (uint8_t hf_version, const quorum_vote_t& vote, cryptonote::vote_verification_context &vvc, const master_nodes::quorum &quorum);
   bool               verify_quorum_signatures           (master_nodes::quorum const &quorum, master_nodes::quorum_type type, uint8_t hf_version, uint64_t height, crypto::hash const &hash, std::vector<quorum_signature> const &signatures, const cryptonote::block* block = nullptr);
   bool               verify_pulse_quorum_sizes          (master_nodes::quorum const &quorum);
@@ -128,7 +128,7 @@ namespace master_nodes
 
     // TODO(beldex): Review relay behaviour and all the cases when it should be triggered
     void                         set_relayed         (const std::vector<quorum_vote_t>& votes);
-    void                         remove_expired_votes(uint64_t height);
+    void                         remove_expired_votes(uint64_t height,uint8_t hf_version);
     void                         remove_used_votes   (std::vector<cryptonote::transaction> const &txs, uint8_t hard_fork_version);
 
     /// Returns relayable votes for either p2p (quorum_relay=false) or quorumnet

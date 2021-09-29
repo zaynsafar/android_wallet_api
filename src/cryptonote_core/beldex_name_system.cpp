@@ -621,7 +621,7 @@ std::vector<mapping_type> all_mapping_types(uint8_t hf_version) {
   return result;
 }
 
-std::optional<uint64_t> expiry_blocks(cryptonote::network_type nettype, mapping_type type)
+std::optional<uint64_t> expiry_blocks(cryptonote::network_type nettype, mapping_type type,uint8_t hf_version)
 {
   std::optional<uint64_t> result;
   if (is_beldexnet_type(type))
@@ -630,16 +630,16 @@ std::optional<uint64_t> expiry_blocks(cryptonote::network_type nettype, mapping_
     // leave 10 years alone to allow long-term registrations on testnet.
     const bool testnet_short = nettype == cryptonote::TESTNET && type != mapping_type::beldexnet_10years;
 
-    if (type == mapping_type::beldexnet)              result = BLOCKS_EXPECTED_IN_DAYS(1 * REGISTRATION_YEAR_DAYS);
-    else if (type == mapping_type::beldexnet_2years)  result = BLOCKS_EXPECTED_IN_DAYS(2 * REGISTRATION_YEAR_DAYS);
-    else if (type == mapping_type::beldexnet_5years)  result = BLOCKS_EXPECTED_IN_DAYS(5 * REGISTRATION_YEAR_DAYS);
-    else if (type == mapping_type::beldexnet_10years) result = BLOCKS_EXPECTED_IN_DAYS(10 * REGISTRATION_YEAR_DAYS);
+    if (type == mapping_type::beldexnet)              result = BLOCKS_EXPECTED_IN_DAYS(1 * REGISTRATION_YEAR_DAYS,hf_version);
+    else if (type == mapping_type::beldexnet_2years)  result = BLOCKS_EXPECTED_IN_DAYS(2 * REGISTRATION_YEAR_DAYS,hf_version);
+    else if (type == mapping_type::beldexnet_5years)  result = BLOCKS_EXPECTED_IN_DAYS(5 * REGISTRATION_YEAR_DAYS,hf_version);
+    else if (type == mapping_type::beldexnet_10years) result = BLOCKS_EXPECTED_IN_DAYS(10 * REGISTRATION_YEAR_DAYS,hf_version);
     assert(result);
 
     if (testnet_short)
       *result /= REGISTRATION_YEAR_DAYS;
     else if (nettype == cryptonote::FAKECHAIN) // For fakenet testing we shorten 1/2/5/10 years to 2/4/10/20 blocks
-      *result /= (BLOCKS_EXPECTED_IN_DAYS(REGISTRATION_YEAR_DAYS) / 2);
+      *result /= (BLOCKS_EXPECTED_IN_DAYS(((REGISTRATION_YEAR_DAYS) / 2),hf_version));
   }
 
   return result;
@@ -1957,7 +1957,7 @@ std::optional<int64_t> add_or_get_owner_id(bns::name_system_db &bns_db, crypto::
 // Build a query and bind values that will create a new row at the given height by copying the
 // current highest-height row values and/or updating the given update fields.
 using update_variant = std::variant<uint16_t, int64_t, uint64_t, blob_view, std::string>;
-std::pair<std::string, std::vector<update_variant>> update_record_query(name_system_db& bns_db, uint64_t height, const cryptonote::tx_extra_beldex_name_system& entry, const crypto::hash& tx_hash)
+std::pair<std::string, std::vector<update_variant>> update_record_query(name_system_db& bns_db, uint64_t height, const cryptonote::tx_extra_beldex_name_system& entry, const crypto::hash& tx_hash,int8_t hf_version)
 {
   assert(entry.is_updating() || entry.is_renewing());
 
@@ -1977,7 +1977,7 @@ SELECT                type, name_hash, ?,    ?)";
   if (entry.is_renewing())
   {
     sql += ", expiration_height + ?, owner_id, backup_owner_id, encrypted_value";
-    bind.emplace_back(expiry_blocks(bns_db.network_type(), entry.type).value_or(0));
+    bind.emplace_back(expiry_blocks(bns_db.network_type(), entry.type,hf_version).value_or(0));
   }
   else
   {
@@ -2032,7 +2032,7 @@ SELECT                type, name_hash, ?,    ?)";
   return result;
 }
 
-bool add_bns_entry(bns::name_system_db &bns_db, uint64_t height, cryptonote::tx_extra_beldex_name_system const &entry, crypto::hash const &tx_hash)
+bool add_bns_entry(bns::name_system_db &bns_db, uint64_t height, cryptonote::tx_extra_beldex_name_system const &entry, crypto::hash const &tx_hash,uint8_t hf_version)
 {
   // -----------------------------------------------------------------------------------------------
   // New Mapping Insert or Completely Replace
@@ -2059,7 +2059,7 @@ bool add_bns_entry(bns::name_system_db &bns_db, uint64_t height, cryptonote::tx_
       }
     }
 
-    auto expiry = expiry_blocks(bns_db.network_type(), entry.type);
+    auto expiry = expiry_blocks(bns_db.network_type(), entry.type,hf_version);
     if (expiry) *expiry += height;
     if (!bns_db.save_mapping(tx_hash, entry, height, expiry, *owner_id, backup_owner_id))
     {
@@ -2072,7 +2072,7 @@ bool add_bns_entry(bns::name_system_db &bns_db, uint64_t height, cryptonote::tx_
   // -----------------------------------------------------------------------------------------------
   else
   {
-    auto [sql, bind] = update_record_query(bns_db, height, entry, tx_hash);
+    auto [sql, bind] = update_record_query(bns_db, height, entry, tx_hash,hf_version);
 
     if (sql.empty())
       return false; // already MERROR'd
@@ -2125,7 +2125,7 @@ bool name_system_db::add_block(const cryptonote::block &block, const std::vector
       }
 
       crypto::hash const &tx_hash = cryptonote::get_transaction_hash(tx);
-      if (!add_bns_entry(*this, height, entry, tx_hash))
+      if (!add_bns_entry(*this, height, entry, tx_hash,block.major_version))
         return false;
 
       bns_parsed_from_block = true;

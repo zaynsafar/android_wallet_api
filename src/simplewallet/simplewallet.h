@@ -54,6 +54,8 @@
 #include "common/i18n.h"
 #include "common/password.h"
 #include "crypto/crypto.h"  // for definition of crypto::secret_key
+#include "cryptonote_config.h"
+#include "cryptonote_basic/hardfork.h"
 
 #undef BELDEX_DEFAULT_LOG_CATEGORY
 #define BELDEX_DEFAULT_LOG_CATEGORY "wallet.simplewallet"
@@ -366,10 +368,11 @@ namespace cryptonote
       {
       }
 
-      void update(uint64_t height, bool force = false)
+      void update(uint64_t height, bool force,cryptonote::network_type nettype) //force= false
       {
         auto current_time = std::chrono::system_clock::now();
-        const auto node_update_threshold = TARGET_BLOCK_TIME / 2;
+        auto hf_version = cryptonote::get_network_version(nettype, height);
+        const auto node_update_threshold = (hf_version>=cryptonote::network_version_17_pulse?TARGET_BLOCK_TIME_V17:TARGET_BLOCK_TIME) / 2;
         if (node_update_threshold < current_time - m_blockchain_height_update_time || m_blockchain_height <= height)
         {
           update_blockchain_height();

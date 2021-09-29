@@ -119,7 +119,7 @@ namespace {
   constexpr float RECENT_OUTPUT_RATIO = 0.5f; // 50% of outputs are from the recent zone
   constexpr float RECENT_OUTPUT_DAYS = 1.8f; // last 1.8 day makes up the recent zone (taken from monerolink.pdf, Miller et al)
   constexpr time_t RECENT_OUTPUT_ZONE = RECENT_OUTPUT_DAYS * 86400;
-  constexpr uint64_t RECENT_OUTPUT_BLOCKS = BLOCKS_EXPECTED_IN_DAYS(RECENT_OUTPUT_DAYS);
+
 
   constexpr uint64_t FEE_ESTIMATE_GRACE_BLOCKS = 10; // estimate fee valid for that many blocks
 
@@ -894,22 +894,22 @@ namespace tools
 
 const char* wallet2::tr(const char* str) { return i18n_translate(str, "tools::wallet2"); }
 
-gamma_picker::gamma_picker(const std::vector<uint64_t> &rct_offsets, double shape, double scale):
+gamma_picker::gamma_picker(const std::vector<uint64_t> &rct_offsets, double shape, double scale,uint8_t hf_version):
     rct_offsets(rct_offsets)
 {
   gamma = std::gamma_distribution<double>(shape, scale);
   THROW_WALLET_EXCEPTION_IF(rct_offsets.size() <= CRYPTONOTE_DEFAULT_TX_SPENDABLE_AGE, error::wallet_internal_error, "Bad offset calculation");
-  const size_t blocks_in_a_year = BLOCKS_EXPECTED_IN_YEARS(1);
+  const size_t blocks_in_a_year = BLOCKS_EXPECTED_IN_YEARS(1,hf_version);
   const size_t blocks_to_consider = std::min<size_t>(rct_offsets.size(), blocks_in_a_year);
   const size_t outputs_to_consider = rct_offsets.back() - (blocks_to_consider < rct_offsets.size() ? rct_offsets[rct_offsets.size() - blocks_to_consider - 1] : 0);
   begin = rct_offsets.data();
   end = rct_offsets.data() + rct_offsets.size() - CRYPTONOTE_DEFAULT_TX_SPENDABLE_AGE;
   num_rct_outputs = *(end - 1);
   THROW_WALLET_EXCEPTION_IF(num_rct_outputs == 0, error::wallet_internal_error, "No rct outputs");
-  average_output_time = tools::to_seconds(TARGET_BLOCK_TIME) * blocks_to_consider / outputs_to_consider; // this assumes constant target over the whole rct range
+  average_output_time = tools::to_seconds((hf_version>=cryptonote::network_version_17_pulse?TARGET_BLOCK_TIME_V17:TARGET_BLOCK_TIME)) * blocks_to_consider / outputs_to_consider; // this assumes constant target over the whole rct range
 };
 
-gamma_picker::gamma_picker(const std::vector<uint64_t> &rct_offsets): gamma_picker(rct_offsets, GAMMA_SHAPE, GAMMA_SCALE) {}
+gamma_picker::gamma_picker(const std::vector<uint64_t> &rct_offsets, uint8_t hf_version): gamma_picker(rct_offsets, GAMMA_SHAPE, GAMMA_SCALE,hf_version) {}
 
 uint64_t gamma_picker::pick()
 {
@@ -4825,7 +4825,9 @@ crypto::secret_key wallet2::generate(const fs::path& wallet_, const epee::wipeab
 
  uint64_t wallet2::estimate_blockchain_height()
  {
-   const uint64_t blocks_per_month = BLOCKS_EXPECTED_IN_DAYS(30);
+   std::optional<uint8_t> hf_version = get_hard_fork_version();
+   THROW_WALLET_EXCEPTION_IF(!hf_version, error::get_hard_fork_version_error, "Failed to query current hard fork version");
+   const uint64_t blocks_per_month = BLOCKS_EXPECTED_IN_DAYS(30,*hf_version);
 
    // try asking the daemon first
    std::string err;
@@ -6730,7 +6732,7 @@ bool wallet2::is_transfer_unlocked(uint64_t unlock_time, uint64_t block_height, 
 //----------------------------------------------------------------------------------------------------
 bool wallet2::is_tx_spendtime_unlocked(uint64_t unlock_time, uint64_t block_height) const
 {
-  return cryptonote::rules::is_output_unlocked(unlock_time, get_blockchain_current_height());
+  return cryptonote::rules::is_output_unlocked(unlock_time, get_blockchain_current_height(),nettype());
 }
 //----------------------------------------------------------------------------------------------------
 namespace
@@ -8625,7 +8627,8 @@ wallet2::request_stake_unlock_result wallet2::can_request_stake_unlock(const cry
         result.msg.append(" has already been requested to be unlocked, unlocking at height: ");
         result.msg.append(std::to_string(node_info.requested_unlock_height));
         result.msg.append(" (about ");
-        result.msg.append(tools::get_human_readable_timespan(std::chrono::seconds((node_info.requested_unlock_height - curr_height) * TARGET_BLOCK_TIME)));
+        auto hf_version = cryptonote::get_network_version(nettype(), curr_height);
+        result.msg.append(tools::get_human_readable_timespan(std::chrono::seconds((node_info.requested_unlock_height - curr_height) * (hf_version>=cryptonote::network_version_17_pulse?TARGET_BLOCK_TIME_V17:TARGET_BLOCK_TIME))));
         result.msg.append(")");
         return result;
       }
@@ -8641,12 +8644,17 @@ wallet2::request_stake_unlock_result wallet2::can_request_stake_unlock(const cry
           result.msg.append(" other contributors will unlock at the same time.");
       }
       result.msg.append("\n\n");
-
-      uint64_t unlock_height = master_nodes::get_locked_key_image_unlock_height(nettype(), node_info.registration_height, curr_height);
+      std::optional<uint8_t> hf_version = get_hard_fork_version();
+      if (!hf_version)
+      {
+        result.msg    = ERR_MSG_NETWORK_VERSION_QUERY_FAILED;
+        return result;
+      }
+      uint64_t unlock_height = master_nodes::get_locked_key_image_unlock_height(nettype(), node_info.registration_height, curr_height,*hf_version);
       result.msg.append("You will continue receiving rewards until the master node expires at the estimated height: ");
       result.msg.append(std::to_string(unlock_height));
       result.msg.append(" (about ");
-      result.msg.append(tools::get_human_readable_timespan(std::chrono::seconds((unlock_height - curr_height) * TARGET_BLOCK_TIME)));
+      result.msg.append(tools::get_human_readable_timespan(std::chrono::seconds((unlock_height - curr_height) * (*hf_version>=cryptonote::network_version_17_pulse?TARGET_BLOCK_TIME_V17:TARGET_BLOCK_TIME))));
       result.msg.append(")");
 
       if(!tools::hex_to_type(contribution.key_image, unlock.key_image))
@@ -9252,6 +9260,7 @@ void wallet2::get_outs(std::vector<std::vector<tools::wallet2::get_outs_entry>> 
     return;
   }
 
+
   if (fake_outputs_count > 0)
   {
     uint64_t segregation_fork_height = get_segregation_fork_height();
@@ -9260,6 +9269,8 @@ void wallet2::get_outs(std::vector<std::vector<tools::wallet2::get_outs_entry>> 
     if (!m_node_rpc_proxy.get_height(height))
       THROW_WALLET_EXCEPTION(tools::error::no_connection_to_daemon, __func__);
 
+    std::optional<uint8_t> hf_version = get_hard_fork_version();
+    THROW_WALLET_EXCEPTION_IF(!hf_version, error::get_hard_fork_version_error, "Failed to query current hard fork version");
     bool is_shortly_after_segregation_fork = height >= segregation_fork_height && height < segregation_fork_height + SEGREGATION_FORK_VICINITY;
     bool is_after_segregation_fork = height >= segregation_fork_height;
 
@@ -9333,7 +9344,11 @@ void wallet2::get_outs(std::vector<std::vector<tools::wallet2::get_outs_entry>> 
       std::sort(req_t.amounts.begin(), req_t.amounts.end());
       auto end = std::unique(req_t.amounts.begin(), req_t.amounts.end());
       req_t.amounts.resize(std::distance(req_t.amounts.begin(), end));
-      req_t.from_height = std::max<uint64_t>(segregation_fork_height, RECENT_OUTPUT_BLOCKS) - RECENT_OUTPUT_BLOCKS;
+      std::optional<uint8_t> hf_version = get_hard_fork_version();
+      THROW_WALLET_EXCEPTION_IF(!hf_version, error::get_hard_fork_version_error, "Failed to query current hard fork version");
+
+      uint64_t recent_output_blocks = BLOCKS_EXPECTED_IN_DAYS(RECENT_OUTPUT_DAYS,*hf_version);
+      req_t.from_height = std::max<uint64_t>(segregation_fork_height, recent_output_blocks) - recent_output_blocks;
       req_t.to_height = segregation_fork_height + 1;
       req_t.cumulative = true;
       req_t.binary = true;
@@ -9354,11 +9369,11 @@ void wallet2::get_outs(std::vector<std::vector<tools::wallet2::get_outs_entry>> 
           {
             THROW_WALLET_EXCEPTION_IF(d.data.start_height > segregation_fork_height, error::get_output_distribution, "Distribution start_height too high");
             THROW_WALLET_EXCEPTION_IF(segregation_fork_height - d.data.start_height >= d.data.distribution.size(), error::get_output_distribution, "Distribution size too small");
-            THROW_WALLET_EXCEPTION_IF(segregation_fork_height - RECENT_OUTPUT_BLOCKS - d.data.start_height >= d.data.distribution.size(), error::get_output_distribution, "Distribution size too small");
-            THROW_WALLET_EXCEPTION_IF(segregation_fork_height <= RECENT_OUTPUT_BLOCKS, error::wallet_internal_error, "Fork height too low");
-            THROW_WALLET_EXCEPTION_IF(segregation_fork_height - RECENT_OUTPUT_BLOCKS < d.data.start_height, error::get_output_distribution, "Bad start height");
+            THROW_WALLET_EXCEPTION_IF(segregation_fork_height - recent_output_blocks - d.data.start_height >= d.data.distribution.size(), error::get_output_distribution, "Distribution size too small");
+            THROW_WALLET_EXCEPTION_IF(segregation_fork_height <= recent_output_blocks, error::wallet_internal_error, "Fork height too low");
+            THROW_WALLET_EXCEPTION_IF(segregation_fork_height - recent_output_blocks < d.data.start_height, error::get_output_distribution, "Bad start height");
             uint64_t till_fork = d.data.distribution[segregation_fork_height - d.data.start_height];
-            uint64_t recent = till_fork - d.data.distribution[segregation_fork_height - RECENT_OUTPUT_BLOCKS - d.data.start_height];
+            uint64_t recent = till_fork - d.data.distribution[segregation_fork_height - recent_output_blocks - d.data.start_height];
             segregation_limit[amount] = std::make_pair(till_fork, recent);
             found = true;
             break;
@@ -9378,7 +9393,7 @@ void wallet2::get_outs(std::vector<std::vector<tools::wallet2::get_outs_entry>> 
 
     std::unique_ptr<gamma_picker> gamma;
     if (has_rct_distribution)
-      gamma.reset(new gamma_picker(rct_offsets));
+      gamma.reset(new gamma_picker(rct_offsets,*hf_version));
 
     size_t num_selected_transfers = 0;
     for(size_t idx: selected_transfers)
@@ -12983,7 +12998,9 @@ uint64_t wallet2::get_approximate_blockchain_height() const
 {
   const auto& netconf = cryptonote::get_config(m_nettype);
   const time_t since_ts = time(nullptr) - netconf.HEIGHT_ESTIMATE_TIMESTAMP;
-  uint64_t approx_blockchain_height = netconf.HEIGHT_ESTIMATE_HEIGHT + (since_ts > 0 ? (uint64_t)since_ts / tools::to_seconds(TARGET_BLOCK_TIME) : 0) - BLOCKS_EXPECTED_IN_DAYS(7); // subtract a week's worth of blocks to be conservative
+  std::optional<uint8_t> hf_version = get_hard_fork_version();
+  THROW_WALLET_EXCEPTION_IF(!hf_version, error::get_hard_fork_version_error, "Failed to query current hard fork version");
+  uint64_t approx_blockchain_height = netconf.HEIGHT_ESTIMATE_HEIGHT + (since_ts > 0 ? (uint64_t)since_ts / tools::to_seconds((*hf_version>=cryptonote::network_version_17_pulse?TARGET_BLOCK_TIME_V17:TARGET_BLOCK_TIME)) : 0) - BLOCKS_EXPECTED_IN_DAYS(7,*hf_version); // subtract a week's worth of blocks to be conservative
   LOG_PRINT_L2("Calculated blockchain height: " << approx_blockchain_height);
   return approx_blockchain_height;
 }
