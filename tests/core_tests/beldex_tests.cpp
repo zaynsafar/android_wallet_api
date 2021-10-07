@@ -1200,7 +1200,7 @@ bool beldex_name_system_get_mappings_by_owner::generate(std::vector<test_event_e
     for (int i = 0; i < 6; i++)
       txs.push_back(gen.create_and_add_tx(miner, bob.get_keys().m_account_address, MK_COINS(100)));
     gen.create_and_add_next_block(std::move(txs));
-    gen.add_transfer_unlock_blocks();
+    gen.add_transfer_unlock_blocks(gen.hardfork());
   }
 
   bns_keys_t bob_key = make_bns_keys(bob);
@@ -1313,7 +1313,7 @@ bool beldex_name_system_get_mappings_by_owners::generate(std::vector<test_event_
     gen.add_mined_money_unlock_blocks();
     cryptonote::transaction transfer = gen.create_and_add_tx(miner, bob.get_keys().m_account_address, MK_COINS(400));
     gen.create_and_add_next_block({transfer});
-    gen.add_transfer_unlock_blocks();
+    gen.add_transfer_unlock_blocks(gen.hardfork());
   }
 
   bns_keys_t bob_key   = make_bns_keys(bob);
@@ -1384,7 +1384,7 @@ bool beldex_name_system_get_mappings::generate(std::vector<test_event_entry> &ev
 
     cryptonote::transaction transfer = gen.create_and_add_tx(miner, bob.get_keys().m_account_address, MK_COINS(400));
     gen.create_and_add_next_block({transfer});
-    gen.add_transfer_unlock_blocks();
+    gen.add_transfer_unlock_blocks(gen.hardfork());
   }
 
   bns_keys_t bob_key = make_bns_keys(bob);
@@ -1424,7 +1424,7 @@ bool beldex_name_system_handles_duplicate_in_bns_db::generate(std::vector<test_e
 
   cryptonote::transaction transfer = gen.create_and_add_tx(miner, bob.get_keys().m_account_address, MK_COINS(400));
   gen.create_and_add_next_block({transfer});
-  gen.add_transfer_unlock_blocks();
+  gen.add_transfer_unlock_blocks(gen.hardfork());
 
   bns_keys_t miner_key     = make_bns_keys(miner);
   bns_keys_t bob_key       = make_bns_keys(bob);
@@ -1502,7 +1502,7 @@ bool beldex_name_system_handles_duplicate_in_tx_pool::generate(std::vector<test_
 
     cryptonote::transaction transfer = gen.create_and_add_tx(miner, bob.get_keys().m_account_address, MK_COINS(400));
     gen.create_and_add_next_block({transfer});
-    gen.add_transfer_unlock_blocks();
+    gen.add_transfer_unlock_blocks(gen.hardfork());
   }
 
   bns_keys_t bob_key       = make_bns_keys(bob);
@@ -1669,7 +1669,7 @@ bool beldex_name_system_large_reorg::generate(std::vector<test_event_entry> &eve
 
     cryptonote::transaction transfer = gen.create_and_add_tx(miner, bob.get_keys().m_account_address, MK_COINS(400));
     gen.create_and_add_next_block({transfer});
-    gen.add_transfer_unlock_blocks();
+    gen.add_transfer_unlock_blocks(gen.hardfork());
   }
 
   // NOTE: Generate the first round of ONS transactions belonging to miner
@@ -2706,7 +2706,7 @@ bool beldex_master_nodes_gen_nodes::generate(std::vector<test_event_entry> &even
 
   const auto tx0 = gen.create_and_add_tx(miner, alice.get_keys().m_account_address, MK_COINS(101));
   gen.create_and_add_next_block({tx0});
-  gen.add_transfer_unlock_blocks();
+  gen.add_transfer_unlock_blocks(gen.hardfork());
 
   const auto reg_tx = gen.create_and_add_registration_tx(alice);
   gen.create_and_add_next_block({reg_tx});

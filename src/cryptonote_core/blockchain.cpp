@@ -2386,11 +2386,13 @@ uint64_t Blockchain::get_num_mature_outputs(uint64_t amount) const
   // ensure we don't include outputs that aren't yet eligible to be used
   // outpouts are sorted by height
   const uint64_t blockchain_height = m_db->height();
+
   while (num_outs > 0)
   {
     const tx_out_index toi = m_db->get_output_tx_and_index(amount, num_outs - 1);
     const uint64_t height = m_db->get_tx_block_height(toi.first);
-    if (height + CRYPTONOTE_DEFAULT_TX_SPENDABLE_AGE <= blockchain_height)
+    const uint8_t hf_version = get_network_version(height);
+    if ((height + (hf_version>=cryptonote::network_version_17_pulse?CRYPTONOTE_DEFAULT_TX_SPENDABLE_AGE_V17:CRYPTONOTE_DEFAULT_TX_SPENDABLE_AGE) )<= blockchain_height)
       break;
     --num_outs;
   }
@@ -3357,7 +3359,8 @@ bool Blockchain::check_tx_inputs(transaction& tx, tx_verification_context &tvc, 
 	
     if (hf_version >= HF_VERSION_ENFORCE_MIN_AGE)
     {
-      CHECK_AND_ASSERT_MES(*pmax_used_block_height + CRYPTONOTE_DEFAULT_TX_SPENDABLE_AGE <= m_db->height(),
+      const uint8_t spendable_age = (hf_version>=cryptonote::network_version_17_pulse?CRYPTONOTE_DEFAULT_TX_SPENDABLE_AGE_V17:CRYPTONOTE_DEFAULT_TX_SPENDABLE_AGE);
+      CHECK_AND_ASSERT_MES((*pmax_used_block_height + spendable_age) <= m_db->height(),
           false, "Transaction spends at least one output which is too young");
     }
 if (tx.version >= cryptonote::txversion::v2_ringct)
@@ -5463,9 +5466,9 @@ void Blockchain::safesyncmode(const bool onoff)
   }
 }
 
-std::map<uint64_t, std::tuple<uint64_t, uint64_t, uint64_t>> Blockchain:: get_output_histogram(const std::vector<uint64_t> &amounts, bool unlocked, uint64_t recent_cutoff, uint64_t min_count) const
+std::map<uint64_t, std::tuple<uint64_t, uint64_t, uint64_t>> Blockchain:: get_output_histogram(const std::vector<uint64_t> &amounts, bool unlocked, uint64_t recent_cutoff, uint64_t min_count,cryptonote::network_type nettype) const
 {
-  return m_db->get_output_histogram(amounts, unlocked, recent_cutoff, min_count);
+  return m_db->get_output_histogram(amounts, unlocked, recent_cutoff, min_count,nettype);
 }
 
 std::vector<std::pair<Blockchain::block_extended_info,std::vector<crypto::hash>>> Blockchain::get_alternative_chains() const

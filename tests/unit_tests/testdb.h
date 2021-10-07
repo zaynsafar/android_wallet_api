@@ -143,7 +143,7 @@ public:
   virtual void check_hard_fork_info() override {}
   virtual void drop_hard_fork_info() override {}
 
-  virtual std::map<uint64_t, std::tuple<uint64_t, uint64_t, uint64_t>> get_output_histogram(const std::vector<uint64_t> &amounts, bool unlocked, uint64_t recent_cutoff, uint64_t min_count) const override { return std::map<uint64_t, std::tuple<uint64_t, uint64_t, uint64_t>>(); }
+  virtual std::map<uint64_t, std::tuple<uint64_t, uint64_t, uint64_t>> get_output_histogram(const std::vector<uint64_t> &amounts, bool unlocked, uint64_t recent_cutoff, uint64_t min_count,cryptonote::network_type nettype) const override { return std::map<uint64_t, std::tuple<uint64_t, uint64_t, uint64_t>>(); }
   virtual bool get_output_distribution(uint64_t amount, uint64_t from_height, uint64_t to_height, std::vector<uint64_t> &distribution, uint64_t &base) const override { return false; }
   virtual bool is_read_only() const override { return false; }
   virtual uint64_t get_database_size() const override { return 0; }

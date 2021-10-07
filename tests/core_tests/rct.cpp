@@ -528,5 +528,5 @@ bool gen_rct_tx_uses_output_too_early::generate(std::vector<test_event_entry>& e
   const int out_idx[] = {1, -1};
   const uint64_t amount_paid = 10000;
   const rct::RCTConfig rct_config { rct::RangeProofType::PaddedBulletproof, 2 };
-  return generate_with_full(events, out_idx, mixin, amount_paid, CRYPTONOTE_DEFAULT_TX_SPENDABLE_AGE-3, HF_VERSION_ENFORCE_MIN_AGE, rct_config, false, NULL, NULL);
+  return generate_with_full(events, out_idx, mixin, amount_paid, CRYPTONOTE_DEFAULT_TX_SPENDABLE_AGE-1, HF_VERSION_ENFORCE_MIN_AGE, rct_config, false, NULL, NULL);
 }

@@ -317,9 +317,9 @@ void beldex_chain_generator::add_mined_money_unlock_blocks()
   add_n_blocks(CRYPTONOTE_MINED_MONEY_UNLOCK_WINDOW);
 }
 
-void beldex_chain_generator::add_transfer_unlock_blocks()
+void beldex_chain_generator::add_transfer_unlock_blocks(uint8_t hf_version)
 {
-  add_n_blocks(CRYPTONOTE_DEFAULT_TX_SPENDABLE_AGE);
+  add_n_blocks((hf_version>=cryptonote::network_version_17_pulse?CRYPTONOTE_DEFAULT_TX_SPENDABLE_AGE_V17:CRYPTONOTE_DEFAULT_TX_SPENDABLE_AGE));
 }
 
 void beldex_chain_generator::add_tx(cryptonote::transaction const &tx, bool can_be_added_to_blockchain, std::string const &fail_msg, bool kept_by_block)

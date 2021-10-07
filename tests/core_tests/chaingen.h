@@ -1459,7 +1459,7 @@ struct beldex_chain_generator
   bool                                                 add_blocks_until_next_checkpointable_height();
   void                                                 add_master_node_checkpoint(uint64_t block_height, size_t num_votes);
   void                                                 add_mined_money_unlock_blocks(); // NOTE: Unlock all Loki generated from mining prior to this call i.e. CRYPTONOTE_MINED_MONEY_UNLOCK_WINDOW
-  void                                                 add_transfer_unlock_blocks(); // Unlock funds from (standard) transfers prior to this call, i.e. CRYPTONOTE_DEFAULT_TX_SPENDABLE_AGE
+  void                                                 add_transfer_unlock_blocks(uint8_t hf_version); // Unlock funds from (standard) transfers prior to this call, i.e. CRYPTONOTE_DEFAULT_TX_SPENDABLE_AGE
 
   // NOTE: Add an event that is just a user specified message to signify progress in the test
   void                                                 add_event_msg(std::string const &msg) { events_.push_back(msg); }
