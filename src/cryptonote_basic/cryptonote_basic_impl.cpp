@@ -139,7 +139,7 @@ namespace cryptonote {
     static_assert(TARGET_BLOCK_TIME_V17 % 1 == 0s, "difficulty targets must be a multiple of 60");
 
     uint64_t base_reward =
-      version >= network_version_18 ? BLOCK_REWARD_HF18 :
+      version >= network_version_17_pulse ? BLOCK_REWARD_HF17_PULSE :
       version >= network_version_16_bns ? BLOCK_REWARD_HF16 :
         block_reward_unpenalized_formula_v7(version, already_generated_coins, height);
 

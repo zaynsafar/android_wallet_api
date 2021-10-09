@@ -135,12 +135,38 @@ namespace cryptonote
 
   uint64_t governance_reward_formula(uint64_t base_reward, uint8_t hf_version)
   {
-    return 0;// NO governance planned
+    return hf_version >= network_version_17_pulse ? FOUNDATION_REWARD_HF17 : FOUNDATION_REWARD_HF16;// governance planned at V17
   }
   
   uint64_t derive_governance_from_block_reward(network_type nettype, const cryptonote::block &block, uint8_t hf_version)
   {
-    return 0;
+    if (hf_version >= network_version_17_pulse)
+      return governance_reward_formula(0, hf_version);
+    uint64_t result       = 0;
+    uint64_t mnode_reward = 0;
+    size_t vout_end     = block.miner_tx.vout.size();
+    if (block_has_governance_output(nettype, block))
+      --vout_end; // skip the governance output, the governance may be the batched amount. we want the original base reward
+
+    for (size_t vout_index = 1; vout_index < vout_end; ++vout_index)
+    {
+      tx_out const &output = block.miner_tx.vout[vout_index];
+      mnode_reward += output.amount;
+    }
+    uint64_t base_reward  = mnode_reward * 2; 
+    uint64_t governance   = governance_reward_formula(base_reward, hf_version);
+    uint64_t block_reward = base_reward - governance;
+
+    uint64_t actual_reward = 0; // sanity check
+    for (tx_out const &output : block.miner_tx.vout) actual_reward += output.amount;
+
+    CHECK_AND_ASSERT_MES(block_reward <= actual_reward, false,
+        "Rederiving the base block reward from the master node reward "
+        "exceeded the actual amount paid in the block, derived block reward: "
+        << block_reward << ", actual reward: " << actual_reward);
+
+    result = governance;
+    return result;  
   }  
 
   bool block_has_governance_output(network_type nettype, cryptonote::block const &block)
@@ -151,15 +177,21 @@ namespace cryptonote
 
   bool height_has_governance_output(network_type nettype, uint8_t hard_fork_version, uint64_t height)
   {
+    if (hard_fork_version < network_version_17_pulse)
+      return false;
 
-    return false; // No governance planned
+    if (height % cryptonote::get_config(nettype).GOVERNANCE_REWARD_INTERVAL_IN_BLOCKS != 0)
+    {
+      return false;
+    }
+    return true;  
   }
 
   
   uint64_t master_node_reward_formula(uint64_t base_reward, uint8_t hard_fork_version)
   {
     return
-      hard_fork_version >= network_version_17_pulse          ? BLOCK_REWARD_HF17 :
+      hard_fork_version >= network_version_17_pulse          ? MN_REWARD_HF17_PULSE :
       hard_fork_version >= network_version_11_infinite_staking ? (base_reward / 10) * (MASTER_NODE_BASE_REWARD_PERCENTAGE/10) : // 90% of base reward up until HF15's fixed payout
       0;
   }
@@ -360,10 +392,14 @@ namespace cryptonote
     }
 
     // NOTE: Add Governance Payout
-    if (already_generated_coins != 0)
+    if (hard_fork_version >= network_version_17_pulse && already_generated_coins != 0)
     {
-      if (hard_fork_version >= network_version_10_bulletproofs && reward_parts.governance_paid != 0)
-      {        
+      if (reward_parts.governance_paid == 0)
+      {
+        CHECK_AND_ASSERT_MES(hard_fork_version >= network_version_17_pulse, false, "Governance reward can NOT be 0 before hardfork 17, hard_fork_version: " << hard_fork_version);
+      }
+      else
+      {
         const network_type nettype = miner_tx_context.nettype;
         cryptonote::address_parse_info governance_wallet_address;
         cryptonote::get_account_address_from_str(governance_wallet_address, nettype, cryptonote::get_config(nettype).governance_wallet_address(hard_fork_version));

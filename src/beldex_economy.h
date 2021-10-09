@@ -10,8 +10,10 @@ constexpr uint64_t EMISSION_DIVISOR           = 2000000;
 
 // HF15 money supply parameters:
 constexpr uint64_t BLOCK_REWARD_HF16      = 2 * COIN;
+constexpr uint64_t BLOCK_REWARD_HF17_PULSE= 10 *COIN;
 constexpr uint64_t MINER_REWARD_HF16      = BLOCK_REWARD_HF16 * 10 / 100; // Only until HF16
 constexpr uint64_t MN_REWARD_HF16         = BLOCK_REWARD_HF16 * 90 / 100;
+constexpr uint64_t MN_REWARD_HF17_PULSE   = BLOCK_REWARD_HF17_PULSE * 62.5 / 100; // After HF17 MN_REWARD changed about 6.25 BDX for each Block
 constexpr uint64_t FOUNDATION_REWARD_HF16 = 0;
 
 // HF16+ money supply parameters: same as HF16 except the miner fee goes away and is redirected to
@@ -20,6 +22,7 @@ constexpr uint64_t FOUNDATION_REWARD_HF16 = 0;
 // after 6 months.
 constexpr uint64_t BLOCK_REWARD_HF17        = BLOCK_REWARD_HF16;
 constexpr uint64_t CHAINFLIP_LIQUIDITY_HF17 = BLOCK_REWARD_HF16 * 10 / 100;
+constexpr uint64_t FOUNDATION_REWARD_HF17   = BLOCK_REWARD_HF17_PULSE * 37.5 /100; //governance reward 3.75 BDX after HF17
 
 // HF17: at most 6 months after HF16.  This is tentative and will likely be replaced before the
 // actual HF with a new reward schedule including Chainflip rewards, but as per the LRC linked
@@ -29,6 +32,7 @@ constexpr uint64_t BLOCK_REWARD_HF18      = 1'800'000'000;
 constexpr uint64_t FOUNDATION_REWARD_HF18 = 0;
                                              
 static_assert(MINER_REWARD_HF16        + MN_REWARD_HF16 + FOUNDATION_REWARD_HF16 == BLOCK_REWARD_HF16);
+static_assert(MN_REWARD_HF17_PULSE     + FOUNDATION_REWARD_HF17                  == BLOCK_REWARD_HF17_PULSE);
 static_assert(CHAINFLIP_LIQUIDITY_HF17 + MN_REWARD_HF16 + FOUNDATION_REWARD_HF16 == BLOCK_REWARD_HF17);
 static_assert(                           MN_REWARD_HF16 + FOUNDATION_REWARD_HF18 == BLOCK_REWARD_HF18);
 

@@ -2460,7 +2460,7 @@ namespace master_nodes
     }
     else
     {
-      if ((reward_parts.base_miner + reward_parts.miner_fee) > 0) // (HF >= 16) this can be zero, no miner coinbase.
+      if ((reward_parts.base_miner + reward_parts.miner_fee) > 0) // (HF >= 17) this can be zero, no miner coinbase.
         expected_vouts_size += 1; /*miner*/
     }
 
