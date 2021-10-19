@@ -960,12 +960,10 @@ bool beldex_chain_generator::block_begin(beldex_blockchain_entry &entry, beldex_
 
     static_assert(cryptonote::network_version_count == cryptonote::network_version_18 + 1,
             "The code below needs to be updated to support higher hard fork versions");
-    if (blk.major_version == cryptonote::network_version_16_bns)
-      miner_tx_context.batched_governance = FOUNDATION_REWARD_HF16 * num_blocks;
-    else if (blk.major_version == cryptonote::network_version_17_pulse)
-      miner_tx_context.batched_governance = (FOUNDATION_REWARD_HF16 + CHAINFLIP_LIQUIDITY_HF17) * num_blocks;
-    else if (blk.major_version >= cryptonote::network_version_18 && blk.major_version <= cryptonote::network_version_18)
-      miner_tx_context.batched_governance = FOUNDATION_REWARD_HF18 * num_blocks;
+    if (blk.major_version <= cryptonote::network_version_16_bns)
+      miner_tx_context.batched_governance = 0;
+    else if (blk.major_version >= cryptonote::network_version_17_pulse)
+      miner_tx_context.batched_governance = (FOUNDATION_REWARD_HF17) * num_blocks;
     else
     {
       for (int i = (int)get_block_height(params.prev.block), count = 0;

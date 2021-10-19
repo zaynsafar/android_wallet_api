@@ -135,7 +135,7 @@ namespace cryptonote
 
   uint64_t governance_reward_formula(uint64_t base_reward, uint8_t hf_version)
   {
-    return hf_version >= network_version_17_pulse ? FOUNDATION_REWARD_HF17 : FOUNDATION_REWARD_HF16;// governance planned at V17
+    return hf_version >= network_version_17_pulse ? FOUNDATION_REWARD_HF17 : 0;// governance planned at V17
   }
   
   uint64_t derive_governance_from_block_reward(network_type nettype, const cryptonote::block &block, uint8_t hf_version)

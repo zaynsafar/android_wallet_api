@@ -5009,11 +5009,9 @@ bool Blockchain::calc_batched_governance_reward(uint64_t height, uint64_t &rewar
   size_t num_blocks = cryptonote::get_config(nettype()).GOVERNANCE_REWARD_INTERVAL_IN_BLOCKS;
 
   // governance reward starting at HF17
-  if (hard_fork_version > network_version_16_bns)
+  if (hard_fork_version >= network_version_17_pulse)
   {
-    reward = num_blocks * (
-        hard_fork_version >= network_version_18 ? FOUNDATION_REWARD_HF18 :
-        hard_fork_version >= network_version_17_pulse ? FOUNDATION_REWARD_HF17 : FOUNDATION_REWARD_HF16);
+   reward = num_blocks * FOUNDATION_REWARD_HF17;
     return true;
   }
 
