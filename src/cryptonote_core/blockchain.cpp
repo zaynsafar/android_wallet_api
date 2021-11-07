@@ -1324,9 +1324,9 @@ bool Blockchain::validate_miner_transaction(const block& b, size_t cumulative_bl
 
   if (already_generated_coins != 0 && block_has_governance_output(nettype(), b))
   {
-    if (version >= network_version_10_bulletproofs && reward_parts.governance_paid == 0)
+    if (version >= network_version_17_pulse && reward_parts.governance_paid == 0)
     {
-      MERROR("Governance reward should not be 0 after hardfork v10 if this height has a governance output because it is the batched payout height");
+      MERROR("Governance reward should not be 0 after hardfork v17 if this height has a governance output because it is the batched payout height");
       return false;
     }
 
@@ -5008,13 +5008,10 @@ bool Blockchain::calc_batched_governance_reward(uint64_t height, uint64_t &rewar
 
   size_t num_blocks = cryptonote::get_config(nettype()).GOVERNANCE_REWARD_INTERVAL_IN_BLOCKS;
 
-  // Fixed reward starting at HF15
-  if (hard_fork_version >= network_version_16_bns)
+  // governance reward starting at HF17
+  if (hard_fork_version >= network_version_17_pulse)
   {
-    reward = num_blocks * (
-        hard_fork_version >= network_version_18 ? FOUNDATION_REWARD_HF18 :
-        hard_fork_version >= network_version_17_pulse ? FOUNDATION_REWARD_HF16 + CHAINFLIP_LIQUIDITY_HF17 :
-        FOUNDATION_REWARD_HF16);
+   reward = num_blocks * FOUNDATION_REWARD_HF17;
     return true;
   }
 
