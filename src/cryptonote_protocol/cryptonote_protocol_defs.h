@@ -240,14 +240,29 @@ namespace cryptonote
       
       KV_MAP_SERIALIZABLE
     };
-  }; 
+  };
 
+    /************************************************************************/
+    /*                                                                      */
+    /************************************************************************/
+    struct NOTIFY_UPTIME_PROOF_V12
+    {
+        const static int ID = BC_COMMANDS_POOL_BASE + 11;
+        struct request
+        {
+            std::array<uint16_t, 3> mnode_version;
+            uint64_t timestamp;
+            crypto::public_key pubkey;
+            crypto::signature sig;
+            KV_MAP_SERIALIZABLE
+        };
+    };
   /************************************************************************/
   /*                                                                      */
   /************************************************************************/
   struct NOTIFY_UPTIME_PROOF
   {
-    const static int ID = BC_COMMANDS_POOL_BASE + 11;
+    const static int ID = BC_COMMANDS_POOL_BASE + 17; //todo switch back to +11 after V12
 
     struct request
     {
@@ -266,6 +281,7 @@ namespace cryptonote
       KV_MAP_SERIALIZABLE
     };
   };
+
 
   /************************************************************************/
   /*                                                                      */

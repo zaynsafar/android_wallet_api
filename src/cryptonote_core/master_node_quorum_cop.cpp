@@ -46,9 +46,9 @@
 
 namespace master_nodes
 {
-  std::optional<std::vector<std::string_view>> master_node_test_results::why() const
+  std::optional<std::vector<std::string_view>> master_node_test_results::why(bool v12) const
   {
-    if (passed())
+    if (passed(v12))
       return std::nullopt;
 
     std::vector<std::string_view> results{{"Master Node is currently failing the following tests:"sv}};
@@ -125,57 +125,56 @@ namespace master_nodes
       result.uptime_proved = false;
     }
 
-    if (!ss_reachable)
-    {
-      LOG_PRINT_L1("Master Node storage server is not reachable for node: " << pubkey);
-      result.storage_server_reachable = false;
-    }
 
-    // TODO: perhaps come back and make this activate on some "soft fork" height before HF19?
-    if (!beldexnet_reachable && hf_version >= cryptonote::network_version_18)
-    {
-      LOG_PRINT_L1("Master Node beldexnet is not reachable for node: " << pubkey);
-      result.beldexnet_reachable = false;
-    }
 
-    // IP change checks
-    if (ips[0].first && ips[1].first) {
-      // Figure out when we last had a blockchain-level IP change penalty (or when we registered);
-      // we only consider IP changes starting two hours after the last IP penalty.
-      std::vector<cryptonote::block> blocks;
-      if (m_core.get_blocks(info.last_ip_change_height, 1, blocks)) {
-        uint64_t find_ips_used_since = std::max(
-            uint64_t(std::time(nullptr)) - std::chrono::seconds{IP_CHANGE_WINDOW}.count(),
-            uint64_t(blocks[0].timestamp) + std::chrono::seconds{IP_CHANGE_BUFFER}.count());
-        if (ips[0].second > find_ips_used_since && ips[1].second > find_ips_used_since)
-          result.single_ip = false;
-      }
-    }
+    if (hf_version > cryptonote::network_version_12_security_signature) {
 
-    if (!info.is_decommissioned())
-    {
-      if (check_checkpoint_obligation && !checkpoint_participation.check_participation(CHECKPOINT_MAX_MISSABLE_VOTES) )
-      {
-        LOG_PRINT_L1("Master Node: " << pubkey << ", failed checkpoint obligation check");
-        result.checkpoint_participation = false;
-      }
+        if (!ss_reachable)
+        {
+            LOG_PRINT_L1("Master Node storage server is not reachable for node: " << pubkey);
+            result.storage_server_reachable = false;
+        }
+        // TODO: perhaps come back and make this activate on some "soft fork" height before HF19?
+        if (!beldexnet_reachable && hf_version >= cryptonote::network_version_18) {
+            LOG_PRINT_L1("Master Node beldexnet is not reachable for node: " << pubkey);
+            result.beldexnet_reachable = false;
+        }
 
-      if (!pulse_participation.check_participation(PULSE_MAX_MISSABLE_VOTES) )
-      {
-        LOG_PRINT_L1("Master Node: " << pubkey << ", failed pulse obligation check");
-        result.pulse_participation = false;
-      }
+        // IP change checks
+        if (ips[0].first && ips[1].first) {
+            // Figure out when we last had a blockchain-level IP change penalty (or when we registered);
+            // we only consider IP changes starting two hours after the last IP penalty.
+            std::vector<cryptonote::block> blocks;
+            if (m_core.get_blocks(info.last_ip_change_height, 1, blocks)) {
+                uint64_t find_ips_used_since = std::max(
+                        uint64_t(std::time(nullptr)) - std::chrono::seconds{IP_CHANGE_WINDOW}.count(),
+                        uint64_t(blocks[0].timestamp) + std::chrono::seconds{IP_CHANGE_BUFFER}.count());
+                if (ips[0].second > find_ips_used_since && ips[1].second > find_ips_used_since)
+                    result.single_ip = false;
+            }
+        }
 
-      if (!timestamp_participation.check_participation(TIMESTAMP_MAX_MISSABLE_VOTES) )
-      {
-        LOG_PRINT_L1("Master Node: " << pubkey << ", failed timestamp obligation check");
-        result.timestamp_participation = false;
-      }
-      if (!timesync_status.check_participation(TIMESYNC_MAX_UNSYNCED_VOTES) )
-      {
-        LOG_PRINT_L1("Master Node: " << pubkey << ", failed timesync obligation check");
-        result.timesync_status = false;
-      }
+        if (!info.is_decommissioned()) {
+            if (check_checkpoint_obligation &&
+                !checkpoint_participation.check_participation(CHECKPOINT_MAX_MISSABLE_VOTES)) {
+                LOG_PRINT_L1("Master Node: " << pubkey << ", failed checkpoint obligation check");
+                result.checkpoint_participation = false;
+            }
+
+            if (!pulse_participation.check_participation(PULSE_MAX_MISSABLE_VOTES)) {
+                LOG_PRINT_L1("Master Node: " << pubkey << ", failed pulse obligation check");
+                result.pulse_participation = false;
+            }
+
+            if (!timestamp_participation.check_participation(TIMESTAMP_MAX_MISSABLE_VOTES)) {
+                LOG_PRINT_L1("Master Node: " << pubkey << ", failed timestamp obligation check");
+                result.timestamp_participation = false;
+            }
+            if (!timesync_status.check_participation(TIMESYNC_MAX_UNSYNCED_VOTES)) {
+                LOG_PRINT_L1("Master Node: " << pubkey << ", failed timesync obligation check");
+                result.timesync_status = false;
+            }
+        }
     }
 
 
@@ -359,7 +358,7 @@ namespace master_nodes
                   continue;
 
                 auto test_results = check_master_node(obligations_height_hf_version, node_key, info);
-                bool passed       = test_results.passed();
+                bool passed       = test_results.passed(hf_version==cryptonote::network_version_12_security_signature);
 
                 new_state vote_for_state;
                 uint16_t reason = 0;
@@ -441,7 +440,7 @@ namespace master_nodes
                   tested_myself_once_per_block = true;
                   auto my_test_results = check_master_node(obligations_height_hf_version, my_keys.pub, info);
                   const bool print_failings = info.is_decommissioned() ||
-                    (info.is_active() && !my_test_results.passed() &&
+                    (info.is_active() && !my_test_results.passed(hf_version==cryptonote::network_version_12_security_signature) &&
                       // Don't warn uptime proofs if the daemon is just recently started and is candidate for testing (i.e. restarting the daemon)
                       (my_test_results.uptime_proved || live_time >= 1h));
 
@@ -452,7 +451,7 @@ namespace master_nodes
                           ? "Master Node (yours) is currently decommissioned and being tested in quorum: "
                           : "Master Node (yours) is active but is not passing tests for quorum: ")
                         << m_obligations_height);
-                    if (auto why = my_test_results.why())
+                    if (auto why = my_test_results.why(hf_version==cryptonote::network_version_12_security_signature))
                       LOG_PRINT_L0(tools::join("\n", *why));
                     else
                       LOG_PRINT_L0("Master Node is passing all local tests");

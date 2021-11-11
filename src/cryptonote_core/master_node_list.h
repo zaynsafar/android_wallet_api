@@ -185,11 +185,12 @@ namespace master_nodes
     // Derived from pubkey_ed25519, not serialized
     crypto::x25519_public_key pubkey_x25519 = crypto::x25519_public_key::null();
 
-    // Updates pubkey_ed25519 to the given key, re-deriving the x25519 key if it actually changes
+              // Updates pubkey_ed25519 to the given key, re-deriving the x25519 key if it actually changes
     // (does nothing if the key is the same as the current value).  If x25519 derivation fails then
     // both pubkeys are set to null.
     void update_pubkey(const crypto::ed25519_public_key &pk);
 
+    bool update_v12(uint64_t ts);
     // Called to update data received from a proof is received, updating values in the local object.
     // Returns true if serializable data is changed (in which case `store()` should be called).
     // Note that this does not update the m_x25519_to_pub map if the x25519 key changes (that's the
@@ -547,20 +548,26 @@ namespace master_nodes
     void set_quorum_history_storage(uint64_t hist_size); // 0 = none (default), 1 = unlimited, N = # of blocks
     bool store();
 
+    //TODO: remove after HF12
+    crypto::hash hash_uptime_proof_v12(const cryptonote::NOTIFY_UPTIME_PROOF_V12::request &proof) const;
     //TODO: remove after HF18
     crypto::hash hash_uptime_proof(const cryptonote::NOTIFY_UPTIME_PROOF::request &proof) const;
 
+    //TODO: remove after HF12
+    cryptonote::NOTIFY_UPTIME_PROOF_V12::request generate_uptime_proof_v12() const;
     /// Record public ip and storage port and add them to the master node list
     //TODO: remove after HF18
     cryptonote::NOTIFY_UPTIME_PROOF::request generate_uptime_proof(uint32_t public_ip,
                                                                    uint16_t storage_https_port,
                                                                    uint16_t storage_omq_port,
                                                                    uint16_t quorumnet_port) const;
-    
+
     uptime_proof::Proof generate_uptime_proof(uint32_t public_ip, uint16_t storage_port, uint16_t storage_omq_port, std::array<uint16_t, 3> ss_version, uint16_t quorumnet_port, std::array<uint16_t, 3> beldexnet_version) const;
 
+    bool handle_uptime_proof_v12(const cryptonote::NOTIFY_UPTIME_PROOF_V12::request &proof, bool &my_uptime_proof_confirmation, crypto::public_key &pubkey);
     //TODO: remove after HF18
     bool handle_uptime_proof(cryptonote::NOTIFY_UPTIME_PROOF::request const &proof, bool &my_uptime_proof_confirmation, crypto::x25519_public_key &x25519_pkey);
+
 
     bool handle_btencoded_uptime_proof(std::unique_ptr<uptime_proof::Proof> proof, bool &my_uptime_proof_confirmation, crypto::x25519_public_key &x25519_pkey);
 
