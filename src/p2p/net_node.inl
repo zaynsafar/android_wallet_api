@@ -610,8 +610,8 @@ namespace nodetool
     std::set<std::string> full_addrs;
     if (nettype == cryptonote::TESTNET)
     {
-		full_addrs.insert("35.178.92.132:29090");
-        full_addrs.insert("18.144.13.220:29090");
+		full_addrs.insert("test1.rpcnode.stream:29090");
+        full_addrs.insert("test2.rpcnode.stream:29090");
     }
     else if (nettype == cryptonote::DEVNET)
     {
@@ -624,11 +624,11 @@ namespace nodetool
     }
     else
     {
-      full_addrs.insert("34.85.44.103:19090");
-      full_addrs.insert("35.211.123.115:19090");
-      full_addrs.insert("35.228.216.218:19090");
-      full_addrs.insert("35.228.9.140:19090");
-      full_addrs.insert("35.229.161.161:19090");
+      full_addrs.insert("seed1.beldex.io:19090");
+      full_addrs.insert("seed2.rpcnode.stream:19090");
+      full_addrs.insert("seed3.beldex.io:19090");
+      full_addrs.insert("seed4.rpcnode.stream:19090");
+      full_addrs.insert("seed5.beldex.io:19090");
     }
     return full_addrs;
   }

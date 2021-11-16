@@ -242,8 +242,8 @@ namespace config
   inline constexpr uint64_t GOVERNANCE_REWARD_INTERVAL_IN_BLOCKS = PRE_POS_BLOCKS_EXPECTED_IN_DAYS(7);//Governance added from V17
   inline constexpr std::array GOVERNANCE_WALLET_ADDRESS =
   {
-    "bxcguQiBhYaDW5wAdPLSwRHA6saX1nCEYUF89SPKZfBY1BENdLQWjti59aEtAEgrVZjnCJEVFoCDrG1DCoz2HeeN2pxhxL9xa"sv, // hardfork v7-10
-    "bxcguQiBhYaDW5wAdPLSwRHA6saX1nCEYUF89SPKZfBY1BENdLQWjti59aEtAEgrVZjnCJEVFoCDrG1DCoz2HeeN2pxhxL9xa"sv,
+    "bxcguQiBhYaDW5wAdPLSwRHA6saX1nCEYUF89SPKZfBY1BENdLQWjti59aEtAEgrVZjnCJEVFoCDrG1DCoz2HeeN2pxhxL9xa"sv, // <V17
+    "bxdwQ4ruRpW9QTfBpStRAMNKgdt7Rr39UcThNZ7mwsfxH7StmykPe9ah1KgJL2LwEAgqRXHLvZYBm1aaUVR8mLtB1u3WauV6P"sv, // V17
   };
 
   inline constexpr auto UPTIME_PROOF_TOLERANCE = 5min; // How much an uptime proof timestamp can deviate from our timestamp before we refuse it
@@ -251,7 +251,7 @@ namespace config
   inline constexpr auto UPTIME_PROOF_CHECK_INTERVAL = 30s; // How frequently to check whether we need to broadcast a proof
   inline constexpr auto UPTIME_PROOF_FREQUENCY = 1h; // How often to send proofs out to the network since the last proof we successfully sent.  (Approximately; this can be up to CHECK_INTERFACE/2 off in either direction).  The minimum accepted time between proofs is half of this.
   inline constexpr auto UPTIME_PROOF_VALIDITY = 2h + 5min; // The maximum time that we consider an uptime proof to be valid (i.e. after this time since the last proof we consider the SN to be down)
-  inline constexpr auto REACHABLE_MAX_FAILURE_VALIDITY = 5min; // If we don't hear any SS ping/beldexnet session test failures for more than this long then we start considering the SN as passing for the purpose of obligation testing until we get another test result.  This should be somewhat larger than SS/beldexnet's max re-test backoff (2min).
+  inline constexpr auto REACHABLE_MAX_FAILURE_VALIDITY = 5min; // If we don't hear any SS ping/belnet session test failures for more than this long then we start considering the SN as passing for the purpose of obligation testing until we get another test result.  This should be somewhat larger than SS/belnet's max re-test backoff (2min).
   // Hash domain separators
   inline constexpr std::string_view HASH_KEY_BULLETPROOF_EXPONENT = "bulletproof"sv;
   inline constexpr std::string_view HASH_KEY_RINGDB = "ringdsb\0"sv;
@@ -396,11 +396,7 @@ namespace cryptonote
     std::chrono::seconds UPTIME_PROOF_VALIDITY;
 
     inline constexpr std::string_view governance_wallet_address(int hard_fork_version) const {
-      const auto wallet_switch =
-        (NETWORK_TYPE == MAINNET || NETWORK_TYPE == FAKECHAIN)
-        ? network_version_11_infinite_staking
-        : network_version_10_bulletproofs;
-      return GOVERNANCE_WALLET_ADDRESS[hard_fork_version >= wallet_switch ? 1 : 0];
+      return GOVERNANCE_WALLET_ADDRESS[hard_fork_version >= cryptonote::network_version_17_POS ? 1 : 0];
     }
   };
   inline constexpr network_config mainnet_config{

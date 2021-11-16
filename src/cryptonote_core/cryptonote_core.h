@@ -999,8 +999,8 @@ namespace cryptonote
       */
      void flush_invalid_blocks();
 
-     /// Time point at which the storage server and beldexnet last pinged us
-     std::atomic<time_t> m_last_storage_server_ping, m_last_beldexnet_ping;
+     /// Time point at which the storage server and belnet last pinged us
+     std::atomic<time_t> m_last_storage_server_ping, m_last_belnet_ping;
      std::atomic<uint16_t> m_storage_https_port, m_storage_omq_port;
 
      uint32_t mn_public_ip() const { return m_mn_public_ip; }
@@ -1143,9 +1143,9 @@ namespace cryptonote
      std::unordered_map<crypto::x25519_public_key, oxenmq::AuthLevel>& _omq_auth_level_map() { return m_omq_auth; }
      oxenmq::TaggedThreadID const &POS_thread_id() const { return *m_POS_thread_id; }
 
-     /// Master Node's storage server and beldexnet version
+     /// Master Node's storage server and belnet version
      std::array<uint16_t, 3> ss_version;
-     std::array<uint16_t, 3> beldexnet_version;
+     std::array<uint16_t, 3> belnet_version;
 
  private:
 
