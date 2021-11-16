@@ -242,7 +242,7 @@ namespace config
   inline constexpr uint64_t GOVERNANCE_REWARD_INTERVAL_IN_BLOCKS = PRE_POS_BLOCKS_EXPECTED_IN_DAYS(7);//Governance added from V17
   inline constexpr std::array GOVERNANCE_WALLET_ADDRESS =
   {
-    "bxdwQ4ruRpW9QTfBpStRAMNKgdt7Rr39UcThNZ7mwsfxH7StmykPe9ah1KgJL2LwEAgqRXHLvZYBm1aaUVR8mLtB1u3WauV6P"sv, 
+    "bxcguQiBhYaDW5wAdPLSwRHA6saX1nCEYUF89SPKZfBY1BENdLQWjti59aEtAEgrVZjnCJEVFoCDrG1DCoz2HeeN2pxhxL9xa"sv, // <V17
     "bxdwQ4ruRpW9QTfBpStRAMNKgdt7Rr39UcThNZ7mwsfxH7StmykPe9ah1KgJL2LwEAgqRXHLvZYBm1aaUVR8mLtB1u3WauV6P"sv, // V17
   };
 
@@ -396,11 +396,7 @@ namespace cryptonote
     std::chrono::seconds UPTIME_PROOF_VALIDITY;
 
     inline constexpr std::string_view governance_wallet_address(int hard_fork_version) const {
-      const auto wallet_switch =
-        (NETWORK_TYPE == MAINNET || NETWORK_TYPE == FAKECHAIN)
-        ? network_version_11_infinite_staking
-        : network_version_10_bulletproofs;
-      return GOVERNANCE_WALLET_ADDRESS[hard_fork_version >= wallet_switch ? 1 : 0];
+      return GOVERNANCE_WALLET_ADDRESS[hard_fork_version >= cryptonote::network_version_17_POS ? 1 : 0];
     }
   };
   inline constexpr network_config mainnet_config{
