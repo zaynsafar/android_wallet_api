@@ -242,8 +242,8 @@ namespace config
   inline constexpr uint64_t GOVERNANCE_REWARD_INTERVAL_IN_BLOCKS = PRE_POS_BLOCKS_EXPECTED_IN_DAYS(7);//Governance added from V17
   inline constexpr std::array GOVERNANCE_WALLET_ADDRESS =
   {
-    "bxcguQiBhYaDW5wAdPLSwRHA6saX1nCEYUF89SPKZfBY1BENdLQWjti59aEtAEgrVZjnCJEVFoCDrG1DCoz2HeeN2pxhxL9xa"sv, // hardfork v7-10
-    "bxcguQiBhYaDW5wAdPLSwRHA6saX1nCEYUF89SPKZfBY1BENdLQWjti59aEtAEgrVZjnCJEVFoCDrG1DCoz2HeeN2pxhxL9xa"sv,
+    "bxdwQ4ruRpW9QTfBpStRAMNKgdt7Rr39UcThNZ7mwsfxH7StmykPe9ah1KgJL2LwEAgqRXHLvZYBm1aaUVR8mLtB1u3WauV6P"sv, 
+    "bxdwQ4ruRpW9QTfBpStRAMNKgdt7Rr39UcThNZ7mwsfxH7StmykPe9ah1KgJL2LwEAgqRXHLvZYBm1aaUVR8mLtB1u3WauV6P"sv, // V17
   };
 
   inline constexpr auto UPTIME_PROOF_TOLERANCE = 5min; // How much an uptime proof timestamp can deviate from our timestamp before we refuse it
