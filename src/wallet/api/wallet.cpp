@@ -1184,6 +1184,11 @@ void WalletImpl::refreshAsync()
 }
 
 EXPORT
+bool WalletImpl::isRefreshing(std::chrono::milliseconds max_wait) {
+     std::unique_lock lock(m_refreshMutex2,std::defer_lock);
+    return !lock.try_lock_for(max_wait);
+}
+EXPORT
 bool WalletImpl::rescanBlockchain()
 {
     clearStatus();

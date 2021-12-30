@@ -127,6 +127,7 @@ public:
     bool refresh() override;
     void refreshAsync() override;
     bool rescanBlockchain() override;
+    bool isRefreshing(std::chrono::milliseconds max_wait = std::chrono::milliseconds{50}) override;
     void rescanBlockchainAsync() override;    
     void setAutoRefreshInterval(int millis) override;
     int autoRefreshInterval() const override;
