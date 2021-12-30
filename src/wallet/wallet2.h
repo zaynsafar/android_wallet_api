@@ -1068,7 +1068,10 @@ private:
     const transfer_details &get_transfer_details(size_t idx) const;
 
     void get_hard_fork_info (uint8_t version, uint64_t &earliest_height) const;
-    std::optional<uint8_t> get_hard_fork_version() const { return m_node_rpc_proxy.get_hardfork_version(); }
+    std::optional<uint8_t> get_hard_fork_version() const {
+        return  ::cryptonote::network_version_17_POS;
+    }
+
     bool use_fork_rules(uint8_t version, uint64_t early_blocks = 0) const;
 
     const fs::path& get_wallet_file() const;

@@ -109,7 +109,7 @@ bool PendingTransactionImpl::commit(std::string_view filename_, bool overwrite, 
             throw std::runtime_error("Not enough signers to send multisig transaction");
         }
 
-        m_wallet.pauseRefresh();
+       // m_wallet.pauseRefresh();
 
         const bool tx_cold_signed = m_wallet.m_wallet->get_account().get_device().has_tx_cold_sign();
         if (tx_cold_signed){
@@ -163,12 +163,12 @@ uint64_t PendingTransactionImpl::amount() const
         for (const auto &dest : ptx.dests) {
             result += dest.amount;
         }
-        service_nodes::staking_components sc;
+        master_nodes::staking_components sc;
         uint64_t height = m_wallet.blockChainHeight();
         std::optional<uint8_t> hf_version = m_wallet.hardForkVersion();
         if (hf_version)
         {
-          if (service_nodes::tx_get_staking_components_and_amounts(static_cast<cryptonote::network_type>(m_wallet.nettype()), *hf_version, ptx.tx, height, &sc)
+          if (master_nodes::tx_get_staking_components_and_amounts(static_cast<cryptonote::network_type>(m_wallet.nettype()), *hf_version, ptx.tx, height, &sc)
           && sc.transferred > 0)
             result = sc.transferred;
         }

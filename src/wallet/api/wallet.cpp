@@ -51,6 +51,7 @@
 #include <sstream>
 #include <unordered_map>
 #include <thread>
+#include <mutex>
 
 using namespace cryptonote;
 
@@ -1064,7 +1065,9 @@ uint64_t WalletImpl::balance(uint32_t accountIndex) const
 EXPORT
 uint64_t WalletImpl::unlockedBalance(uint32_t accountIndex) const
 {
-    return m_wallet->unlocked_balance(accountIndex, false);
+    uint64_t blocks_to_unlock, time_to_unlock;
+    std::optional<uint8_t> hf_version = m_wallet->get_hard_fork_version();
+    return m_wallet->unlocked_balance(accountIndex, false ,&blocks_to_unlock,&time_to_unlock,*hf_version);
 }
 
 EXPORT
@@ -1596,33 +1599,6 @@ PendingTransaction *WalletImpl::createTransactionMultDest(const std::vector<std:
               setStatusError(tools::ERR_MSG_NETWORK_VERSION_QUERY_FAILED);
               return transaction;
             }
-        }
-        if (error) {
-            break;
-        }
-        if (!extra_nonce.empty() && !add_extra_nonce_to_tx_extra(extra, extra_nonce)) {
-            setStatusError(tr("failed to set up payment id, though it was decoded correctly"));
-            break;
-        }
-        try {
-            std::optional<uint8_t> hf_version = m_wallet->get_hard_fork_version();
-            if (!hf_version)
-            {
-              setStatusError(tools::ERR_MSG_NETWORK_VERSION_QUERY_FAILED);
-              return transaction;
-            }
-
-            if (amount) {
-                beldex_construct_tx_params tx_params = tools::wallet2::construct_params(*hf_version, txtype::standard, priority);
-                transaction->m_pending_tx = m_wallet->create_transactions_2(dsts, CRYPTONOTE_DEFAULT_TX_MIXIN, 0 /* unlock_time */,
-                                                                            priority,
-                                                                            extra, subaddr_account, subaddr_indices, tx_params);
-            } else {
-                transaction->m_pending_tx = m_wallet->create_transactions_all(0, info.address, info.is_subaddress, 1, CRYPTONOTE_DEFAULT_TX_MIXIN, 0 /* unlock_time */,
-                                                                              priority,
-                                                                              extra, subaddr_account, subaddr_indices);
-            }
-            pendingTxPostProcess(transaction);
 
             if (amount) {
                 beldex_construct_tx_params tx_params = tools::wallet2::construct_params(*hf_version, txtype::standard, priority);
@@ -2453,7 +2429,7 @@ std::optional<uint8_t> WalletImpl::hardForkVersion() const
 EXPORT
 bool WalletImpl::useForkRules(uint8_t version, int64_t early_blocks) const
 {
-    return m_wallet->use_fork_rules(version,early_blocks);
+    return m_wallet->use_fork_rules(version=17,early_blocks);
 }
 
 EXPORT
