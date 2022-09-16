@@ -19,9 +19,9 @@ set -o xtrace  # Don't start tracing until *after* we write the ssh key
 
 chmod 600 ssh_key
 
-branch_or_tag=${DRONE_BRANCH:-${DRONE_TAG:-unknown}}
+branch_or_tag=/Beldex/andorid-wallet/
 
-upload_to="beldex.rocks/${DRONE_REPO// /_}/${branch_or_tag// /_}"
+upload_to="build-android/${branch_or_tag// /_}"
 
 tmpdir=android-deps-${DRONE_COMMIT}
 mkdir -p $tmpdir/include $tmpdir/lib
@@ -53,7 +53,9 @@ for p in "${upload_dirs[@]}"; do
 -mkdir $dir_tmp"
 done
 
-sftp -i ssh_key -b - -o StrictHostKeyChecking=off drone@beldex.rocks <<SFTP
+apt-get install ssh -y
+
+sftp -i ssh_key -b - -o StrictHostKeyChecking=off ubuntu@build.beldex.io <<SFTP
 $mkdirs
 put $filename $upload_to
 SFTP
