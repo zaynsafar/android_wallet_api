@@ -1,6 +1,6 @@
 {
    "kind": "pipeline",
-   "name": "Android wallet_api",
+   "name": "Android_wallet_api",
    "platform": {
       "arch": "amd64"
    },
