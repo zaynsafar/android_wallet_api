@@ -39,7 +39,7 @@ for android_abi in "$@"; do
 done
 
 filename=android-deps-${DRONE_COMMIT}.zip
-XZ_OPT="--threads=6" tar --dereference -cJvf $filename $tmpdir
+# XZ_OPT="--threads=6" tar --dereference -cJvf $filename $tmpdir
 
 # sftp doesn't have any equivalent to mkdir -p, so we have to split the above up into a chain of
 # -mkdir a/, -mkdir a/b/, -mkdir a/b/c/, ... commands.  The leading `-` allows the command to fail
