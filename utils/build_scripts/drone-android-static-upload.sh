@@ -38,7 +38,7 @@ for android_abi in "$@"; do
     ln -s ../../../build-${android_abi}/src/wallet/api/libwallet_merged.a $tmpdir/lib/${android_abi}/libwallet_api.a
 done
 
-filename=android-deps-${DRONE_COMMIT}.tar.xz
+filename=android-deps-${DRONE_COMMIT}.zip
 XZ_OPT="--threads=6" tar --dereference -cJvf $filename $tmpdir
 
 # sftp doesn't have any equivalent to mkdir -p, so we have to split the above up into a chain of
