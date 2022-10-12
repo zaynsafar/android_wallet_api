@@ -56,7 +56,3 @@ jobs:
          local_path: 'build/bin/*.zip'
          remote_path: '/home/ubuntu/'
          sftpArgs: '-o ConnectTimeout=5'
-
-
-    
-   
