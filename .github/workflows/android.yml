@@ -17,7 +17,8 @@ jobs:
     - name: Install depedencies
       run: |
          sudo apt-get update
-         sudo apt install -y g++ git ninja-build ccache tar xz-utils google-android-ndk-installer autoconf automake make qttools5-dev file libtool gperf pkg-config patch openssh-client
+         sudo apt install clang
+         sudo apt install -y g++ git ninja ccache tar xz-utils google-android-ndk-installer autoconf automake make qttools5-dev file libtool gperf pkg-config patch openssh-client
          git submodule update --init --recursive
          
     - name: Setup cmake
